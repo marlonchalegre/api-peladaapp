@@ -9,9 +9,9 @@
 
   See also https://github.com/stuartsierra/component.repl"
   (:require
-   [api-100folego.components :as core.components]
-   [api-100folego.core]
-   [api-100folego.server :as server]
+   [api-peladaapp.components :as core.components]
+   [api-peladaapp.core]
+   [api-peladaapp.server :as server]
    [clojure.tools.namespace.repl :as repl]
    [com.stuartsierra.component :as component]
    [com.stuartsierra.component.repl :refer [set-init]]))

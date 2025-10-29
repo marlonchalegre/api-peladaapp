@@ -1,4 +1,4 @@
-# Multi-stage build for api-100folego
+# Multi-stage build for api-peladaapp
 
 # --- Builder image: builds the uberjar
 FROM clojure:temurin-21-lein AS builder

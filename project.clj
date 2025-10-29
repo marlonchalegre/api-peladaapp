@@ -1,4 +1,4 @@
-(defproject api-100folego "0.1.0-SNAPSHOT"
+(defproject api-peladaapp "0.1.0-SNAPSHOT"
   :description "FIXME: write description"
   :url "http://example.com/FIXME"
   :license {:name "MIT"
@@ -22,15 +22,15 @@
   :plugins [[lein-ancient "1.0.0-RC3"]
             [lein-ring "0.12.6"]
             [migratus-lein "0.7.3"]]
-  :repl-options {:init-ns api-100folego.core}
+  :repl-options {:init-ns api-peladaapp.core}
   :test-paths ["test" "test/unit" "test/integration"]
-  :main ^:skip-aot api-100folego.core
+  :main ^:skip-aot api-peladaapp.core
   :migratus {:store :database
              ;; Use classpath path for migrations
              :migration-dir "migrations"
              :init-script  "migrations/init.sql"
              :db {:dbtype "sqlite"
-                  :dbname "100folego.db"}}
+                  :dbname "peladaapp.db"}}
   :profiles {:dev {:plugins      [[com.github.clojure-lsp/lein-clojure-lsp "1.4.9"]]
                    :dependencies [[com.stuartsierra/component.repl "1.0.0"]
                                   [prismatic/schema-generators "0.1.5"]
@@ -39,7 +39,7 @@
                    :source-paths ["dev"]
                    :repl-options {:init-ns dev}}
             :test {:dependencies [[ring/ring-mock "0.4.0"]]}}
-  :ring {:handler api-100folego.server/app
+  :ring {:handler api-peladaapp.server/app
          :port 8000
          :reload-paths ["src"]}
   :target-path "target/%s")

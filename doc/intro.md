@@ -1,3 +1,3 @@
-# Introduction to api-100folego
+# Introduction to api-peladaapp
 
 TODO: write [great documentation](http://jacobian.org/writing/what-to-write/)

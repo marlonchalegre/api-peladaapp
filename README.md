@@ -1,4 +1,4 @@
-# ⚽️ 100Fôlego API
+# ⚽️ PeladaApp API
 
 A Clojure HTTP API to organize casual soccer (pelada) with friends: manage users/players, organizations, game days (peladas), teams, round‑robin matches with constraints, substitutions, and post‑game voting with normalized scores. Built on Ring/Compojure, next.jdbc (SQLite), and Buddy Auth.
 
@@ -27,23 +27,23 @@ lein test
 # Start dev REPL (optional)
 lein repl
 
-# Run the app (AOT main: api-100folego.core)
+# Run the app (AOT main: api-peladaapp.core)
 lein run
 ```
 
 - Docker:
 ```bash
 # Build
-docker build -t api-100folego:latest .
+docker build -t api-peladaapp:latest .
 
 # Run (ephemeral DB inside the container)
-docker run --rm -p 8080:8080 api-100folego:latest
+docker run --rm -p 8080:8080 api-peladaapp:latest
 
 # Run with persistent SQLite DB + custom config
 docker run --rm -p 8080:8080 \
-  -v "$(pwd)/100folego.db:/app/100folego.db" \
+  -v "$(pwd)/peladaapp.db:/app/peladaapp.db" \
   -v "$(pwd)/resources/config.json:/app/resources/config.json:ro" \
-  api-100folego:latest
+  api-peladaapp:latest
 ```
 
 ---
@@ -96,7 +96,7 @@ curl -i http://localhost:8080/auth/login -X POST \
 ```
 - Keys:
   - **jwt-secret**: Symmetric key for JWT signing (HS512).
-- DB: SQLite file `100folego.db` in working dir; handled by HikariCP via `components.clj`.
+- DB: SQLite file `peladaapp.db` in working dir; handled by HikariCP via `components.clj`.
 - Port: `8080` (see `components.clj`).
 
 Override in Docker by bind mounting updated files into `/app` (see Docker run example above).
@@ -116,12 +116,12 @@ Override in Docker by bind mounting updated files into `/app` (see Docker run ex
 /                      # Project root
 ├─ project.clj         # Leiningen config (deps, main, test paths, migratus)
 ├─ pom.xml             # Maven interop (generated/maintained for IDEs if needed)
-├─ 100folego.db        # SQLite DB file (local dev; can be regenerated)
+├─ peladaapp.db        # SQLite DB file (local dev; can be regenerated)
 ├─ resources/
 │  ├─ config.json      # App configuration (JWT secret, etc.)
 │  └─ migrations/
 │     └─ 20251028150000-init_all.up.sql  # Consolidated schema for all tables
-├─ src/api_100folego/
+├─ src/api_peladaapp/
 │  ├─ core.clj         # Entry point (-main) starting the Component system
 │  ├─ components.clj   # System wiring: DB, App, WebServer (Jetty on :8080)
 │  ├─ server.clj       # Ring app stack (middleware) and `app`
@@ -140,7 +140,7 @@ Override in Docker by bind mounting updated files into `/app` (see Docker run ex
 ├─ test/
 │  ├─ unit/            # Unit tests (pure functions, small scope)
 │  ├─ integration/     # Integration tests (end-to-end HTTP flows)
-│  └─ api_100folego/test_helpers.clj  # Test utilities (DB reset, auth, decode)
+│  └─ api_peladaapp/test_helpers.clj  # Test utilities (DB reset, auth, decode)
 ├─ Dockerfile          # Multi-stage build (uberjar + slim runtime)
 ├─ CHANGELOG.md        # Changes over time
 ├─ LICENSE             # MIT License
@@ -195,7 +195,7 @@ All `/api/**` require `Authorization: Token <jwt>`.
 ---
 
 ### Development Tips
-- Clean DB during dev: delete `100folego.db` and restart; tests recreate schema directly from the consolidated SQL.
+- Clean DB during dev: delete `peladaapp.db` and restart; tests recreate schema directly from the consolidated SQL.
 - Test helpers handle JWT auth and tolerant JSON decoding.
 - Middleware order is important; see `server.clj` for final working order.
 
