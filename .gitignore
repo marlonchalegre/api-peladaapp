@@ -1,0 +1,47 @@
+/target
+/classes
+/checkouts
+
+# Maven / Leiningen artifacts
+profiles.clj
+pom.xml
+pom.xml.asc
+*.jar
+*.class
+/.lein-*
+/.nrepl-port
+/.prepl-port
+/.cpcache
+/.bb-cache
+/.clj-kondo/
+/.lsp/
+/.calva/
+/.shadow-cljs/
+
+# Editor and IDE directories
+.idea/
+.vscode/
+.project
+.classpath
+.settings/
+.direnv/
+.cursor/
+
+# OS-generated files
+.DS_Store
+Icon?
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+
+# REPL and tooling history
+/.nrepl-history
+/.clojure-repl-history
+/.cider-repl-history
+
+# Build / temp outputs
+out/
+tmp/
+/.cljs_node_repl
+

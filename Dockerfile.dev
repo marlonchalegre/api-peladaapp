@@ -1,0 +1,17 @@
+# Backend development Dockerfile with live reload via lein-ring
+FROM clojure:temurin-21-lein
+
+WORKDIR /app
+
+# Cache deps
+COPY project.clj ./
+RUN lein deps
+
+# Copy source
+COPY . .
+
+# Expose backend port
+EXPOSE 8000
+
+# Run Ring server with auto-reload
+CMD ["lein", "ring", "server-headless"]
