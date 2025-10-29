@@ -44,4 +44,4 @@ ehthumbs.db
 out/
 tmp/
 /.cljs_node_repl
-
+*.db
