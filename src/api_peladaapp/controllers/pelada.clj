@@ -72,4 +72,4 @@
 (s/defn close-pelada :- s/Int
   [pelada-id :- s/Int db]
   (db.match/finish-all-by-pelada pelada-id db)
-  (db.pelada/update-pelada pelada-id {:status "closed"} db))
+  (db.pelada/update-pelada pelada-id {:status "closed" :closed_at (java.time.Instant/now)} db))

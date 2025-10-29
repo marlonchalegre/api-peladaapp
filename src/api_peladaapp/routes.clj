@@ -1,6 +1,7 @@
 (ns api-peladaapp.routes
   (:require
    [api-peladaapp.handlers.auth :as auth]
+   [api-peladaapp.handlers.admin :as handler.admin]
    [api-peladaapp.handlers.match :as handler.match]
    [api-peladaapp.handlers.organization :as handler.organization]
    [api-peladaapp.handlers.pelada :as handler.pelada]
@@ -19,7 +20,8 @@
     (GET "/users" [] handler.user/list-all)
     (GET "/user/:id" [] handler.user/get-by-id)
     (DELETE "/user/:id" [] handler.user/delete)
-    (PUT "/user/:id" [] handler.user/update-by-id)))
+    (PUT "/user/:id" [] handler.user/update-by-id)
+    (PUT "/user/:id/profile" [] handler.user/update-profile)))
 
 (defroutes api-peladas
   (context "/api" []
@@ -77,10 +79,20 @@
     (PUT "/organizations/:id" [] handler.organization/update-by-id)
     (DELETE "/organizations/:id" [] handler.organization/delete)))
 
+(defroutes api-admins
+  (context "/api" []
+    (POST "/organizations/:organization_id/admins" [] handler.admin/add-admin)
+    (GET "/organizations/:organization_id/admins" [] handler.admin/list-by-organization)
+    (DELETE "/organizations/:organization_id/admins/:user_id" [] handler.admin/remove-admin-by-org-and-user)
+    (GET "/users/:user_id/admin-organizations" [] handler.admin/list-by-user)
+    (GET "/organizations/:organization_id/users/:user_id/is-admin" [] handler.admin/check-is-admin)))
+
 (defroutes api-votes
   (context "/api" []
     (POST "/votes" [] handler.vote/cast)
+    (POST "/peladas/:pelada_id/votes/batch" [] handler.vote/batch-cast)
     (GET "/peladas/:pelada_id/votes" [] handler.vote/list-by-pelada)
+    (GET "/peladas/:pelada_id/voters/:voter_id/voting-info" [] handler.vote/voting-info)
     (GET "/peladas/:pelada_id/players/:player_id/normalized-score" [] handler.vote/normalize-score)))
 
 (defroutes api-auth
@@ -108,6 +120,7 @@
                          api-matches
                          api-substitutions
                          api-organizations
+                         api-admins
                          api-players
                          api-votes
                          gen-routes))

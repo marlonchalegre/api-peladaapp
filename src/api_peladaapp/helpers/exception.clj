@@ -1,6 +1,6 @@
 (ns api-peladaapp.helpers.exception
   (:require
-   [api-peladaapp.helpers.responses :refer [bad-request server-error not-found]]))
+   [api-peladaapp.helpers.responses :refer [bad-request server-error not-found forbidden]]))
 
 (defn- exception->map [^Throwable e]
   (let [sw (java.io.StringWriter.)
@@ -18,6 +18,8 @@
       :not-found           (not-found (:message data))
       :invalid-credentials (bad-request (:message data))
       :bad-request         (bad-request (:message data))
+      :validation-error    (bad-request (:message data))
+      :forbidden           (forbidden (:message data))
       (server-error (exception->map e)))))
 ; NOTE: Full exception details are returned for easier debugging in dev.
 ; Do NOT keep this behavior in production.

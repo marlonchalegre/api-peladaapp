@@ -68,3 +68,24 @@
       (responses/ok (controller.user/list-users db)))
     (catch Exception e
       (exception/api-exception-handler e))))
+
+(defn- update-profile-action [request]
+  (let [user-id (-> request :params :id Integer/parseInt)
+        authenticated-user-id (-> request :identity :id)
+        body (-> request :body)
+        db (-> request :database)]
+    ;; Authorization check: user can only update their own profile
+    (when (not= user-id authenticated-user-id)
+      (throw (ex-info nil {:type :forbidden :message "You can only update your own profile"})))
+    ;; The controller will handle checking if user exists
+    (-> body
+        adapter.user/in->profile-update
+        (controller.user/update-user-profile user-id db)
+        adapter.user/model->out)))
+
+(defn update-profile [request]
+  (try (-> request
+           update-profile-action
+           responses/updated)
+       (catch Exception e
+         (exception/api-exception-handler e))))

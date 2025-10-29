@@ -7,4 +7,5 @@
    :scheduled_at s/Any
    :num_teams (s/maybe s/Int)
    :players_per_team (s/maybe s/Int)
-   :status (s/maybe s/Str)})
+   :status (s/maybe s/Str)
+   :closed_at (s/maybe s/Any)})

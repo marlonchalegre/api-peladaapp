@@ -34,3 +34,38 @@
     (let [resp (app (-> (mock/request :delete "/api/teams/1/players") (mock/json-body {:player_id 1}) auth))]
       (is (= 200 (:status resp)))
       (is (= {} (th/decode-body resp))))))
+
+(deftest cannot-add-player-from-different-organization
+  (let [{:keys [app db-file]} (th/make-app!)
+        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+        token (th/register-and-login! app {:name "U" :email "u@e.com" :password "p"})
+        auth (th/auth-header token)]
+    ;; Create two organizations
+    (sql/insert! ds :organizations {:name "Org1"})
+    (sql/insert! ds :organizations {:name "Org2"})
+    ;; Create pelada for Org1
+    (sql/insert! ds :peladas {:organization_id 1 :scheduled_at "2025-10-28"})
+    ;; Create users
+    (sql/insert! ds :users {:name "Ana" :email "ana@example.com" :password "p"})
+    (sql/insert! ds :users {:name "Bob" :email "bob@example.com" :password "p"})
+    ;; Ana is in Org1, Bob is in Org2
+    (sql/insert! ds :organizationplayers {:organization_id 1 :user_id 2})
+    (sql/insert! ds :organizationplayers {:organization_id 2 :user_id 3})
+    ;; Create team for pelada (which is in Org1)
+    (let [resp (app (-> (mock/request :post "/api/teams")
+                        (mock/json-body {:pelada_id 1 :name "Team A"})
+                        auth))]
+      (is (= 201 (:status resp))))
+    ;; Try to add Ana (player_id 1, from Org1) - should succeed
+    (let [resp (app (-> (mock/request :post "/api/teams/1/players")
+                        (mock/json-body {:player_id 1})
+                        auth))]
+      (is (= 201 (:status resp))))
+    ;; Try to add Bob (player_id 2, from Org2) - should fail
+    (let [resp (app (-> (mock/request :post "/api/teams/1/players")
+                        (mock/json-body {:player_id 2})
+                        auth))]
+      (is (= 400 (:status resp)))
+      (let [body (th/decode-body resp)]
+        (is (contains? body :message))
+        (is (= "Player does not belong to the pelada's organization" (:message body)))))))

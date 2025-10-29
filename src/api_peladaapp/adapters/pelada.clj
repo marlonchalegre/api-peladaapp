@@ -11,7 +11,7 @@
     status (assoc :status status)))
 
 (s/defn model->out [pelada]
-  (some-> pelada (select-keys [:id :organization_id :scheduled_at :num_teams :players_per_team :status])))
+  (some-> pelada (select-keys [:id :organization_id :scheduled_at :num_teams :players_per_team :status :closed_at])))
 
 (s/defn db->model [pelada]
-  (some-> pelada misc/unamespace (select-keys [:id :organization_id :scheduled_at :num_teams :players_per_team :status])))
+  (some-> pelada misc/unamespace (select-keys [:id :organization_id :scheduled_at :num_teams :players_per_team :status :closed_at])))

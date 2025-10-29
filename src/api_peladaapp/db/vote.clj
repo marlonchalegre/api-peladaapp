@@ -21,3 +21,22 @@
   [pelada-id player-id db]
   (->> (sql/find-by-keys (db) :votes {:pelada_id pelada-id :target_id player-id})
        (map adapter.vote/db->model)))
+
+(s/defn list-votes-by-voter :- [s/Any]
+  "Get all votes cast by a specific voter in a pelada."
+  [pelada-id voter-id db]
+  (->> (sql/find-by-keys (db) :votes {:pelada_id pelada-id :voter_id voter-id})
+       (map adapter.vote/db->model)))
+
+(s/defn has-voter-voted? :- s/Bool
+  "Check if a voter has cast any votes in a pelada."
+  [pelada-id voter-id db]
+  (-> (sql/find-by-keys (db) :votes {:pelada_id pelada-id :voter_id voter-id})
+      seq
+      boolean))
+
+(s/defn delete-votes-by-voter :- s/Int
+  "Delete all votes by a voter in a pelada (for re-voting)."
+  [pelada-id voter-id db]
+  (-> (sql/delete! (db) :votes {:pelada_id pelada-id :voter_id voter-id})
+      affected-rows-count))

@@ -12,6 +12,22 @@
          (created (controller.vote/cast-vote vote db)))
        (catch Exception e (exception/api-exception-handler e))))
 
+(defn batch-cast [request]
+  (try (let [db (:database request)
+             pelada-id (Integer/parseInt (str (get-in request [:params :pelada_id])))
+             body (:body request)
+             voter-id (:voter_id body)
+             votes (:votes body)]
+         (ok (controller.vote/batch-cast-votes pelada-id voter-id votes db)))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn voting-info [request]
+  (try (let [db (:database request)
+             pelada-id (Integer/parseInt (str (get-in request [:params :pelada_id])))
+             voter-id (Integer/parseInt (str (get-in request [:params :voter_id])))]
+         (ok (controller.vote/get-voting-info pelada-id voter-id db)))
+       (catch Exception e (exception/api-exception-handler e))))
+
 (defn list-by-pelada [request]
   (try (let [db (:database request)
              pelada-id (Integer/parseInt (str (get-in request [:params :pelada_id])))]

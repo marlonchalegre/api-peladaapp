@@ -14,8 +14,10 @@
         find-called (atom nil)]
     (with-redefs [db.user/find-user-by-email (fn [_ _] (reset! find-called true) user)
                   config/get-key (fn [_] "dev-secret")]
-      (let [token (controllers.auth/authenticate {:email (:email user) :password plain} db)]
-        (is (string? token))
+      (let [result (controllers.auth/authenticate {:email (:email user) :password plain} db)]
+        (is (map? result))
+        (is (string? (:token result)))
+        (is (= user (:user result)))
         (is @find-called)))))
 
 (deftest authenticate-invalid-password

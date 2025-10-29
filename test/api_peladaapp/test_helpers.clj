@@ -15,7 +15,8 @@
 (def migration-files
   ["resources/migrations/20251028150000-init_all.up.sql"
    "resources/migrations/20251028160000-match_events.up.sql"
-   "resources/migrations/20251029183000-match_lineups.up.sql"])
+   "resources/migrations/20251029183000-match_lineups.up.sql"
+   "resources/migrations/20251029200000-organization_admins.up.sql"])
 
 (defn migrate! [db-file]
   (let [ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]

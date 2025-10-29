@@ -12,10 +12,26 @@
   (:gen-class))
 
 (defn on-error
-  [_request _value]
-  {:status 403
-   :headers {}
-   :body {:error "forbidden"}})
+  "Handle authentication and authorization errors.
+  Returns 401 for authentication failures (missing/invalid token)
+  and 403 for authorization failures (valid token but insufficient permissions)."
+  [_request value]
+  (let [error-type (or (:type value) :forbidden)
+        status (case error-type
+                 :authentication 401
+                 :unauthorized 401
+                 :forbidden 403
+                 403)
+        message (or (:message value) 
+                    (case error-type
+                      :authentication "Authentication required"
+                      :unauthorized "Authentication required"
+                      :forbidden "Access forbidden"
+                      "Access denied"))]
+    {:status status
+     :headers {"Content-Type" "application/json; charset=utf-8"}
+     :body {:error message
+            :type (name error-type)}}))
 
 ;; In dev (lein-ring), we don't start the Component system, so we must
 ;; initialize the database and inject it into every request ourselves.
@@ -68,4 +84,4 @@
            (wrap-access-rules $ {:rules routes/access-rules :on-error on-error})
            (wrap-authorization $ auth/auth-backend)
            (wrap-authentication $ auth/auth-backend)
-           (wrap-json-response $)))
+           (wrap-json-response $ {:charset "utf-8"})))

@@ -7,8 +7,8 @@
    [buddy.hashers :as hashers]
    [schema.core :as s]))
 
-(s/defn authenticate :- s/Str
-  "Authenticate a user by email/password and return a JWT token."
+(s/defn authenticate
+  "Authenticate a user by email/password and return a JWT token with user info."
   [{:keys [email password]} :- models.credential/Credential
    db]
   (let [user-db (db.user/find-user-by-email email db)
@@ -18,4 +18,5 @@
       (throw (ex-info nil {:type :not-found :message "User not found"})))
     (when (or (nil? password) (nil? db-pass) (not (hashers/check password db-pass)))
       (throw (ex-info nil {:type :invalid-credentials :message "Invalid credentials"})))
-    (logic.user/build-token user-db secret)))
+    {:token (logic.user/build-token user-db secret)
+     :user user-db}))

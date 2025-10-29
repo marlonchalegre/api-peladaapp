@@ -29,27 +29,37 @@
   [request]
   (let [body (-> request :body)
         db (-> request :database)]
-    (try (-> body
-             adapters.credential/in->model
-             (controllers.auth/authenticate db)
-             adapters.credential/->out
-             ok)
+    (try (let [{:keys [token user]} (-> body
+                                        adapters.credential/in->model
+                                        (controllers.auth/authenticate db))]
+           (-> (adapters.credential/->out token user)
+               ok))
          (catch Exception e
            (exception/api-exception-handler e)))))
 
 ;; Access Level Handlers
 
 (defn authenticated-access
-  "Check if request coming in is authenticated with a valid JWT token"
+  "Check if request coming in is authenticated with a valid JWT token.
+  Returns error with :authentication type if not authenticated."
   [request]
   (if (authenticated? request)
     true
-    (error "access not allowed")))
+    (error {:type :authentication 
+            :message "Authentication required. Please provide a valid token."})))
 
 (defn admin-access
-  "Check if request with JWT token has :is-admin? claim"
+  "Check if request with JWT token has :is-admin? claim.
+  Returns error with :forbidden type if user is authenticated but not admin."
   [request]
-  (if (and (:identity request)
-           (:is-admin? (:identity request)))
-    true
-    (error "requires admin access")))
+  (cond
+    (not (authenticated? request))
+    (error {:type :authentication
+            :message "Authentication required. Please provide a valid token."})
+    
+    (not (and (:identity request)
+              (:is-admin? (:identity request))))
+    (error {:type :forbidden
+            :message "Admin access required."})
+    
+    :else true))

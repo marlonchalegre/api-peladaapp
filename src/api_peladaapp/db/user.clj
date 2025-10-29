@@ -57,3 +57,18 @@
   [db]
   (->> (sql/query (db) ["select * from users"]) (map adapter.user/db->model)))
 
+(s/defn update-user-profile :- s/Int
+  "Update user profile (name, email, password only) in the database"
+  [id :- s/Int
+   user :- models.user/User
+   db]
+  ;; Only update allowed fields: name, email, password
+  (-> (sql/update! (db)
+                   :users
+                   (medley.core/assoc-some {} 
+                                           :name (:name user)
+                                           :email (:email user)
+                                           :password (:password user))
+                   {:id id})
+      affected-rows-count))
+

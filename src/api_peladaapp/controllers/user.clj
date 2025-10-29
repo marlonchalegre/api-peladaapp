@@ -50,3 +50,25 @@
 (s/defn list-users :- [models.user/User]
   [db]
   (map #(dissoc % :password) (db.user/list-users db)))
+
+(s/defn update-user-profile
+  "Update user profile - only allows updating name, email, and password. Score is protected."
+  [profile-data :- models.user/UserProfileUpdate
+   user-id :- s/Int
+   db]
+  (let [existing-user (db.user/find-user-by-id user-id db)]
+    (if (nil? existing-user)
+      (throw (ex-info nil {:type :not-found :message "User not found"}))
+      (let [;; Start with existing user
+            base-user existing-user
+            ;; Update with new data, only if provided
+            updated-user (cond-> base-user
+                           (:name profile-data) (assoc :name (:name profile-data))
+                           (:email profile-data) (assoc :email (:email profile-data))
+                           (:password profile-data) (assoc :password (:password profile-data)))
+            ;; Encrypt password if it was updated
+            final-user (if (:password profile-data)
+                        (logic.user/encrypt-password updated-user)
+                        updated-user)]
+        (db.user/update-user-profile user-id final-user db)
+        (db.user/find-user-by-id user-id db)))))

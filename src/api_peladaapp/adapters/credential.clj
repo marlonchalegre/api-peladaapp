@@ -9,5 +9,9 @@
    :password password})
 
 (s/defn ->out
-  [token]
-  {:token token})
+  "Convert token and user to output format"
+  ([token]
+   {:token token})
+  ([token user]
+   {:token token
+    :user (select-keys user [:id :name :email])}))

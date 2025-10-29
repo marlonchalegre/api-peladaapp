@@ -23,3 +23,11 @@
   (some-> user
           misc/unamespace
           (select-keys [:id :name :email :password])))
+
+(defn in->profile-update
+  "Convert input to profile update model - only allows name, email, password"
+  [{:keys [name email password]}]
+  (medley.core/assoc-some {}
+                          :name name
+                          :email email
+                          :password password))
