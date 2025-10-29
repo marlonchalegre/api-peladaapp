@@ -1,21 +1,43 @@
 (ns api-100folego.controllers.pelada
   (:require [api-100folego.db.match :as db.match]
+            [api-100folego.db.match-lineup :as db.match-lineup]
             [api-100folego.db.pelada :as db.pelada]
             [api-100folego.db.team :as db.team]
-            [api-100folego.db.match-lineup :as db.match-lineup]
-            [api-100folego.logic.schedule :as schedule]
+            [api-100folego.logic.pelada :as pelada.logic]
             [schema.core :as s]))
 
+(defn- auto-create-teams!
+  [pelada-id team-count db]
+  (when (pos? team-count)
+    (->> (range 1 (inc team-count))
+         (map (fn [index]
+                {:pelada_id pelada-id
+                 :name (str "Time " index)}))
+         (run! #(db.team/insert-team % db)))))
+
+(defn- fetch-team-ids
+  [pelada-id db]
+  (->> (db.team/list-pelada-teams pelada-id db)
+       (map :id)
+       vec))
+
+(defn- persist-match-plan!
+  [pelada-id match-plan db]
+  (->> (pelada.logic/match-plan->rows pelada-id match-plan)
+       (run! #(db.match/insert-match % db))))
+
+(defn- seed-lineups-from-teams!
+  [pelada-id db]
+  (->> (db.match/list-matches-by-pelada pelada-id db)
+       (map :id)
+       (run! #(db.match-lineup/ensure-seeded % db))))
+
 (s/defn create-pelada :- s/Int
-  "Create pelada and, if :num_teams is provided, auto-create teams named
-  'Time 1'..'Time N' bound to the pelada. Returns pelada id."
+  "Create pelada and optionally seed default teams. Returns pelada id."
   [pelada db]
-  (let [pelada-id (db.pelada/insert-pelada pelada db)
-        n (:num_teams pelada)]
-    (when (and n (pos? n))
-      (doseq [i (range 1 (inc n))]
-        (db.team/insert-team {:pelada_id pelada-id
-                              :name (str "Time " i)} db)))
+  (let [pelada-id (db.pelada/insert-pelada pelada db)]
+    (when-let [team-count (:num_teams pelada)]
+      (auto-create-teams! pelada-id team-count db))
     pelada-id))
 
 (s/defn get-pelada :- s/Any
@@ -35,37 +57,17 @@
   (db.pelada/list-peladas organization-id db))
 
 (s/defn begin-pelada :- {:matches-created s/Int}
-  "Generate matches based on teams in pelada and update status to running. If
-  :matches_per_team is provided, schedule that many per team under constraints."
+  "Generate matches for a pelada, transition it to running, and seed lineups."
   [pelada-id :- s/Int db & [opts]]
-  (let [matches_per_team (:matches_per_team (or opts {}))
+  (let [matches-per-team (:matches_per_team (or opts {}))
         pelada (db.pelada/get-pelada pelada-id db)
-        _ (when (not= "open" (:status pelada))
-            (throw (ex-info nil {:type :bad-request :message "Pelada already started or closed"})))
-        teams (db.team/list-pelada-teams pelada-id db)
-        team-ids (map :id teams)
-        _ (when (< (count team-ids) 2)
-            (throw (ex-info nil {:type :bad-request :message "At least two teams are required"})))
-        _ (when (odd? (count team-ids))
-            (throw (ex-info nil {:type :bad-request :message "Number of teams must be even"})))
-        pairs (if matches_per_team
-                (schedule/schedule-matches-with-limit team-ids matches_per_team)
-                (schedule/schedule-matches team-ids))
-        _ (doseq [[idx {:keys [home away]}] (map-indexed vector pairs)]
-            (db.match/insert-match {:pelada_id pelada-id
-                                    :home_team_id home
-                                    :away_team_id away
-                                    :sequence (inc idx)
-                                    :status "scheduled"
-                                    :home_score 0
-                                    :away_score 0}
-                                   db))
-        _ (db.pelada/update-pelada pelada-id {:status "running"} db)
-        ;; Seed per-match lineups from current team players
-        matches (db.match/list-matches-by-pelada pelada-id db)
-        _ (doseq [m matches]
-            (db.match-lineup/ensure-seeded (:id m) db))]
-    {:matches-created (count pairs)}))
+        team-ids (->> (fetch-team-ids pelada-id db)
+                      (pelada.logic/ensure-startable pelada))
+        match-plan (pelada.logic/schedule-matches-for-start team-ids matches-per-team)]
+    (persist-match-plan! pelada-id match-plan db)
+    (db.pelada/update-pelada pelada-id {:status "running"} db)
+    (seed-lineups-from-teams! pelada-id db)
+    {:matches-created (count match-plan)}))
 
 (s/defn close-pelada :- s/Int
   [pelada-id :- s/Int db]

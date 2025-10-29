@@ -2,6 +2,8 @@
   (:require [api-100folego.db.match :as db.match]
             [api-100folego.db.match-event :as db.match-event]
             [api-100folego.db.match-lineup :as db.match-lineup]
+            [api-100folego.logic.match :as match.logic]
+            [api-100folego.logic.match-event :as match-event.logic]
             [schema.core :as s]))
 
 (s/defn list-matches :- [s/Any]
@@ -9,19 +11,15 @@
   (db.match/list-matches-by-pelada pelada-id db))
 
 (s/defn update-score :- s/Int
-  [match-id :- s/Int {:keys [home_score away_score status]} db]
-  (when (or (and (some? home_score) (neg? home_score))
-            (and (some? away_score) (neg? away_score)))
-    (throw (ex-info "Negative score not allowed" {:type :bad-request :message "Placar não pode ser negativo" :home_score home_score :away_score away_score})))
-  (db.match/update-score match-id {:home_score home_score :away_score away_score :status status} db))
-
-(def ^:private allowed-event-types #{"assist" "goal" "own_goal"})
+  [match-id :- s/Int score-update db]
+  (let [validated-update (match.logic/build-score-update score-update)]
+    (db.match/update-score match-id validated-update db)))
 
 (s/defn create-event :- s/Int
   [match-id :- s/Int {:keys [player_id event_type]} db]
-  (if-not (allowed-event-types (str event_type))
-    (throw (ex-info "Invalid event type" {:type :bad-request :event_type event_type}))
-    (db.match-event/insert-event match-id player_id (str event_type) db)))
+  (let [player-id (match-event.logic/ensure-player-id player_id)
+        canonical-type (match-event.logic/canonical-type event_type)]
+    (db.match-event/insert-event match-id player-id canonical-type db)))
 
 (s/defn list-events-by-pelada :- [s/Any]
   [pelada-id :- s/Int db]
@@ -29,7 +27,9 @@
 
 (s/defn delete-last-event :- s/Int
   [match-id :- s/Int {:keys [player_id event_type]} db]
-  (db.match-event/delete-last-event match-id player_id (str event_type) db))
+  (let [player-id (match-event.logic/ensure-player-id player_id)
+        canonical-type (match-event.logic/canonical-type event_type)]
+    (db.match-event/delete-last-event match-id player-id canonical-type db)))
 
 (s/defn list-player-stats-by-pelada :- [s/Any]
   [pelada-id :- s/Int db]
