@@ -1,5 +1,5 @@
 (ns api-100folego.schedule-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is testing]]
             [api-100folego.logic.schedule :as schedule]))
 
 (deftest schedule-generates-balanced-sequence

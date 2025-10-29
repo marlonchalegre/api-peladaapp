@@ -1,5 +1,5 @@
 (ns api-100folego.peladas-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [ring.mock.request :as mock]
             [clojure.data.json :as json]
             [clojure.string :as str]
@@ -26,28 +26,27 @@
     ;; seed org
     (sql/insert! ds :organizations {:name "Club"})
     ;; auth
-    (let [register (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Ana" :email "ana@ex.com" :password "p"})))
-          login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "ana@ex.com" :password "p"})))
+    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Ana" :email "ana@ex.com" :password "p"})))
+    (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "ana@ex.com" :password "p"})))
           token (:token (decode-body login))
           auth (fn [req] (mock/header req "authorization" (str "Token " token)))]
       ;; create pelada (minimal payload)
-    (let [resp (app (-> (mock/request :post "/api/peladas")
-                        (mock/json-body {:organization_id 1})
-                        auth))
-          body (decode-body resp)]
-      (is (= 201 (:status resp))))
-    ;; create teams
-    (doseq [n ["A" "B" "C" "D"]]
-      (is (= 201 (:status (app (-> (mock/request :post "/api/teams")
-                                   (mock/json-body {:pelada_id 1 :name n})
-                                   auth))))))
-    ;; begin pelada (generate matches) - should now succeed with 4 teams
-    (let [resp (app (-> (mock/request :post "/api/peladas/1/begin") auth))
-          body (decode-body resp)]
-      (is (= 200 (:status resp)))
-      (is (pos? (:matches-created body))))
-    ;; list matches
-    (let [resp (app (-> (mock/request :get "/api/peladas/1/matches") auth))
-          body (decode-body resp)]
-      (is (= 200 (:status resp)))
-      (is (seq body))))))
+      (let [resp (app (-> (mock/request :post "/api/peladas")
+                          (mock/json-body {:organization_id 1})
+                          auth))]
+        (is (= 201 (:status resp))))
+      ;; create teams
+      (doseq [n ["A" "B" "C" "D"]]
+        (is (= 201 (:status (app (-> (mock/request :post "/api/teams")
+                                     (mock/json-body {:pelada_id 1 :name n})
+                                     auth))))))
+      ;; begin pelada (generate matches) - should now succeed with 4 teams
+      (let [resp (app (-> (mock/request :post "/api/peladas/1/begin") auth))
+            body (decode-body resp)]
+        (is (= 200 (:status resp)))
+        (is (pos? (:matches-created body))))
+      ;; list matches
+      (let [resp (app (-> (mock/request :get "/api/peladas/1/matches") auth))
+            body (decode-body resp)]
+        (is (= 200 (:status resp)))
+        (is (seq body))))))

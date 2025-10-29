@@ -1,10 +1,4 @@
-(ns api-100folego.logic.schedule
-  (:require [schema.core :as s]))
-
-(defn- rotate [coll]
-  (let [head (first coll)
-        tail (rest coll)]
-    (concat [head] (take (dec (count tail)) (rest tail)) [(last tail)])))
+(ns api-100folego.logic.schedule)
 
 (defn- pair-round [teams]
   (let [n (count teams)

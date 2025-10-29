@@ -1,4 +1,5 @@
 (ns api-100folego.handlers.vote
+  (:refer-clojure :exclude [cast])
   (:require [api-100folego.adapters.vote :as adapter.vote]
             [api-100folego.controllers.vote :as controller.vote]
             [api-100folego.helpers.exception :as exception]

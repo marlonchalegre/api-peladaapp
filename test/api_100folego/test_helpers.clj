@@ -5,7 +5,6 @@
    [clojure.data.json :as json]
    [clojure.string :as str]
    [next.jdbc :as jdbc]
-   [next.jdbc.sql :as sql]
    [ring.mock.request :as mock]))
 
 (defn- temp-db-file []
@@ -15,7 +14,8 @@
 
 (def migration-files
   ["resources/migrations/20251028150000-init_all.up.sql"
-   "resources/migrations/20251028160000-match_events.up.sql"])
+   "resources/migrations/20251028160000-match_events.up.sql"
+   "resources/migrations/20251029183000-match_lineups.up.sql"])
 
 (defn migrate! [db-file]
   (let [ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]

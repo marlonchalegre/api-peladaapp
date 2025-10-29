@@ -48,8 +48,8 @@
   (try (let [db (:database request)
              team-id (Integer/parseInt (str (get-in request [:params :id])))
              player-id (Integer/parseInt (str (get-in request [:body :player_id])))]
-         (do (controller.team/add-player team-id player-id db)
-             (created {:team_id team-id :player_id player-id})))
+         (controller.team/add-player team-id player-id db)
+         (created {:team_id team-id :player_id player-id}))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn remove-player [request]

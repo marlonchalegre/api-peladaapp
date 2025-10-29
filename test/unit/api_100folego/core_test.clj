@@ -1,7 +1,7 @@
 (ns api-100folego.core-test
-  (:require [clojure.test :refer :all]
-            [api-100folego.core :refer :all]))
+  (:require [clojure.test :refer [deftest is testing]]
+            [api-100folego.core :as core]))
 
 (deftest sanity
-  (testing "sanity"
-    (is (= 1 1))))
+  (testing "-main is defined"
+    (is (fn? core/-main))))

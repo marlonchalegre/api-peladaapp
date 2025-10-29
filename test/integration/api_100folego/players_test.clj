@@ -1,5 +1,5 @@
 (ns api-100folego.players-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [ring.mock.request :as mock]
             [next.jdbc :as jdbc]
             [next.jdbc.sql :as sql]
@@ -16,8 +16,7 @@
     ;; create
     (let [resp (app (-> (mock/request :post "/api/players")
                         (mock/json-body {:organization_id 1 :user_id 1})
-                        auth))
-          body (th/decode-body resp)]
+                        auth))]
       (is (= 201 (:status resp))))
     ;; read
     (let [resp (app (-> (mock/request :get "/api/players/1") auth))

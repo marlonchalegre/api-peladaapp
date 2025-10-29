@@ -1,5 +1,5 @@
 (ns api-100folego.schedule-limit-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [api-100folego.logic.schedule :as sch]))
 
 (deftest schedule-with-limit-returns-vector

@@ -1,5 +1,5 @@
 (ns api-100folego.organizations-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [ring.mock.request :as mock]
             [api-100folego.test-helpers :as th]))
 

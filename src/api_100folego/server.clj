@@ -6,14 +6,13 @@
    [buddy.auth.middleware    :refer [wrap-authentication wrap-authorization]]
    [migratus.core            :as migratus]
    [next.jdbc                :as jdbc]
-   [next.jdbc.sql            :as sql]
    [clojure.string           :as str]
    [clojure.java.io          :as io]
    [ring.middleware.json     :refer [wrap-json-body wrap-json-response]])
   (:gen-class))
 
 (defn on-error
-  [request value]
+  [_request _value]
   {:status 403
    :headers {}
    :body {:error "forbidden"}})

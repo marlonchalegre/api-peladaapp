@@ -32,11 +32,13 @@
             away-players (map :teamplayers/player_id (db.team/list-team-players away db))
             to-insert (concat (map (fn [pid] {:match_id match-id :team_id home :player_id pid}) home-players)
                               (map (fn [pid] {:match_id match-id :team_id away :player_id pid}) away-players))]
-        (reduce + (map (fn [row]
-                         (try
-                           (affected-rows-count (sql/insert! (db) :matchlineups row))
-                           (catch Exception _ 0)))
-                       to-insert))))))
+        (reduce (fn [acc row]
+                  (+ acc
+                     (try
+                       (affected-rows-count (sql/insert! (db) :matchlineups row))
+                       (catch Exception _ 0))))
+                0
+                to-insert)))))
 
 (s/defn add-player :- s/Int
   [match-id :- s/Int team-id :- s/Int player-id :- s/Int db]

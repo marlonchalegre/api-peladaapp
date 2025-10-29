@@ -1,5 +1,5 @@
 (ns api-100folego.peladas-begin-limit-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [ring.mock.request :as mock]
             [clojure.data.json :as json]
             [clojure.string :as str]
@@ -24,8 +24,8 @@
   (let [{:keys [app db-file]} (th/make-app!)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
     (sql/insert! ds :organizations {:name "Club"})
-    (let [register (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Ana" :email "ana@ex.com" :password "p"})))
-          login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "ana@ex.com" :password "p"})))
+    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Ana" :email "ana@ex.com" :password "p"})))
+    (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "ana@ex.com" :password "p"})))
           token (:token (decode-body login))
           auth (fn [req] (mock/header req "authorization" (str "Token " token)))]
       (let [pel (app (-> (mock/request :post "/api/peladas") (mock/json-body {:organization_id 1}) auth))]

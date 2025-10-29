@@ -1,5 +1,5 @@
 (ns api-100folego.matches-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [ring.mock.request :as mock]
             [clojure.data.json :as json]
             [clojure.string :as str]
@@ -24,15 +24,18 @@
     (doseq [n ["A" "B"]]
       (sql/insert! ds :teams {:pelada_id 1 :name n}))
     ;; auth
-    (let [register (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Ana" :email "ana@ex.com" :password "p"})))
-          login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "ana@ex.com" :password "p"})))
+    (let [_ (app (-> (mock/request :post "/auth/register")
+                     (mock/json-body {:name "Ana" :email "ana@ex.com" :password "p"})))
+          login (app (-> (mock/request :post "/auth/login")
+                         (mock/json-body {:email "ana@ex.com" :password "p"})))
           token (:token (decode-body login))
           auth (fn [req] (mock/header req "authorization" (str "Token " token)))]
       ;; create matches by beginning pelada (ensures a match exists)
-      (doseq [n ["C" "D"]] (sql/insert! ds :teams {:pelada_id 1 :name n}))
+      (doseq [n ["C" "D"]]
+        (sql/insert! ds :teams {:pelada_id 1 :name n}))
       (is (= 200 (:status (app (-> (mock/request :post "/api/peladas/1/begin") auth)))))
       ;; update score of first match id=1
-      (let [resp (app (-> (mock/request :put "/api/matches/1/score") auth
-                          (mock/json-body {:home_score 1 :away_score 0 :status "finished"})))
-            body (decode-body resp)]
+      (let [resp (app (-> (mock/request :put "/api/matches/1/score")
+                          auth
+                          (mock/json-body {:home_score 1 :away_score 0 :status "finished"})))]
         (is (= 200 (:status resp)))))))

@@ -1,5 +1,5 @@
 (ns api-100folego.teams-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [ring.mock.request :as mock]
             [next.jdbc :as jdbc]
             [next.jdbc.sql :as sql]
@@ -20,8 +20,7 @@
     ;; create team
     (let [resp (app (-> (mock/request :post "/api/teams")
                         (mock/json-body {:pelada_id 1 :name "A"})
-                        auth))
-          body (th/decode-body resp)]
+                        auth))]
       (is (= 201 (:status resp))))
     ;; add players
     (is (= 201 (:status (app (-> (mock/request :post "/api/teams/1/players") (mock/json-body {:player_id 1}) auth)))))

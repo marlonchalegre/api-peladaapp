@@ -1,5 +1,5 @@
 (ns api-100folego.match-event-unit-test
-  (:require [clojure.test :refer :all]
+  (:require [clojure.test :refer [deftest is]]
             [api-100folego.db.match-event :as match-event-db]))
 
 (deftest unqualify-row-drops-namespaces
