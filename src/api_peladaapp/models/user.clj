@@ -17,3 +17,8 @@
   {(s/optional-key :name) s/Str
    (s/optional-key :email) s/Str
    (s/optional-key :password) s/Str})
+
+(s/defschema PublicUser
+  "Schema for a user when sensitive fields like password and email are excluded"
+  {:id s/Int
+   :name s/Str})

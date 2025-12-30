@@ -6,6 +6,7 @@
             [api-peladaapp.db.player :as db.player]
             [api-peladaapp.db.team :as db.team]
             [api-peladaapp.db.user :as db.user]
+            [api-peladaapp.models.user :as models.user]
             [api-peladaapp.logic.pelada :as pelada.logic]
             [schema.core :as s]))
 
@@ -85,7 +86,7 @@
   {:pelada s/Any
    :matches [s/Any]
    :teams [s/Any]
-   :users [s/Any]
+   :users [models.user/PublicUser]
    :organization-players [s/Any]
    :match-events [s/Any]
    :player-stats (s/maybe [s/Any])
