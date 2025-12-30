@@ -98,7 +98,7 @@
         organization-id (:organization_id pelada)
         matches (db.match/list-matches-by-pelada pelada-id db)
         teams (db.team/list-pelada-teams pelada-id db)
-        users (db.user/list-users db 0 1000000)
+        users (map #(dissoc % :password :email) (db.user/list-users db 0 1000000))
         organization-players (db.player/list-players-by-organization organization-id db)
         match-events (db.match-event/list-events-by-pelada pelada-id db)
         player-stats (try (db.match-event/list-player-stats-by-pelada pelada-id db) (catch Exception _ nil))
@@ -117,8 +117,8 @@
      :matches matches
      :teams teams
      :users users
-     :organization-players organization-players
-     :match-events match-events
-     :player-stats player-stats
-     :team-players-map team-players-map
-     :match-lineups-map match-lineups-map}))
+     :organization_players organization-players
+     :match_events match-events
+     :player_stats player-stats
+     :team_players_map team-players-map
+     :match_lineups_map match-lineups-map}))
