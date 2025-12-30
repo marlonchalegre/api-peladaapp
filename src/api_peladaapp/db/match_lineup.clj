@@ -5,6 +5,13 @@
             [next.jdbc :as jdbc]
             [schema.core :as s]))
 
+(defn- unqualify-row [row]
+  (into {}
+        (map (fn [[k v]]
+               (let [kw (if (keyword? k) (keyword (name k)) k)]
+                 [kw v])))
+        row))
+
 (defn- affected-rows-count [result]
   (-> result vals first))
 
@@ -65,7 +72,9 @@
 (s/defn list-match-lineups-by-pelada :- [s/Any]
   [pelada-id :- s/Int db]
   (with-open [conn (jdbc/get-connection (db))]
-    (sql/query conn ["SELECT ml.*
+    (->> (sql/query conn ["SELECT ml.*
                         FROM MatchLineups ml
                         JOIN Matches m ON ml.match_id = m.id
-                        WHERE m.pelada_id = ?" pelada-id])))
+                        WHERE m.pelada_id = ?" pelada-id])
+         (map unqualify-row)
+         vec)))

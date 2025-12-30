@@ -4,6 +4,13 @@
             [next.jdbc.sql :as sql]
             [schema.core :as s]))
 
+(defn- unqualify-row [row]
+  (into {}
+        (map (fn [[k v]]
+               (let [kw (if (keyword? k) (keyword (name k)) k)]
+                 [kw v])))
+        row))
+
 (defn- affected-rows-count [result]
   (-> result vals first))
 
@@ -89,7 +96,9 @@
 
 (s/defn list-team-players-by-pelada [pelada-id db]
   (with-open [conn (jdbc/get-connection (db))]
-    (sql/query conn ["SELECT tp.*, t.name as team_name, t.pelada_id
+    (->> (sql/query conn ["SELECT tp.*, t.name as team_name, t.pelada_id
                         FROM TeamPlayers tp
                         JOIN Teams t ON tp.team_id = t.id
-                        WHERE t.pelada_id = ?" pelada-id])))
+                        WHERE t.pelada_id = ?" pelada-id])
+         (map unqualify-row)
+         vec)))
