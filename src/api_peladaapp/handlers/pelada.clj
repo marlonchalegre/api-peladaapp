@@ -85,3 +85,14 @@
          (auth/require-organization-admin! user-id org-id db)
          (ok (controller.pelada/close-pelada id db)))
        (catch Exception e (exception/api-exception-handler e))))
+
+(defn get-dashboard-data [request]
+  (try (let [db (:database request)
+             id (get-in request [:params :id])
+             user-id (auth/get-user-id-from-request request)
+             pelada (controller.pelada/get-pelada id db)
+             org-id (:organization_id pelada)]
+         ;; Members can view peladas
+         (auth/require-organization-member! user-id org-id db)
+         (ok (controller.pelada/get-pelada-dashboard-data id db)))
+       (catch Exception e (exception/api-exception-handler e))))

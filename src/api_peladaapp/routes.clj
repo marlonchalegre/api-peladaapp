@@ -34,6 +34,7 @@
     (GET "/organizations/:organization_id/peladas" [] handler.pelada/list-by-org)
     (POST "/peladas/:id/begin" [] handler.pelada/begin)
     (POST "/peladas/:id/close" [] handler.pelada/close)
+    (GET "/peladas/:id/dashboard-data" [] handler.pelada/get-dashboard-data)
     (POST "/scores/normalized" [] handlers.score/get-normalized-scores)
 ))
 
