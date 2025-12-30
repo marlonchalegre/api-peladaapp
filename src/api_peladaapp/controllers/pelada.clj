@@ -1,8 +1,11 @@
 (ns api-peladaapp.controllers.pelada
   (:require [api-peladaapp.db.match :as db.match]
+            [api-peladaapp.db.match-event :as db.match-event]
             [api-peladaapp.db.match-lineup :as db.match-lineup]
             [api-peladaapp.db.pelada :as db.pelada]
+            [api-peladaapp.db.player :as db.player]
             [api-peladaapp.db.team :as db.team]
+            [api-peladaapp.db.user :as db.user]
             [api-peladaapp.logic.pelada :as pelada.logic]
             [schema.core :as s]))
 
@@ -75,3 +78,47 @@
   [pelada-id :- s/Int db]
   (db.match/finish-all-by-pelada pelada-id db)
   {:updated (db.pelada/update-pelada pelada-id {:status "closed" :closed_at (str (java.time.Instant/now))} db)})
+
+(s/defschema TeamLineupSchema {(s/pred int? "int-key") [s/Any]})
+
+(s/defschema PeladaDashboardResponse
+  {:pelada s/Any
+   :matches [s/Any]
+   :teams [s/Any]
+   :users [s/Any]
+   :organization-players [s/Any]
+   :match-events [s/Any]
+   :player-stats (s/maybe [s/Any])
+   :team-players-map {s/Int [s/Any]}
+   :match-lineups-map {s/Int TeamLineupSchema}})
+
+(s/defn get-pelada-dashboard-data :- PeladaDashboardResponse
+  [pelada-id :- s/Int db]
+  (let [pelada (db.pelada/get-pelada pelada-id db)
+        organization-id (:organization_id pelada)
+        matches (db.match/list-matches-by-pelada pelada-id db)
+        teams (db.team/list-pelada-teams pelada-id db)
+        users (db.user/list-users db 0 1000000)
+        organization-players (db.player/list-players-by-organization organization-id db)
+        match-events (db.match-event/list-events-by-pelada pelada-id db)
+        player-stats (try (db.match-event/list-player-stats-by-pelada pelada-id db) (catch Exception _ nil))
+        team-players (db.team/list-team-players-by-pelada pelada-id db) ; New function
+        match-lineups (db.match-lineup/list-match-lineups-by-pelada pelada-id db) ; New function
+
+        ;; Transform team-players into a map
+        team-players-map (group-by :team_id team-players)
+
+        ;; Transform match-lineups into a map of match-id -> team-id -> players
+        match-lineups-map (reduce (fn [acc {:keys [match_id team_id] :as lineup}]
+                                    (assoc-in acc [match_id team_id] (conj (get-in acc [match_id team_id] []) lineup)))
+                                  {}
+                                  match-lineups)]
+    {:pelada pelada
+     :matches matches
+     :teams teams
+     :users users
+     :organization-players organization-players
+     :match-events match-events
+     :player-stats player-stats
+     :team-players-map team-players-map
+     :match-lineups-map match-lineups-map}))
