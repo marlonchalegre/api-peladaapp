@@ -8,6 +8,7 @@
    [next.jdbc                :as jdbc]
    [clojure.string           :as str]
    [clojure.java.io          :as io]
+   [ring.middleware.params   :refer [wrap-params]]
    [ring.middleware.json     :refer [wrap-json-body wrap-json-response]])
   (:gen-class))
 
@@ -22,7 +23,7 @@
                  :unauthorized 401
                  :forbidden 403
                  403)
-        message (or (:message value) 
+        message (or (:message value)
                     (case error-type
                       :authentication "Authentication required"
                       :unauthorized "Authentication required"
@@ -54,7 +55,8 @@
       (migratus/migrate {:store :database
                          :migration-dir "migrations"
                          :db db-spec})
-      (catch Exception _
+      (catch Exception e
+        (.printStackTrace e)
         ;; ignore, fall through to manual ensure
         ))
     (try
@@ -78,6 +80,7 @@
       (handler request*))))
 
 (def app (as-> #'routes/app-handler $
+           (wrap-params $)
            (wrap-json-body $ {:keywords? true :bigdecimals? true})
            ;; Provide a zero-arg function returning the DataSource, matching tests/handlers expectations
            (wrap-assoc $ :database (fn [] datasource))
