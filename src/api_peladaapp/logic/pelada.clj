@@ -18,10 +18,6 @@
       (throw (ex-info nil {:type :bad-request
                            :message "At least two teams are required"}))
 
-      (odd? team-count)
-      (throw (ex-info nil {:type :bad-request
-                           :message "Number of teams must be even"}))
-
       :else (vec team-ids))))
 
 (defn ensure-startable
