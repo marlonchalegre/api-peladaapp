@@ -69,7 +69,9 @@
     (seed-lineups-from-teams! pelada-id db)
     {:matches-created (count match-plan)}))
 
-(s/defn close-pelada :- s/Int
+(s/defschema PeladaClosedResponse {:updated s/Int})
+
+(s/defn close-pelada :- PeladaClosedResponse
   [pelada-id :- s/Int db]
   (db.match/finish-all-by-pelada pelada-id db)
-  (db.pelada/update-pelada pelada-id {:status "closed" :closed_at (java.time.Instant/now)} db))
+  {:updated (db.pelada/update-pelada pelada-id {:status "closed" :closed_at (str (java.time.Instant/now))} db)})

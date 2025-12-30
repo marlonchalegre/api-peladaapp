@@ -38,7 +38,7 @@
 
 (deftest test-ensure-voting-window-open
   (testing "Missing closed_at should throw"
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Cannot determine voting window"
+    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Pelada has no closed_at timestamp"
           (vote.logic/ensure-voting-window-open {:status "closed"}))))
   
   (testing "Within 24 hours should pass"
@@ -79,7 +79,7 @@
           (vote.logic/validate-voting-eligibility {:status "open"}))))
   
   (testing "Closed pelada without closed_at should fail"
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Cannot determine voting window"
+    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Pelada has no closed_at timestamp"
           (vote.logic/validate-voting-eligibility {:status "closed"}))))
   
   (testing "Closed pelada within 24h should pass"
