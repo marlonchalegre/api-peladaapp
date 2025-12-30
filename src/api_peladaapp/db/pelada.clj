@@ -23,24 +23,28 @@
 (s/defn get-pelada :- s/Any
   [id :- s/Int
    db]
-  (-> (sql/get-by-id (db) :Peladas id)
-      adapter.pelada/db->model))
+  (with-open [conn (jdbc/get-connection (db))]
+    (-> (sql/get-by-id conn :Peladas id)
+        adapter.pelada/db->model)))
 
 (s/defn update-pelada :- s/Int
   [id :- s/Int
    pelada
    db]
-  (-> (sql/update! (db) :Peladas (select-keys pelada [:organization_id :scheduled_at :num_teams :players_per_team :status :closed_at]) {:id id})
-      affected-rows-count))
+  (with-open [conn (jdbc/get-connection (db))]
+    (-> (sql/update! conn :Peladas (select-keys pelada [:organization_id :scheduled_at :num_teams :players_per_team :status :closed_at]) {:id id})
+        affected-rows-count)))
 
 (s/defn delete-pelada :- s/Int
   [id :- s/Int
    db]
-  (-> (sql/delete! (db) :Peladas {:id id})
-      affected-rows-count))
+  (with-open [conn (jdbc/get-connection (db))]
+    (-> (sql/delete! conn :Peladas {:id id})
+        affected-rows-count)))
 
 (s/defn list-peladas :- [s/Any]
   [organization-id :- s/Int
    db]
-  (->> (sql/find-by-keys (db) :Peladas {:organization_id organization-id})
-       (map adapter.pelada/db->model)))
+  (with-open [conn (jdbc/get-connection (db))]
+    (->> (sql/find-by-keys conn :Peladas {:organization_id organization-id})
+         (map adapter.pelada/db->model))))
