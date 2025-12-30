@@ -3,6 +3,7 @@
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.logic.user :as logic.user]
    [api-peladaapp.models.user :as models.user]
+   [api-peladaapp.helpers.pagination :as pagination]
    [schema.core :as s]))
 
 (s/defn create-user
@@ -47,9 +48,14 @@
       (throw (ex-info nil {:type :not-found :message "User not found"}))
       (db.user/delete-user user-id db))))
 
-(s/defn list-users :- [models.user/User]
-  [db]
-  (map #(dissoc % :password) (db.user/list-users db)))
+(s/defn list-users
+  [db pagination]
+  (let [page (or (:page pagination) 1)
+        per-page (or (:per-page pagination) 20)
+        offset (* (- page 1) per-page)
+        users (db.user/list-users db offset per-page)
+        total-count (db.user/count-users db)]
+    (pagination/with-pagination-headers (map #(dissoc % :password) users) total-count page per-page)))
 
 (s/defn update-user-profile
   "Update user profile - only allows updating name, email, and password. Score is protected."

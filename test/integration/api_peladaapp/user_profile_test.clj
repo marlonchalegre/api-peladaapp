@@ -138,7 +138,7 @@
                             (mock/header "authorization" (str "Token " token))
                             (mock/json-body {:name "New Name"})))]
           (is (= 403 (:status resp)))
-          (is (= "You can only update your own profile" (:body resp))))))))
+          (is (= "You can only update your own profile" (:message (decode-body resp)))))))))
 
 (deftest user-profile-update-empty-body
   (testing "Handles empty update gracefully"
@@ -202,7 +202,7 @@
                             (mock/json-body {:name "Hacked Name"})))]
           ;; Should return 403 Forbidden
           (is (= 403 (:status resp)))
-          (is (= "You can only update your own profile" (:body resp))))
+          (is (= "You can only update your own profile" (:message (decode-body resp)))))
         ;; Verify user 1's profile was not changed
         (let [login1 (login! app {:email email1 :password password})
               body1 (decode-body login1)

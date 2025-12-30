@@ -3,6 +3,7 @@
    [api-peladaapp.adapters.user :as adapter.user]
    [api-peladaapp.controllers.user :as controller.user]
    [api-peladaapp.helpers.exception :as exception]
+   [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.helpers.responses :as responses]))
 
 (defn- create-action [request]
@@ -64,8 +65,11 @@
 
 (defn list-all [request]
   (try
-    (let [db (-> request :database)]
-      (responses/ok (controller.user/list-users db)))
+    (let [db (-> request :database)
+          query-params (:query-params request)
+          pagination (pagination/parse-pagination-params query-params)
+          users-data (controller.user/list-users db pagination)]
+      (responses/ok (:data users-data) (:headers users-data)))
     (catch Exception e
       (exception/api-exception-handler e))))
 

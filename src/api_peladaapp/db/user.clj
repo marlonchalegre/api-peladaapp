@@ -54,8 +54,16 @@
 
 (s/defn list-users :- [models.user/User]
   "List all users in the database"
+  [db offset limit]
+  (->> (sql/query (db) ["select * from users order by id limit ? offset ?" limit offset])
+       (map adapter.user/db->model)))
+
+(s/defn count-users :- s/Int
+  "Count all users in the database"
   [db]
-  (->> (sql/query (db) ["select * from users"]) (map adapter.user/db->model)))
+  (-> (sql/query (db) ["select count(*) as count from users"])
+      first
+      :count))
 
 (s/defn update-user-profile :- s/Int
   "Update user profile (name, email, password only) in the database"
@@ -65,7 +73,7 @@
   ;; Only update allowed fields: name, email, password
   (-> (sql/update! (db)
                    :users
-                   (medley.core/assoc-some {} 
+                   (medley.core/assoc-some {}
                                            :name (:name user)
                                            :email (:email user)
                                            :password (:password user))

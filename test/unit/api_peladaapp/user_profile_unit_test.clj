@@ -142,7 +142,7 @@
           response (api-peladaapp.handlers.user/update-profile request)]
       ;; Should return 403 Forbidden
       (is (= 403 (:status response)))
-      (is (= "You can only update your own profile" (:body response))))))
+      (is (= "You can only update your own profile" (:message (:body response)))))))
 
 (deftest authorization-handler-allows-own-profile
   (testing "Handler allows user to update their own profile"
