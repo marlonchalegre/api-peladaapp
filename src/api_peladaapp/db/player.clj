@@ -45,4 +45,5 @@
 (s/defn list-players-by-organization [organization-id db]
   (with-open [conn (jdbc/get-connection (db))]
     (->> (sql/find-by-keys conn :organizationplayers {:organization_id organization-id})
-         (map adapter.player/db->model))))
+         (map adapter.player/db->model)
+         vec)))
