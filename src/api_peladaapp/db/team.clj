@@ -41,12 +41,28 @@
         result (jdbc/execute-one! (db) query)]
     (some? result)))
 
+(s/defn validate-player-not-in-another-team-of-same-pelada :- (s/maybe s/Bool)
+  "Validates if a player is not already in another team of the same pelada"
+  [team-id player-id db]
+  (let [query ["SELECT 1 FROM TeamPlayers tp
+                INNER JOIN Teams t ON t.id = tp.team_id
+                WHERE t.pelada_id = (SELECT pelada_id FROM Teams WHERE id = ?) AND tp.player_id = ?"
+               team-id player-id]
+        result (jdbc/execute-one! (db) query)]
+    (nil? result)))
+
 (s/defn add-player-to-team :- s/Int
   [team-id player-id db]
   (when-not (validate-player-belongs-to-pelada-org team-id player-id db)
     (throw (ex-info "Player does not belong to the pelada's organization"
                     {:type :validation-error
                      :message "Player does not belong to the pelada's organization"
+                     :team-id team-id
+                     :player-id player-id})))
+  (when-not (validate-player-not-in-another-team-of-same-pelada team-id player-id db)
+    (throw (ex-info "Player is already in a team for this pelada"
+                    {:type :validation-error
+                     :message "Player is already in a team for this pelada"
                      :team-id team-id
                      :player-id player-id})))
   (-> (sql/insert! (db) :teamplayers {:team_id team-id :player_id player-id})
