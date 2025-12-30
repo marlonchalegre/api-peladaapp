@@ -29,6 +29,13 @@
   (-> (sql/get-by-id (db) :organizationplayers id)
       adapter.player/db->model))
 
+(s/defn get-org-player-by-user-id :- s/Any
+  [user-id organization-id db]
+  (let [unqualify #(update-keys % (comp keyword name))]
+    (some-> (sql/find-by-keys (db) :organizationplayers {:user_id user-id :organization_id organization-id})
+            first
+            unqualify)))
+
 (s/defn list-players-by-organization [organization-id db]
   (->> (sql/find-by-keys (db) :organizationplayers {:organization_id organization-id})
        (map adapter.player/db->model)))
