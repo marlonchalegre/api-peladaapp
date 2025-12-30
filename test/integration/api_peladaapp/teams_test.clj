@@ -12,7 +12,7 @@
         auth (th/auth-header token)]
     ;; seed org, pelada, users and players
     (sql/insert! ds :organizations {:name "Org"})
-    (sql/insert! ds :peladas {:organization_id 1 :scheduled_at "2025-10-28"})
+    (sql/insert! ds :Peladas {:organization_id 1 :scheduled_at "2025-10-28"})
     (doseq [[name email] [["Ana" "ana@example.com"] ["Bob" "bob@example.com"]]]
       (sql/insert! ds :users {:name name :email email :password "p"}))
     (doseq [uid [1 2]]
@@ -44,7 +44,7 @@
     (sql/insert! ds :organizations {:name "Org1"})
     (sql/insert! ds :organizations {:name "Org2"})
     ;; Create pelada for Org1
-    (sql/insert! ds :peladas {:organization_id 1 :scheduled_at "2025-10-28"})
+    (sql/insert! ds :Peladas {:organization_id 1 :scheduled_at "2025-10-28"})
     ;; Create users
     (sql/insert! ds :users {:name "Ana" :email "ana@example.com" :password "p"})
     (sql/insert! ds :users {:name "Bob" :email "bob@example.com" :password "p"})

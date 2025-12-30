@@ -2,7 +2,9 @@
 
 
 ;; Semantic response helpers - always return JSON bodies
-(defn ok [d] {:status 200 :body (or d {})})
+(defn ok
+  ([d] (ok d {}))
+  ([d headers] {:status 200 :headers headers :body (or d {})}))
 (defn bad-request [d] 
   {:status 400 
    :body (cond

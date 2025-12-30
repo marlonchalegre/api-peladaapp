@@ -20,13 +20,13 @@
   (let [{:keys [app db-file]} (th/make-app!)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
     ;; seed org and players
-    (sql/insert! ds :organizations {:name "Org"})
+    (sql/insert! ds :Organizations {:name "Org"})
     (doseq [[i name email] [[1 "Ana" "ana@example.com"] [2 "Bob" "bob@example.com"] [3 "Cid" "cid@example.com"]]]
-      (sql/insert! ds :users {:name name :email email :password "p"})
-      (sql/insert! ds :organizationplayers {:id i :organization_id 1 :user_id i}))
+      (sql/insert! ds :Users {:name name :email email :password "p"})
+      (sql/insert! ds :OrganizationPlayers {:id i :organization_id 1 :user_id i}))
     ;; Create closed pelada with closed_at timestamp
     (let [closed-at (str (.minus (Instant/now) (Duration/ofHours 2)))]
-      (sql/insert! ds :peladas {:id 1 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at closed-at}))
+      (sql/insert! ds :Peladas {:id 1 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at closed-at}))
 
     ;; auth-protected endpoints: login to get token
     (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Admin" :email "admin@example.com" :password "p"})))
@@ -57,22 +57,22 @@
   (let [{:keys [app db-file]} (th/make-app!)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
     ;; seed org, players, and teams
-    (sql/insert! ds :organizations {:name "Org"})
+    (sql/insert! ds :Organizations {:name "Org"})
     (doseq [[i name email] [[1 "Ana" "ana@example.com"] [2 "Bob" "bob@example.com"] [3 "Cid" "cid@example.com"] [4 "Dan" "dan@example.com"]]]
-      (sql/insert! ds :users {:name name :email email :password "p"})
-      (sql/insert! ds :organizationplayers {:id i :organization_id 1 :user_id i}))
+      (sql/insert! ds :Users {:name name :email email :password "p"})
+      (sql/insert! ds :OrganizationPlayers {:id i :organization_id 1 :user_id i}))
     
     ;; Create closed pelada with closed_at timestamp
     (let [closed-at (str (.minus (Instant/now) (Duration/ofHours 1)))]
-      (sql/insert! ds :peladas {:id 1 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at closed-at}))
+      (sql/insert! ds :Peladas {:id 1 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at closed-at}))
     
     ;; Create teams and add players
-    (sql/insert! ds :teams {:id 1 :pelada_id 1 :name "Team A"})
-    (sql/insert! ds :teams {:id 2 :pelada_id 1 :name "Team B"})
-    (sql/insert! ds :teamplayers {:team_id 1 :player_id 1})
-    (sql/insert! ds :teamplayers {:team_id 1 :player_id 2})
-    (sql/insert! ds :teamplayers {:team_id 2 :player_id 3})
-    (sql/insert! ds :teamplayers {:team_id 2 :player_id 4})
+    (sql/insert! ds :Teams {:id 1 :pelada_id 1 :name "Team A"})
+    (sql/insert! ds :Teams {:id 2 :pelada_id 1 :name "Team B"})
+    (sql/insert! ds :TeamPlayers {:team_id 1 :player_id 1})
+    (sql/insert! ds :TeamPlayers {:team_id 1 :player_id 2})
+    (sql/insert! ds :TeamPlayers {:team_id 2 :player_id 3})
+    (sql/insert! ds :TeamPlayers {:team_id 2 :player_id 4})
 
     ;; auth-protected endpoints: login to get token
     (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Admin" :email "admin@example.com" :password "p"})))
@@ -125,10 +125,10 @@
   (let [{:keys [app db-file]} (th/make-app!)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
     ;; seed org and players
-    (sql/insert! ds :organizations {:name "Org"})
+    (sql/insert! ds :Organizations {:name "Org"})
     (doseq [[i name email] [[1 "Ana" "ana@example.com"] [2 "Bob" "bob@example.com"]]]
-      (sql/insert! ds :users {:name name :email email :password "p"})
-      (sql/insert! ds :organizationplayers {:id i :organization_id 1 :user_id i}))
+      (sql/insert! ds :Users {:name name :email email :password "p"})
+      (sql/insert! ds :OrganizationPlayers {:id i :organization_id 1 :user_id i}))
     
     ;; auth-protected endpoints: login to get token
     (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Admin" :email "admin@example.com" :password "p"})))
@@ -137,18 +137,18 @@
           auth (fn [req] (mock/header req "authorization" (str "Token " token)))]
       
       (testing "Cannot vote on open pelada"
-        (sql/insert! ds :peladas {:id 2 :organization_id 1 :scheduled_at "2025-10-28" :status "open"})
+        (sql/insert! ds :Peladas {:id 2 :organization_id 1 :scheduled_at "2025-10-28" :status "open"})
         (let [resp (app (-> (mock/request :post "/api/votes") auth (mock/json-body {:pelada_id 2 :voter_id 2 :target_id 1 :stars 5})))]
           (is (= 400 (:status resp)))))
       
       (testing "Cannot vote after 24 hours"
         (let [twenty-five-hours-ago (str (.minus (Instant/now) (Duration/ofHours 25)))]
-          (sql/insert! ds :peladas {:id 3 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at twenty-five-hours-ago})
+          (sql/insert! ds :Peladas {:id 3 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at twenty-five-hours-ago})
           (let [resp (app (-> (mock/request :post "/api/votes") auth (mock/json-body {:pelada_id 3 :voter_id 2 :target_id 1 :stars 5})))]
             (is (= 400 (:status resp))))))
       
       (testing "Can vote within 24 hours"
         (let [two-hours-ago (str (.minus (Instant/now) (Duration/ofHours 2)))]
-          (sql/insert! ds :peladas {:id 4 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at two-hours-ago})
+          (sql/insert! ds :Peladas {:id 4 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at two-hours-ago})
           (let [resp (app (-> (mock/request :post "/api/votes") auth (mock/json-body {:pelada_id 4 :voter_id 2 :target_id 1 :stars 5})))]
             (is (= 201 (:status resp)))))))))

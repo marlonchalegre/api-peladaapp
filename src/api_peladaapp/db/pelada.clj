@@ -17,30 +17,30 @@
               num_teams (assoc :num_teams num_teams)
               players_per_team (assoc :players_per_team players_per_team))]
     (with-open [conn (jdbc/get-connection (db))]
-      (sql/insert! conn :peladas row)
+      (sql/insert! conn :Peladas row)
       (-> (jdbc/execute-one! conn ["select last_insert_rowid() as id"]) :id int))))
 
 (s/defn get-pelada :- s/Any
   [id :- s/Int
    db]
-  (-> (sql/get-by-id (db) :peladas id)
+  (-> (sql/get-by-id (db) :Peladas id)
       adapter.pelada/db->model))
 
 (s/defn update-pelada :- s/Int
   [id :- s/Int
    pelada
    db]
-  (-> (sql/update! (db) :peladas (select-keys pelada [:organization_id :scheduled_at :num_teams :players_per_team :status]) {:id id})
+  (-> (sql/update! (db) :Peladas (select-keys pelada [:organization_id :scheduled_at :num_teams :players_per_team :status :closed_at]) {:id id})
       affected-rows-count))
 
 (s/defn delete-pelada :- s/Int
   [id :- s/Int
    db]
-  (-> (sql/delete! (db) :peladas {:id id})
+  (-> (sql/delete! (db) :Peladas {:id id})
       affected-rows-count))
 
 (s/defn list-peladas :- [s/Any]
   [organization-id :- s/Int
    db]
-  (->> (sql/find-by-keys (db) :peladas {:organization_id organization-id})
+  (->> (sql/find-by-keys (db) :Peladas {:organization_id organization-id})
        (map adapter.pelada/db->model)))

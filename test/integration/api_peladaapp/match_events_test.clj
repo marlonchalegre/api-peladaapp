@@ -14,7 +14,7 @@
         user-id (th/user-id-by-email ds email)]
     (sql/insert! ds :organizations {:id 1 :name "Org"})
     (sql/insert! ds :organizationplayers {:id 13 :organization_id 1 :user_id user-id})
-    (sql/insert! ds :peladas {:id 1 :organization_id 1 :scheduled_at "2025-10-28"})
+    (sql/insert! ds :Peladas {:id 1 :organization_id 1 :scheduled_at "2025-10-28"})
     (sql/insert! ds :teams {:id 1 :pelada_id 1 :name "Home"})
     (sql/insert! ds :teams {:id 2 :pelada_id 1 :name "Away"})
     (sql/insert! ds :matches {:id 1 :pelada_id 1 :home_team_id 1 :away_team_id 2 :sequence 1 :status "finished" :home_score 1 :away_score 0})
