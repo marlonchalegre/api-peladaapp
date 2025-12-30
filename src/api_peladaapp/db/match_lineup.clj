@@ -65,7 +65,7 @@
 (s/defn list-match-lineups-by-pelada :- [s/Any]
   [pelada-id :- s/Int db]
   (with-open [conn (jdbc/get-connection (db))]
-    (jdbc/query conn ["SELECT ml.*
+    (sql/query conn ["SELECT ml.*
                         FROM MatchLineups ml
                         JOIN Matches m ON ml.match_id = m.id
                         WHERE m.pelada_id = ?" pelada-id])))

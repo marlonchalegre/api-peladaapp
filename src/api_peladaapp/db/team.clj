@@ -89,7 +89,7 @@
 
 (s/defn list-team-players-by-pelada [pelada-id db]
   (with-open [conn (jdbc/get-connection (db))]
-    (jdbc/query conn ["SELECT tp.*, t.name as team_name, t.pelada_id
+    (sql/query conn ["SELECT tp.*, t.name as team_name, t.pelada_id
                         FROM TeamPlayers tp
                         JOIN Teams t ON tp.team_id = t.id
                         WHERE t.pelada_id = ?" pelada-id])))
