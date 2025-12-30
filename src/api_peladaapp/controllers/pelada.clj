@@ -123,3 +123,18 @@
      :player_stats player-stats
      :team_players_map team-players-map
      :match_lineups_map match-lineups-map}))
+
+(s/defn get-pelada-full-details-controller :- s/Any
+  [pelada-id :- s/Int
+   user-id :- s/Int
+   db]
+  (let [pelada-data (db.pelada/get-pelada-full-details pelada-id db)
+        pelada (:pelada pelada-data)
+        org-id (:organization_id pelada)
+        all-org-players (:org_players_map pelada-data)
+        current-player (some-> (filter #(= user-id (:user_id %)) (vals all-org-players)) first)
+        player-id (:id current-player)
+        voting-info (if (and (= "closed" (:status pelada)) player-id)
+                      (pelada.logic/get-voting-info pelada-id player-id db)
+                      nil)]
+    (assoc pelada-data :voting_info voting-info)))

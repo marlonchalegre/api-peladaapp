@@ -82,8 +82,8 @@
 (def app (as-> #'routes/app-handler $
            (wrap-params $)
            (wrap-json-body $ {:keywords? true :bigdecimals? true})
-           ;; Provide a zero-arg function returning the DataSource, matching tests/handlers expectations
-           (wrap-assoc $ :database (fn [] datasource))
+           ;; Provide the DataSource directly
+           (wrap-assoc $ :database datasource)
            (wrap-access-rules $ {:rules routes/access-rules :on-error on-error})
            (wrap-authorization $ auth/auth-backend)
            (wrap-authentication $ auth/auth-backend)

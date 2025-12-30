@@ -9,25 +9,24 @@
 
 (s/defn insert-organization :- s/Int
   [{:keys [name]} db]
-  (with-open [conn (jdbc/get-connection (db))]
-    (sql/insert! conn :organizations {:name name})
-    (-> (jdbc/execute-one! conn ["select last_insert_rowid() as id"]) :id int)))
+  (sql/insert! db :organizations {:name name})
+  (-> (jdbc/execute-one! db ["select last_insert_rowid() as id"]) :id int))
 
 (s/defn get-organization [id db]
-  (-> (sql/get-by-id (db) :organizations id) adapter.organization/db->model))
+  (-> (sql/get-by-id db :organizations id) adapter.organization/db->model))
 
 (s/defn update-organization :- s/Int
   [id {:keys [name]} db]
-  (-> (sql/update! (db) :organizations {:name name} {:id id}) affected-rows-count))
+  (-> (sql/update! db :organizations {:name name} {:id id}) affected-rows-count))
 
 (s/defn delete-organization :- s/Int
   [id db]
-  (-> (sql/delete! (db) :organizations {:id id}) affected-rows-count))
+  (-> (sql/delete! db :organizations {:id id}) affected-rows-count))
 
 (s/defn list-organizations [db limit offset]
-  (->> (sql/query (db) ["select * from organizations order by id limit ? offset ?" limit offset])
+  (->> (sql/query db ["select * from organizations order by id limit ? offset ?" limit offset])
        (map adapter.organization/db->model)))
 
 (s/defn count-organizations :- s/Int
   [db]
-  (-> (sql/query (db) ["select count(*) as count from organizations"]) first :count))
+  (-> (sql/query db ["select count(*) as count from organizations"]) first :count))

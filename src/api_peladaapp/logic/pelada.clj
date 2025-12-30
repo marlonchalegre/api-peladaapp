@@ -1,5 +1,9 @@
 (ns api-peladaapp.logic.pelada
-  (:require [api-peladaapp.logic.schedule :as schedule]))
+  (:require [api-peladaapp.logic.schedule :as schedule]
+            [api-peladaapp.db.pelada :as db.pelada]
+            [api-peladaapp.db.vote :as db.vote]
+            [api-peladaapp.logic.vote :as logic.vote]
+            [schema.core :as s]))
 
 (defn ensure-open
   "Ensure pelada can start. Returns pelada or throws with :bad-request."
@@ -19,6 +23,19 @@
                            :message "At least two teams are required"}))
 
       :else (vec team-ids))))
+
+(s/defn get-voting-info :- s/Any
+  [pelada-id :- s/Int
+   player-id :- s/Int
+   db]
+  (let [pelada (db.pelada/get-pelada pelada-id db) ;; Re-fetch pelada to ensure latest status and closed_at
+        can-vote (try (logic.vote/validate-voting-eligibility pelada) true (catch Exception _ false))
+        has-voted (db.vote/has-voter-voted? pelada-id player-id db)]
+    {:can_vote can-vote
+     :has_voted has-voted
+     :message (if (not can-vote)
+                "Voting is not open or has closed."
+                "")}))
 
 (defn ensure-startable
   "Validate pelada start preconditions. Returns vector of team ids."

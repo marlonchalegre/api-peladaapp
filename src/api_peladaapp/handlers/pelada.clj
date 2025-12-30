@@ -28,6 +28,17 @@
          (ok pelada))
        (catch Exception e (exception/api-exception-handler e))))
 
+(defn get-full-details [request]
+  (try (let [db (:database request)
+             id (Integer/parseInt (str (get-in request [:params :id])))
+             user-id (auth/get-user-id-from-request request)
+             pelada-data (controller.pelada/get-pelada-full-details-controller id user-id db)
+             org-id (get-in pelada-data [:pelada :organization_id])]
+         ;; Members can view peladas
+         (auth/require-organization-member! user-id org-id db)
+         (ok pelada-data))
+       (catch Exception e (exception/api-exception-handler e))))
+
 (defn update-by-id [request]
   (try (let [db (:database request)
              id (get-in request [:params :id])

@@ -6,7 +6,7 @@
 (defn get-normalized-scores
   "Fetches normalized scores for a list of player IDs.
    Returns a map of {player-id score}."
-  [player-ids db-fn]
+  [player-ids db]
   (if (empty? player-ids)
     {}
     (let [placeholders (str/join "," (repeat (count player-ids) "?"))
@@ -15,4 +15,4 @@
       (reduce (fn [acc {s :score id :target_id}]
                 (assoc acc id s))
               {}
-              (jdbc/execute! (db-fn) query {:builder-fn rs/as-unqualified-lower-maps})))))
+              (jdbc/execute! db query {:builder-fn rs/as-unqualified-lower-maps})))))

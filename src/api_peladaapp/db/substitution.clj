@@ -8,8 +8,8 @@
 (s/defn insert-substitution :- s/Int
   [{:keys [match_id minute out_player_id in_player_id]}
    db]
-  (-> (sql/insert! (db) :matchsubstitutions {:match_id match_id :minute minute :out_player_id out_player_id :in_player_id in_player_id})
+  (-> (sql/insert! db :matchsubstitutions {:match_id match_id :minute minute :out_player_id out_player_id :in_player_id in_player_id})
       affected-rows-count))
 
 (s/defn list-substitutions [match-id db]
-  (sql/find-by-keys (db) :matchsubstitutions {:match_id match-id}))
+  (sql/find-by-keys db :matchsubstitutions {:match_id match-id}))

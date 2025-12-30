@@ -29,6 +29,7 @@
   (context "/api" []
     (POST "/peladas" [] handler.pelada/create)
     (GET "/peladas/:id" [] handler.pelada/get-by-id)
+    (GET "/peladas/:id/full-details" [] handler.pelada/get-full-details)
     (PUT "/peladas/:id" [] handler.pelada/update-by-id)
     (DELETE "/peladas/:id" [] handler.pelada/delete)
     (GET "/organizations/:organization_id/peladas" [] handler.pelada/list-by-org)

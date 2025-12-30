@@ -15,37 +15,33 @@
 
 (s/defn insert-event :- s/Int
   [match-id :- s/Int player-id :- s/Int event-type :- s/Str db]
-  (with-open [conn (jdbc/get-connection (db))]
-    (-> (sql/insert! conn :matchevents {:match_id match-id
+  (-> (sql/insert! db :matchevents {:match_id match-id
                                         :player_id player-id
                                         :event_type event-type})
-        affected-rows-count)))
+        affected-rows-count))
 
 (s/defn list-events-by-pelada :- [s/Any]
   [pelada-id :- s/Int db]
-  (with-open [conn (jdbc/get-connection (db))]
-    (jdbc/execute! conn
+  (jdbc/execute! db
                    ["select e.id, e.match_id, e.player_id, e.event_type, e.created_at
                      from MatchEvents e
                      join Matches m on m.id = e.match_id
                      where m.pelada_id = ?
-                     order by e.id" pelada-id])))
+                     order by e.id" pelada-id]))
 
 (s/defn delete-last-event :- s/Int
   [match-id :- s/Int player-id :- s/Int event-type :- s/Str db]
-  (with-open [conn (jdbc/get-connection (db))]
-    (-> (jdbc/execute-one! conn
+  (-> (jdbc/execute-one! db
                            ["delete from MatchEvents where id in (
                                 select id from MatchEvents
                                 where match_id = ? and player_id = ? and event_type = ?
                                 order by id desc limit 1
                               )" match-id player-id event-type])
-        affected-rows-count)))
+        affected-rows-count))
 
 (s/defn list-player-stats-by-pelada :- [s/Any]
   [pelada-id :- s/Int db]
-  (with-open [conn (jdbc/get-connection (db))]
-    (->> (jdbc/execute! conn
+  (->> (jdbc/execute! db
                         ["select e.player_id,
                                  sum(case when e.event_type='goal' then 1 else 0 end)      as goals,
                                  sum(case when e.event_type='assist' then 1 else 0 end)    as assists,
@@ -56,4 +52,4 @@
                           group by e.player_id
                           order by goals desc, assists desc" pelada-id])
          (map unqualify-row)
-         vec)))
+         vec))
