@@ -61,3 +61,11 @@
   (let [rm (remove-player match-id team-id out-player-id db)
         ad (add-player match-id team-id in-player-id db)]
     (+ rm ad)))
+
+(s/defn list-match-lineups-by-pelada :- [s/Any]
+  [pelada-id :- s/Int db]
+  (with-open [conn (jdbc/get-connection (db))]
+    (jdbc/query conn ["SELECT ml.*
+                        FROM MatchLineups ml
+                        JOIN Matches m ON ml.match_id = m.id
+                        WHERE m.pelada_id = ?" pelada-id])))
