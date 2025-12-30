@@ -24,5 +24,10 @@
   [id db]
   (-> (sql/delete! (db) :organizations {:id id}) affected-rows-count))
 
-(s/defn list-organizations [db]
-  (->> (sql/query (db) ["select * from organizations"]) (map adapter.organization/db->model)))
+(s/defn list-organizations [db limit offset]
+  (->> (sql/query (db) ["select * from organizations order by id limit ? offset ?" limit offset])
+       (map adapter.organization/db->model)))
+
+(s/defn count-organizations :- s/Int
+  [db]
+  (-> (sql/query (db) ["select count(*) as count from organizations"]) first :count))

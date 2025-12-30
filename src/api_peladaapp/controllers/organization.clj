@@ -19,5 +19,10 @@
 (s/defn delete-organization :- s/Int [id db]
   (db.organization/delete-organization id db))
 
-(s/defn list-organizations [db]
-  (db.organization/list-organizations db))
+(s/defn list-organizations [db page per-page]
+  (let [limit  per-page
+        offset (* (dec page) per-page)
+        orgs   (db.organization/list-organizations db limit offset)
+        total  (db.organization/count-organizations db)]
+    {:organizations orgs
+     :total         total}))

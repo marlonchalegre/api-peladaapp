@@ -2,6 +2,7 @@
   (:require [api-peladaapp.adapters.organization :as adapter.organization]
             [api-peladaapp.controllers.organization :as controller.organization]
             [api-peladaapp.helpers.exception :as exception]
+            [api-peladaapp.helpers.pagination :as pagination]
             [api-peladaapp.helpers.responses :refer [created ok updated deleted]]
             [api-peladaapp.logic.authorization :as auth]))
 
@@ -33,6 +34,8 @@
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn list-all [request]
-  (try (let [db (:database request)]
-         (ok (controller.organization/list-organizations db)))
+  (try (let [db (:database request)
+             query-params (:query-params request)
+             {:keys [page per-page]} (pagination/parse-pagination-params query-params)]
+         (ok (controller.organization/list-organizations db page per-page)))
        (catch Exception e (exception/api-exception-handler e))))
