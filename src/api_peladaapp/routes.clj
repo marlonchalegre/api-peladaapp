@@ -10,6 +10,8 @@
    [api-peladaapp.handlers.substitution :as handler.substitution]
    [api-peladaapp.handlers.vote :as handler.vote]
    [api-peladaapp.handlers.user :as handler.user]
+   [api-peladaapp.handlers.randomize :as handlers.randomize]
+   [api-peladaapp.handlers.score :as handlers.score]
    [compojure.core     :refer [context defroutes DELETE GET POST PUT routes]]
    [compojure.route    :refer [not-found]]))
 
@@ -31,7 +33,9 @@
     (DELETE "/peladas/:id" [] handler.pelada/delete)
     (GET "/organizations/:organization_id/peladas" [] handler.pelada/list-by-org)
     (POST "/peladas/:id/begin" [] handler.pelada/begin)
-    (POST "/peladas/:id/close" [] handler.pelada/close)))
+    (POST "/peladas/:id/close" [] handler.pelada/close)
+    (POST "/scores/normalized" [] handlers.score/get-normalized-scores)
+))
 
 (defroutes api-teams
   (context "/api" []
@@ -49,6 +53,7 @@
     (GET "/peladas/:pelada_id/matches" [] handler.match/list-by-pelada)
     (GET "/peladas/:pelada_id/events" [] handler.match/list-events-by-pelada)
     (GET "/peladas/:pelada_id/player-stats" [] handler.match/list-player-stats-by-pelada)
+    (POST "/peladas/:id/teams/randomize" [] handlers.randomize/randomize-teams)
     (PUT "/matches/:id/score" [] handler.match/update-score)
     (POST "/matches/:id/events" [] handler.match/create-event)
     (DELETE "/matches/:id/events" [] handler.match/delete-event)
