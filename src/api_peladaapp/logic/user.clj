@@ -11,7 +11,7 @@
     (update user :password hashers/encrypt)
     user))
 
-(s/defn build-token :- s/Str 
+(s/defn build-token :- s/Str
   [{:keys [id email]} :- models.user/User
    secret :- s/Str]
   (-> {:id id

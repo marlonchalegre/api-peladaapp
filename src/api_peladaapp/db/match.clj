@@ -36,9 +36,9 @@
   [id {:keys [home_score away_score status]} db]
   (with-open [conn (jdbc/get-connection (db))]
     (-> (sql/update! conn :matches (cond-> {}
-                                      (some? home_score) (assoc :home_score home_score)
-                                      (some? away_score) (assoc :away_score away_score)
-                                      status (assoc :status status))
+                                     (some? home_score) (assoc :home_score home_score)
+                                     (some? away_score) (assoc :away_score away_score)
+                                     status (assoc :status status))
                      {:id id})
         affected-rows-count)))
 

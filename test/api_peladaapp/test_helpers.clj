@@ -8,7 +8,7 @@
    [ring.mock.request :as mock]))
 
 (defn- temp-db-file []
-  (let [f (java.io.File/createTempFile "peladaapp-test-" ".db")] 
+  (let [f (java.io.File/createTempFile "peladaapp-test-" ".db")]
     (.deleteOnExit f)
     (.getAbsolutePath f)))
 

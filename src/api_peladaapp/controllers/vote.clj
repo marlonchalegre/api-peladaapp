@@ -43,9 +43,9 @@
     (vote.logic/normalized-score player-id votes)))
 
 (s/defn get-voting-info :- {:can_vote s/Bool
-                             :has_voted s/Bool
-                             :eligible_players [s/Int]
-                             (s/optional-key :message) s/Str}
+                            :has_voted s/Bool
+                            :eligible_players [s/Int]
+                            (s/optional-key :message) s/Str}
   "Get voting eligibility info for a voter in a pelada."
   [pelada-id :- s/Int voter-id :- s/Int db]
   (let [pelada (db.pelada/get-pelada pelada-id db)]
@@ -54,10 +54,10 @@
       ;; Get all players who participated (were in teams)
       (let [teams (db.team/list-pelada-teams pelada-id db)
             all-player-ids (->> teams
-                               (mapcat #(db.team/list-team-players (:id %) db))
-                               (map :player_id)
-                               distinct
-                               (remove #(= % voter-id))) ;; exclude self
+                                (mapcat #(db.team/list-team-players (:id %) db))
+                                (map :player_id)
+                                distinct
+                                (remove #(= % voter-id))) ;; exclude self
             has-voted (db.vote/has-voter-voted? pelada-id voter-id db)]
         {:can_vote true
          :has_voted has-voted

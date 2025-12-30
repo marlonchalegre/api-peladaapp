@@ -10,7 +10,7 @@
   (let [{:keys [db-file]} (th/make-app!)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
         db-fn (constantly ds)]
-    
+
     ;; Setup Schema and Data
     (jdbc/execute! ds ["INSERT INTO Organizations (name) VALUES ('Org')"])
     (doseq [[i name email] [[1 "Ana" "ana@example.com"] [2 "Bob" "bob@example.com"] [3 "Cid" "cid@example.com"]]]

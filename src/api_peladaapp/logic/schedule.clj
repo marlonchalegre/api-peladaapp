@@ -55,20 +55,20 @@
     (let [distinct-matches (distinct remaining-matches)]
       (loop [candidates distinct-matches]
         (when-let [match (first candidates)]
-        (let [teams-in-match [(:home match) (:away match)]]
-          (if (valid-match? team-stats matches-per-team teams-in-match)
-            (let [playing-teams (set teams-in-match)
+          (let [teams-in-match [(:home match) (:away match)]]
+            (if (valid-match? team-stats matches-per-team teams-in-match)
+              (let [playing-teams (set teams-in-match)
                     resting-teams (set/difference all-teams playing-teams)
-                  next-team-stats (reduce update-stats-for-play team-stats playing-teams)
-                  next-team-stats (reduce update-stats-for-rest next-team-stats resting-teams)
-                  
+                    next-team-stats (reduce update-stats-for-play team-stats playing-teams)
+                    next-team-stats (reduce update-stats-for-rest next-team-stats resting-teams)
+
                     idx (.indexOf remaining-matches match)
                     next-remaining (vec (concat (subvec remaining-matches 0 idx)
                                                 (subvec remaining-matches (inc idx))))
-                  
+
                     result (find-schedule (conj schedule match) next-team-stats all-teams total-matches matches-per-team next-remaining)]
-              (if (seq result)
-                result
+                (if (seq result)
+                  result
                   (recur (rest candidates))))
               (recur (rest candidates)))))))))
 
@@ -129,4 +129,4 @@
   [team-ids]
   (let [n (count team-ids)
         matches-per-team (dec n)]
-   (schedule-matches-with-limit team-ids matches-per-team)))
+    (schedule-matches-with-limit team-ids matches-per-team)))

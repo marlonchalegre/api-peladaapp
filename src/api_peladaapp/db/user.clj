@@ -5,14 +5,14 @@
    [medley.core :as medley.core]
    [next.jdbc.sql :as sql]
    [next.jdbc :as jdbc]
-  [schema.core :as s]))
+   [schema.core :as s]))
 
 (defn- affected-rows-count
   "Get the number of affected rows from a query"
   [result]
   (->  result
-      vals
-      first))
+       vals
+       first))
 
 (s/defn find-user-by-email :- (s/maybe models.user/User)
   "Find a user by email"
@@ -45,8 +45,8 @@
     (-> (sql/update! conn
                      :users
                      (medley.core/assoc-some {} :name (:name user)
-                                                 :email (:email user)
-                                                 :password (:password user))
+                                             :email (:email user)
+                                             :password (:password user))
                      {:id id})
         affected-rows-count)))
 

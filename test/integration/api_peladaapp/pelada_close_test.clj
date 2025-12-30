@@ -31,19 +31,19 @@
 
       ;; Create organization
       (let [org-resp (app (-> (mock/request :post "/api/organizations")
-                             (mock/json-body {:name "Test Org"})
-                             auth))
+                              (mock/json-body {:name "Test Org"})
+                              auth))
             org-id (:id (decode-body org-resp))]
 
         ;; Create pelada
         (let [pelada-resp (app (-> (mock/request :post "/api/peladas")
-                                  (mock/json-body {:organization_id org-id :num_teams 2})
-                                  auth))
+                                   (mock/json-body {:organization_id org-id :num_teams 2})
+                                   auth))
               pelada-id (:id (decode-body pelada-resp))]
 
           ;; Begin pelada
           (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin"))
-                  auth))
+                   auth))
 
           ;; Close pelada
           (let [close-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close"))

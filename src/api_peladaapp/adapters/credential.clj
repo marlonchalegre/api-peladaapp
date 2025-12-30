@@ -1,7 +1,6 @@
-(ns api-peladaapp.adapters.credential 
+(ns api-peladaapp.adapters.credential
   (:require
-    [schema.core :as s]))
-
+   [schema.core :as s]))
 
 (s/defn in->model
   [{:keys [email password]}]

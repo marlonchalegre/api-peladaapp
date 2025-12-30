@@ -13,13 +13,13 @@
           db (fn [] nil)
           find-called (atom 0)
           update-called (atom nil)]
-      (with-redefs [db.user/find-user-by-id (fn [_ _] 
-                                               (swap! find-called inc)
-                                               (if (= @find-called 1)
-                                                 existing-user
-                                                 (assoc existing-user :name "New Name")))
-                    db.user/update-user-profile (fn [_ user _] 
-                                                  (reset! update-called user) 
+      (with-redefs [db.user/find-user-by-id (fn [_ _]
+                                              (swap! find-called inc)
+                                              (if (= @find-called 1)
+                                                existing-user
+                                                (assoc existing-user :name "New Name")))
+                    db.user/update-user-profile (fn [_ user _]
+                                                  (reset! update-called user)
                                                   1)]
         (let [result (controllers.user/update-user-profile profile-data user-id db)]
           (is (= "New Name" (:name result)))
@@ -34,13 +34,13 @@
           db (fn [] nil)
           find-called (atom 0)
           update-called (atom nil)]
-      (with-redefs [db.user/find-user-by-id (fn [_ _] 
-                                               (swap! find-called inc)
-                                               (if (= @find-called 1)
-                                                 existing-user
-                                                 (assoc existing-user :email "new@test.com")))
-                    db.user/update-user-profile (fn [_ user _] 
-                                                  (reset! update-called user) 
+      (with-redefs [db.user/find-user-by-id (fn [_ _]
+                                              (swap! find-called inc)
+                                              (if (= @find-called 1)
+                                                existing-user
+                                                (assoc existing-user :email "new@test.com")))
+                    db.user/update-user-profile (fn [_ user _]
+                                                  (reset! update-called user)
                                                   1)]
         (let [result (controllers.user/update-user-profile profile-data user-id db)]
           (is (= "new@test.com" (:email result)))
@@ -55,13 +55,13 @@
           db (fn [] nil)
           find-called (atom 0)
           update-called (atom nil)]
-      (with-redefs [db.user/find-user-by-id (fn [_ _] 
-                                               (swap! find-called inc)
-                                               (if (= @find-called 1)
-                                                 existing-user
-                                                 (assoc existing-user :password "new-hashed")))
-                    db.user/update-user-profile (fn [_ user _] 
-                                                  (reset! update-called user) 
+      (with-redefs [db.user/find-user-by-id (fn [_ _]
+                                              (swap! find-called inc)
+                                              (if (= @find-called 1)
+                                                existing-user
+                                                (assoc existing-user :password "new-hashed")))
+                    db.user/update-user-profile (fn [_ user _]
+                                                  (reset! update-called user)
                                                   1)]
         (let [result (controllers.user/update-user-profile profile-data user-id db)]
           ;; Password should be encrypted
@@ -79,13 +79,13 @@
           db (fn [] nil)
           find-called (atom 0)
           update-called (atom nil)]
-      (with-redefs [db.user/find-user-by-id (fn [_ _] 
-                                               (swap! find-called inc)
-                                               (if (= @find-called 1)
-                                                 existing-user
-                                                 (assoc existing-user :name "New Name" :email "new@test.com")))
-                    db.user/update-user-profile (fn [_ user _] 
-                                                  (reset! update-called user) 
+      (with-redefs [db.user/find-user-by-id (fn [_ _]
+                                              (swap! find-called inc)
+                                              (if (= @find-called 1)
+                                                existing-user
+                                                (assoc existing-user :name "New Name" :email "new@test.com")))
+                    db.user/update-user-profile (fn [_ user _]
+                                                  (reset! update-called user)
                                                   1)]
         (let [result (controllers.user/update-user-profile profile-data user-id db)]
           (is (= "New Name" (:name result)))
@@ -117,13 +117,13 @@
           db (fn [] nil)
           find-called (atom 0)
           update-called (atom nil)]
-      (with-redefs [db.user/find-user-by-id (fn [_ _] 
-                                               (swap! find-called inc)
-                                               (if (= @find-called 1)
-                                                 existing-user
-                                                 (assoc existing-user :name "New Name")))
-                    db.user/update-user-profile (fn [_ user _] 
-                                                  (reset! update-called user) 
+      (with-redefs [db.user/find-user-by-id (fn [_ _]
+                                              (swap! find-called inc)
+                                              (if (= @find-called 1)
+                                                existing-user
+                                                (assoc existing-user :name "New Name")))
+                    db.user/update-user-profile (fn [_ user _]
+                                                  (reset! update-called user)
                                                   1)]
         (let [result (controllers.user/update-user-profile profile-data user-id db)]
           ;; ID should remain unchanged
@@ -154,11 +154,11 @@
                    :body {:name "New Name"}
                    :database (fn [] nil)}
           find-called (atom 0)]
-      (with-redefs [db.user/find-user-by-id (fn [_ _] 
-                                               (swap! find-called inc)
-                                               (if (= @find-called 1)
-                                                 existing-user
-                                                 (assoc existing-user :name "New Name")))
+      (with-redefs [db.user/find-user-by-id (fn [_ _]
+                                              (swap! find-called inc)
+                                              (if (= @find-called 1)
+                                                existing-user
+                                                (assoc existing-user :name "New Name")))
                     db.user/update-user-profile (fn [_ _ _] 1)]
         (let [response (api-peladaapp.handlers.user/update-profile request)]
           (is (= 200 (:status response)))

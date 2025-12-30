@@ -62,8 +62,8 @@
                               :email "test@example.com"
                               :password (hashers/encrypt "password123")})
       (let [token (th/register-and-login! app {:name "Auth User"
-                                                :email "auth@example.com"
-                                                :password "pass123"})
+                                               :email "auth@example.com"
+                                               :password "pass123"})
             ;; Test only GET endpoints to avoid side effects
             get-endpoints (filter #(= :get (:method %)) protected-endpoints)]
         (doseq [{:keys [method path]} get-endpoints]
@@ -85,7 +85,7 @@
         ;; Should not be 401 (might be 400 or 404 for bad credentials)
         (is (not= 401 (:status login-resp))
             "Login endpoint should be public"))
-      
+
       ;; Register endpoint should be accessible
       (let [register-req (-> (mock/request :post "/auth/register")
                              (mock/json-body {:name "New User"
@@ -105,7 +105,7 @@
             resp (app req)]
         (is (= 401 (:status resp))
             "Expected 401 for malformed Authorization header"))
-      
+
       ;; Empty Authorization header
       (let [req (-> (mock/request :get "/api/users")
                     (mock/header "Authorization" ""))

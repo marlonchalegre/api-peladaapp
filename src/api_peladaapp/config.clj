@@ -1,4 +1,4 @@
-(ns api-peladaapp.config 
+(ns api-peladaapp.config
   (:require
    [clojure.data.json :as json]))
 

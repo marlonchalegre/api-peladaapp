@@ -12,5 +12,4 @@
       ;; ensure each team appears reasonable times (round-robin each team plays 3 times in 4 teams)
       (let [freqs (frequencies (mapcat (fn [{:keys [home away]}] [home away]) matches))]
         (doseq [t teams]
-          (is (= 3 (get freqs t 0)))))))
-)
+          (is (= 3 (get freqs t 0))))))))

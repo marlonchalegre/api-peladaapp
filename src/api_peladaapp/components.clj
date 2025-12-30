@@ -61,7 +61,7 @@
       (assoc component :handler
              (wrap-assoc handler :database database-fn))))
   (stop [component]
-        component))
+    component))
 
 (defn new-app [handler]
   (component/using

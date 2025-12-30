@@ -55,7 +55,7 @@
   (try
     (with-open [conn (jdbc/get-connection (db))]
       (affected-rows-count (sql/insert! conn :matchlineups {:match_id match-id :team_id team-id :player_id player-id})))
-    (catch Exception _ 0)) )
+    (catch Exception _ 0)))
 
 (s/defn remove-player :- s/Int
   [match-id :- s/Int team-id :- s/Int player-id :- s/Int db]

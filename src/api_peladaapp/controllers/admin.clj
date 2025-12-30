@@ -23,7 +23,7 @@
   (let [admin-records (db.admin/list-organizations-by-admin user_id db)]
     (map (fn [admin]
            (let [org (db.organization/get-organization (:organization_id admin) db)]
-             (assoc admin 
+             (assoc admin
                     :organization_id (:organization_id admin)
                     :organization_name (:name org))))
          admin-records)))

@@ -11,7 +11,7 @@
   [{:keys [organization_id user_id]} db]
   (with-open [conn (jdbc/get-connection (db))]
     (sql/insert! conn :OrganizationAdmins {:organization_id organization_id
-                                            :user_id user_id})
+                                           :user_id user_id})
     (-> (jdbc/execute-one! conn ["select last_insert_rowid() as id"]) :id int)))
 
 (s/defn get-organization-admin [id db]
@@ -24,7 +24,7 @@
 (s/defn delete-organization-admin-by-org-and-user :- s/Int
   [organization_id user_id db]
   (-> (sql/delete! (db) :OrganizationAdmins {:organization_id organization_id
-                                               :user_id user_id})
+                                             :user_id user_id})
       affected-rows-count))
 
 (s/defn list-admins-by-organization [organization_id db]
@@ -43,7 +43,7 @@
 
 (s/defn is-user-admin-of-organization? :- s/Bool
   [user_id organization_id db]
-  (let [result (jdbc/execute-one! (db) 
-                                   ["select count(*) as count from OrganizationAdmins where user_id = ? and organization_id = ?" 
-                                    user_id organization_id])]
+  (let [result (jdbc/execute-one! (db)
+                                  ["select count(*) as count from OrganizationAdmins where user_id = ? and organization_id = ?"
+                                   user_id organization_id])]
     (> (:count result) 0)))

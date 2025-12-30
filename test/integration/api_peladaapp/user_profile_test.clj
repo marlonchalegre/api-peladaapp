@@ -208,6 +208,6 @@
               body1 (decode-body login1)
               token1 (:token body1)
               get-resp (app (-> (mock/request :get "/api/user/1")
-                               (mock/header "authorization" (str "Token " token1))))
+                                (mock/header "authorization" (str "Token " token1))))
               get-body (decode-body get-resp)]
           (is (= "User 1" (:name get-body))))))))

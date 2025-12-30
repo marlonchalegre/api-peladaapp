@@ -32,13 +32,13 @@
                       {:type :bad-request
                        :message "Cannot determine voting window"})))
     (let [closed-instant (if (instance? Instant closed-at)
-                          closed-at
+                           closed-at
                           ;; Try to parse, adding :00Z if needed for incomplete timestamps
-                          (try
-                            (Instant/parse (str closed-at))
-                            (catch Exception _
+                           (try
+                             (Instant/parse (str closed-at))
+                             (catch Exception _
                               ;; If parsing fails, try adding :00Z suffix for incomplete ISO timestamps
-                              (Instant/parse (str closed-at ":00Z")))))
+                               (Instant/parse (str closed-at ":00Z")))))
           now (Instant/now)
           hours-since-close (.toHours (Duration/between closed-instant now))]
       (when (> hours-since-close 24)
@@ -61,7 +61,7 @@
   pelada)
 
 (defn normalized-score
-  "Normalize player's average stars (1..5) into 1..10 scale." 
+  "Normalize player's average stars (1..5) into 1..10 scale."
   [player-id votes]
   (let [stars (map :stars votes)
         avg (if (seq stars)

@@ -11,7 +11,7 @@
    "gol-contra" "own_goal"})
 
 (defn canonical-type
-  "Normalize event type value and ensure it is allowed." 
+  "Normalize event type value and ensure it is allowed."
   [event-type]
   (let [normalized (some-> event-type name str/lower-case)
         canonical (get aliases normalized normalized)]
@@ -31,7 +31,7 @@
                        :event_type event-type})))))
 
 (defn ensure-player-id
-  "Ensure player id is provided." 
+  "Ensure player id is provided."
   [player-id]
   (if (some? player-id)
     player-id

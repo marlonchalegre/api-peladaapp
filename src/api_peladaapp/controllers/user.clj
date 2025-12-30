@@ -26,11 +26,11 @@
                           (dissoc :id :password))]
     (if (nil? existing-user)
       (throw (ex-info nil {:type :not-found :message "User not found"}))
-       (as-> user $
-          (merge existing-user $)
-          (logic.user/encrypt-password $)
-          (do (db.user/update-user user-id $ db)
-              (db.user/find-user-by-id user-id db))))))
+      (as-> user $
+        (merge existing-user $)
+        (logic.user/encrypt-password $)
+        (do (db.user/update-user user-id $ db)
+            (db.user/find-user-by-id user-id db))))))
 
 (s/defn get-user :- models.user/User
   [user-id :- s/Int
@@ -74,7 +74,7 @@
                            (:password profile-data) (assoc :password (:password profile-data)))
             ;; Encrypt password if it was updated
             final-user (if (:password profile-data)
-                        (logic.user/encrypt-password updated-user)
-                        updated-user)]
+                         (logic.user/encrypt-password updated-user)
+                         updated-user)]
         (db.user/update-user-profile user-id final-user db)
         (db.user/find-user-by-id user-id db)))))

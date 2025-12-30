@@ -17,8 +17,8 @@
   [match-id :- s/Int player-id :- s/Int event-type :- s/Str db]
   (with-open [conn (jdbc/get-connection (db))]
     (-> (sql/insert! conn :matchevents {:match_id match-id
-                                      :player_id player-id
-                                      :event_type event-type})
+                                        :player_id player-id
+                                        :event_type event-type})
         affected-rows-count)))
 
 (s/defn list-events-by-pelada :- [s/Any]
@@ -35,7 +35,7 @@
   [match-id :- s/Int player-id :- s/Int event-type :- s/Str db]
   (with-open [conn (jdbc/get-connection (db))]
     (-> (jdbc/execute-one! conn
-                            ["delete from MatchEvents where id in (
+                           ["delete from MatchEvents where id in (
                                 select id from MatchEvents
                                 where match_id = ? and player_id = ? and event_type = ?
                                 order by id desc limit 1

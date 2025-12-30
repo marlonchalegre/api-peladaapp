@@ -45,7 +45,7 @@
   [request]
   (if (authenticated? request)
     true
-    (error {:type :authentication 
+    (error {:type :authentication
             :message "Authentication required. Please provide a valid token."})))
 
 (defn admin-access
@@ -56,10 +56,10 @@
     (not (authenticated? request))
     (error {:type :authentication
             :message "Authentication required. Please provide a valid token."})
-    
+
     (not (and (:identity request)
               (:is-admin? (:identity request))))
     (error {:type :forbidden
             :message "Admin access required."})
-    
+
     :else true))

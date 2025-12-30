@@ -1,4 +1,4 @@
-(ns api-peladaapp.models.credential 
+(ns api-peladaapp.models.credential
   (:require
    [schema.core :as s]))
 

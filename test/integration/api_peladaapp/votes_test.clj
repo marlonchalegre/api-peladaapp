@@ -61,11 +61,11 @@
     (doseq [[i name email] [[1 "Ana" "ana@example.com"] [2 "Bob" "bob@example.com"] [3 "Cid" "cid@example.com"] [4 "Dan" "dan@example.com"]]]
       (sql/insert! ds :Users {:name name :email email :password "p"})
       (sql/insert! ds :OrganizationPlayers {:id i :organization_id 1 :user_id i}))
-    
+
     ;; Create closed pelada with closed_at timestamp
     (let [closed-at (str (.minus (Instant/now) (Duration/ofHours 1)))]
       (sql/insert! ds :Peladas {:id 1 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at closed-at}))
-    
+
     ;; Create teams and add players
     (sql/insert! ds :Teams {:id 1 :pelada_id 1 :name "Team A"})
     (sql/insert! ds :Teams {:id 2 :pelada_id 1 :name "Team B"})
@@ -79,7 +79,7 @@
     (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "admin@example.com" :password "p"})))
           token (:token (decode-body login))
           auth (fn [req] (mock/header req "authorization" (str "Token " token)))]
-      
+
       (testing "Voting info before voting"
         (let [resp (app (-> (mock/request :get "/api/peladas/1/voters/1/voting-info") auth))
               body (decode-body resp)]
@@ -88,32 +88,32 @@
           (is (false? (:has_voted body)))
           ;; Player 1 should see players 2, 3, 4 (not themselves)
           (is (= 3 (count (:eligible_players body))))))
-      
+
       (testing "Batch cast votes"
         (let [votes [{:target_id 2 :stars 5}
                      {:target_id 3 :stars 4}
                      {:target_id 4 :stars 3}]
-              resp (app (-> (mock/request :post "/api/peladas/1/votes/batch") 
-                           auth 
-                           (mock/json-body {:voter_id 1 :votes votes})))
+              resp (app (-> (mock/request :post "/api/peladas/1/votes/batch")
+                            auth
+                            (mock/json-body {:voter_id 1 :votes votes})))
               body (decode-body resp)]
           (is (= 200 (:status resp)))
           (is (= 3 (:votes-cast body)))))
-      
+
       (testing "Voting info after voting"
         (let [resp (app (-> (mock/request :get "/api/peladas/1/voters/1/voting-info") auth))
               body (decode-body resp)]
           (is (= 200 (:status resp)))
           (is (true? (:can_vote body)))
           (is (true? (:has_voted body)))))
-      
+
       (testing "Re-voting replaces previous votes"
         (let [new-votes [{:target_id 2 :stars 1}
-                        {:target_id 3 :stars 2}
-                        {:target_id 4 :stars 3}]
-              resp (app (-> (mock/request :post "/api/peladas/1/votes/batch") 
-                           auth 
-                           (mock/json-body {:voter_id 1 :votes new-votes})))]
+                         {:target_id 3 :stars 2}
+                         {:target_id 4 :stars 3}]
+              resp (app (-> (mock/request :post "/api/peladas/1/votes/batch")
+                            auth
+                            (mock/json-body {:voter_id 1 :votes new-votes})))]
           (is (= 200 (:status resp)))
           ;; Check that votes were replaced
           (let [votes-resp (app (-> (mock/request :get "/api/peladas/1/votes") auth))
@@ -129,24 +129,24 @@
     (doseq [[i name email] [[1 "Ana" "ana@example.com"] [2 "Bob" "bob@example.com"]]]
       (sql/insert! ds :Users {:name name :email email :password "p"})
       (sql/insert! ds :OrganizationPlayers {:id i :organization_id 1 :user_id i}))
-    
+
     ;; auth-protected endpoints: login to get token
     (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Admin" :email "admin@example.com" :password "p"})))
     (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "admin@example.com" :password "p"})))
           token (:token (decode-body login))
           auth (fn [req] (mock/header req "authorization" (str "Token " token)))]
-      
+
       (testing "Cannot vote on open pelada"
         (sql/insert! ds :Peladas {:id 2 :organization_id 1 :scheduled_at "2025-10-28" :status "open"})
         (let [resp (app (-> (mock/request :post "/api/votes") auth (mock/json-body {:pelada_id 2 :voter_id 2 :target_id 1 :stars 5})))]
           (is (= 400 (:status resp)))))
-      
+
       (testing "Cannot vote after 24 hours"
         (let [twenty-five-hours-ago (str (.minus (Instant/now) (Duration/ofHours 25)))]
           (sql/insert! ds :Peladas {:id 3 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at twenty-five-hours-ago})
           (let [resp (app (-> (mock/request :post "/api/votes") auth (mock/json-body {:pelada_id 3 :voter_id 2 :target_id 1 :stars 5})))]
             (is (= 400 (:status resp))))))
-      
+
       (testing "Can vote within 24 hours"
         (let [two-hours-ago (str (.minus (Instant/now) (Duration/ofHours 2)))]
           (sql/insert! ds :Peladas {:id 4 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at two-hours-ago})

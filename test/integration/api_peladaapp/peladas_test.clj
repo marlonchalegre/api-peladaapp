@@ -29,32 +29,32 @@
           token (:token (decode-body login))
           auth (fn [req] (mock/header req "authorization" (str "Token " token)))
           user-id (th/user-id-by-email ds "ana@ex.com")]
-      
+
       ;; Create organization (user becomes admin automatically)
       (let [org-resp (app (-> (mock/request :post "/api/organizations")
-                             (mock/json-body {:name "Club"})
-                             auth))
+                              (mock/json-body {:name "Club"})
+                              auth))
             org-id (:id (decode-body org-resp))]
         (is (= 201 (:status org-resp)))
-        
+
         ;; Create pelada (user is admin, so can create)
         (let [resp (app (-> (mock/request :post "/api/peladas")
-                           (mock/json-body {:organization_id org-id})
-                           auth))]
+                            (mock/json-body {:organization_id org-id})
+                            auth))]
           (is (= 201 (:status resp))))
-        
+
         ;; Create teams (user is admin)
         (doseq [n ["A" "B" "C" "D"]]
           (is (= 201 (:status (app (-> (mock/request :post "/api/teams")
-                                      (mock/json-body {:pelada_id 1 :name n})
-                                      auth))))))
-        
+                                       (mock/json-body {:pelada_id 1 :name n})
+                                       auth))))))
+
         ;; Begin pelada (user is admin, can begin)
         (let [resp (app (-> (mock/request :post "/api/peladas/1/begin") auth))
               body (decode-body resp)]
           (is (= 200 (:status resp)))
           (is (pos? (:matches-created body))))
-        
+
         ;; List matches (user is member, can view)
         (let [resp (app (-> (mock/request :get "/api/peladas/1/matches") auth))
               body (decode-body resp)]

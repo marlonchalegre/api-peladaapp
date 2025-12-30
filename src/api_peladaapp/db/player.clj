@@ -12,9 +12,9 @@
    db]
   (with-open [conn (jdbc/get-connection (db))]
     (-> (sql/insert! conn :organizationplayers {:user_id user_id
-                                              :organization_id organization_id
-                                              :grade grade
-                                              :position_id position_id})
+                                                :organization_id organization_id
+                                                :grade grade
+                                                :position_id position_id})
         affected-rows-count)))
 
 (s/defn update-player :- s/Int
