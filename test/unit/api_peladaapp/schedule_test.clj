@@ -13,5 +13,4 @@
       (let [freqs (frequencies (mapcat (fn [{:keys [home away]}] [home away]) matches))]
         (doseq [t teams]
           (is (= 3 (get freqs t 0)))))))
-  (testing "even teams required"
-    (is (thrown? AssertionError (schedule/schedule-matches [1 2 3])))))
+)

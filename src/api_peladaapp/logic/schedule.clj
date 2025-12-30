@@ -1,4 +1,76 @@
-(ns api-peladaapp.logic.schedule)
+(ns api-peladaapp.logic.schedule
+  (:require [clojure.math.combinatorics :as combo]
+            [clojure.set :as set]))
+
+(defn update-stats-for-play [stats team-id]
+  (let [current-stats (get stats team-id)
+        consecutive-plays (:consecutive-plays current-stats 0)
+        is-double (pos? consecutive-plays)]
+    (-> stats
+        (update-in [team-id :played] (fnil inc 0))
+        (assoc-in [team-id :consecutive-rests] 0)
+        (update-in [team-id :consecutive-plays] (fnil inc 0))
+        (update-in [team-id :doubles-count] (if is-double inc identity)))))
+
+(defn update-stats-for-rest [stats team-id]
+  (-> stats
+      (assoc-in [team-id :consecutive-plays] 0)
+      (update-in [team-id :consecutive-rests] (fnil inc 0))))
+
+(defn valid-match? [team-stats matches-per-team teams-in-match]
+  (let [team1 (first teams-in-match)
+        team2 (second teams-in-match)
+        stats1 (get team-stats team1)
+        stats2 (get team-stats team2)
+
+        ;; Calculate potential new doubles count
+        t1-double? (pos? (:consecutive-plays stats1 0))
+        t2-double? (pos? (:consecutive-plays stats2 0))
+        t1-new-doubles (if t1-double? (inc (:doubles-count stats1 0)) (:doubles-count stats1 0))
+        t2-new-doubles (if t2-double? (inc (:doubles-count stats2 0)) (:doubles-count stats2 0))
+
+        all-doubles (map :doubles-count (vals team-stats))
+        min-doubles (if (seq all-doubles) (apply min all-doubles) 0)]
+    (and
+     ;; Check for team1
+     (< (:played stats1 0) matches-per-team)
+     (< (:consecutive-plays stats1 0) 2)
+     ;; Check for team2
+     (< (:played stats2 0) matches-per-team)
+     (< (:consecutive-plays stats2 0) 2)
+     ;; Check other teams for consecutive rests
+     (every? (fn [[team-id stats]]
+               (if (or (= team-id team1) (= team-id team2))
+                 true
+                 (< (:consecutive-rests stats 0) 2)))
+             (apply dissoc team-stats teams-in-match))
+     ;; Fairness check for doubles
+     (<= (- t1-new-doubles min-doubles) 1)
+     (<= (- t2-new-doubles min-doubles) 1))))
+
+(defn- find-schedule
+  [schedule team-stats all-teams total-matches matches-per-team remaining-matches]
+  (if (empty? remaining-matches)
+    schedule
+    (let [distinct-matches (distinct remaining-matches)]
+      (loop [candidates distinct-matches]
+        (when-let [match (first candidates)]
+        (let [teams-in-match [(:home match) (:away match)]]
+          (if (valid-match? team-stats matches-per-team teams-in-match)
+            (let [playing-teams (set teams-in-match)
+                    resting-teams (set/difference all-teams playing-teams)
+                  next-team-stats (reduce update-stats-for-play team-stats playing-teams)
+                  next-team-stats (reduce update-stats-for-rest next-team-stats resting-teams)
+                  
+                    idx (.indexOf remaining-matches match)
+                    next-remaining (vec (concat (subvec remaining-matches 0 idx)
+                                                (subvec remaining-matches (inc idx))))
+                  
+                    result (find-schedule (conj schedule match) next-team-stats all-teams total-matches matches-per-team next-remaining)]
+              (if (seq result)
+                result
+                  (recur (rest candidates))))
+              (recur (rest candidates)))))))))
 
 (defn- pair-round [teams]
   (let [n (count teams)
@@ -8,8 +80,6 @@
     (map vector left right)))
 
 (defn- circle-method-rounds
-  "Generate round-robin rounds using the circle method.
-   teams: vector of team ids (even count). Returns a seq of rounds, each a seq of [home away]."
   [teams]
   (let [n (count teams)
         _ (assert (even? n) "Number of teams must be even")
@@ -24,7 +94,6 @@
         rounds
         (let [current (vec (concat left right))
               pairs (pair-round current)
-              ;; rotate keeping head fixed
               rotated (if (<= 2 (count current))
                         (vec (concat [head] [(last current)] (subvec current 1 (dec (count current)))))
                         current)]
@@ -33,74 +102,31 @@
                  (vec (rest rotated))
                  (conj rounds pairs)))))))
 
-(defn schedule-matches
-  "Return a vector of matches as maps {:home team-id :away team-id}, with a sequence order that tries
-   to avoid >2 consecutive plays or rests. For now we flatten rounds and interleave pairs from different rounds
-   to reduce consecutive constraints."
-  [team-ids]
-  (let [rounds (circle-method-rounds (vec team-ids))
-        ;; Interleave across rounds by taking first match from each round, then second, etc.
-        max-matches-per-round (apply max (map count rounds))
-        seq-matches (for [i (range max-matches-per-round)
-                          r rounds
-                          :let [m (nth r i nil)]
-                          :when m]
-                      m)]
-    (mapv (fn [[h a]] {:home h :away a}) seq-matches)))
+(defn- generate-all-possible-matches [team-ids]
+  (->> (combo/combinations team-ids 2)
+       (mapv (fn [[h a]] {:home h :away a}))))
 
 (defn schedule-matches-with-limit
-  "Greedy scheduler with coverage: ensure every pair of teams meets at least
-  once, and respect max 2 consecutive plays or rests. Each team plays up to
-  target = max(matches-per-team, (count teams)-1). Returns a vector."
+  "Backtracking scheduler to find a valid sequence of matches."
   [team-ids matches-per-team]
+  (when (and matches-per-team (odd? (* (count team-ids) matches-per-team)))
+    (throw (ex-info "Total number of plays must be even."
+                    {:type :bad-request})))
   (let [teams (vec team-ids)
         n (count teams)
-        target (max (or matches-per-team 0) (dec n))
-        init (zipmap teams (repeat {:played 0 :play-streak 0 :rest-streak 0}))
-        required (->> (schedule-matches team-ids)
-                      (map (fn [{:keys [home away]}]
-                             [(min home away) (max home away)]))
-                      set)]
-    (loop [state init
-           need required
-           acc []]
-      (if (every? (fn [[_ {:keys [played]}]] (>= played target)) state)
-        (vec acc)
-        (let [all-pairs (for [i (range n)
-                              j (range (inc i) n)]
-                          [(teams i) (teams j)])
-              scored (->> all-pairs
-                          (filter (fn [[a b]]
-                                    (let [{pa :played sa :play-streak} (state a)
-                                          {pb :played sb :play-streak} (state b)]
-                                      (and (< pa target) (< pb target) (< sa 2) (< sb 2)))))
-                          (map (fn [[a b]]
-                                 (let [{ra :rest-streak pa :played} (state a)
-                                       {rb :rest-streak pb :played} (state b)
-                                       must? (contains? need [(min a b) (max a b)])]
-                                   [[a b] [(if must? 1 0) (- target pa) (- target pb) ra rb]])))
-                          (sort-by (fn [[_ [must need-a need-b rest-a rest-b]]]
-                                     [(- must) (- need-a) (- need-b) (- rest-a) (- rest-b)])))
-              pair (ffirst scored)]
-          (if (nil? pair)
-            (vec acc)
-            (let [[a b] pair
-                  updated (-> state
-                              (update a (fn [{:keys [played]}]
-                                          {:played (inc played)
-                                           :play-streak (inc (:play-streak (state a)))
-                                           :rest-streak 0}))
-                              (update b (fn [{:keys [played]}]
-                                          {:played (inc played)
-                                           :play-streak (inc (:play-streak (state b)))
-                                           :rest-streak 0})))
-                  state' (into {}
-                               (for [[t s] updated]
-                                 (if (or (= t a) (= t b))
-                                   [t s]
-                                   [t {:played (:played s)
-                                       :play-streak 0
-                                       :rest-streak (inc (:rest-streak s))}])))
-                  need' (disj need [(min a b) (max a b)])]
-              (recur state' need' (conj acc {:home a :away b})))))))))
+        total-matches (if (and n (pos? n) matches-per-team) (quot (* n matches-per-team) 2) 0)
+        all-teams-set (set teams)
+        initial-stats (zipmap teams (repeat {:played 0 :consecutive-plays 0 :consecutive-rests 0 :doubles-count 0}))
 
+        round-robin-matches (if (even? n)
+                              (mapv (fn [[h a]] {:home h :away a}) (mapcat identity (circle-method-rounds teams)))
+                              (generate-all-possible-matches teams))
+
+        all-possible-matches (vec (take total-matches (cycle round-robin-matches)))]
+    (find-schedule [] initial-stats all-teams-set total-matches matches-per-team all-possible-matches)))
+
+(defn schedule-matches
+  [team-ids]
+  (let [n (count team-ids)
+        matches-per-team (dec n)]
+   (schedule-matches-with-limit team-ids matches-per-team)))
