@@ -3,6 +3,7 @@
    [api-peladaapp.adapters.pelada :as adapter.pelada]
    [api-peladaapp.controllers.pelada :as controller.pelada]
    [api-peladaapp.helpers.exception :as exception]
+   [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.helpers.responses :refer [created deleted ok updated]]
    [api-peladaapp.logic.authorization :as auth]))
 
@@ -72,11 +73,15 @@
 (defn list-by-org [request]
   (try (let [db (:database request)
              org-id (get-in request [:params :organization_id])
-             user-id (auth/get-user-id-from-request request)]
+             user-id (auth/get-user-id-from-request request)
+             query-params (:query-params request)
+             pagination (pagination/parse-pagination-params query-params)]
          ;; Members can list peladas
          (auth/require-organization-member! user-id org-id db)
-         (let [peladas (controller.pelada/list-peladas org-id db)]
-           (ok (map adapter.pelada/model->response peladas))))
+         (let [peladas-data (controller.pelada/list-peladas org-id db pagination)
+               peladas-models (:data peladas-data)
+               peladas-responses (map adapter.pelada/model->response peladas-models)]
+           (ok peladas-responses (:headers peladas-data))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn begin [request]

@@ -43,9 +43,18 @@
 
 (s/defn list-peladas :- [s/Any]
   [organization-id :- s/Int
+   limit :- s/Int
+   offset :- s/Int
    db]
-  (->> (sql/find-by-keys db :Peladas {:organization_id organization-id})
+  (->> (sql/query db ["select * from Peladas where organization_id = ? order by id desc limit ? offset ?" organization-id limit offset])
        (map adapter.pelada/db->model)))
+
+(s/defn count-peladas :- s/Int
+  [organization-id :- s/Int
+   db]
+  (-> (sql/query db ["select count(*) as count from Peladas where organization_id = ?" organization-id])
+      first
+      :count))
 
 (s/defn get-pelada-full-details :- s/Any
   [pelada-id :- s/Int

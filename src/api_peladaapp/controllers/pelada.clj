@@ -7,6 +7,7 @@
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.team :as db.team]
    [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.logic.pelada :as pelada.logic]
    [api-peladaapp.models.pelada :as models.pelada]
    [api-peladaapp.responses.pelada :as responses.pelada]
@@ -68,9 +69,14 @@
       (throw (ex-info nil {:type :not-found :message "Pelada not found"}))
       rows)))
 
-(s/defn list-peladas :- [models.pelada/Pelada]
-  [organization-id :- s/Int db]
-  (db.pelada/list-peladas organization-id db))
+(s/defn list-peladas
+  [organization-id :- s/Int db pagination]
+  (let [page (or (:page pagination) 1)
+        per-page (or (:per-page pagination) 20)
+        offset (* (- page 1) per-page)
+        peladas (db.pelada/list-peladas organization-id per-page offset db)
+        total-count (db.pelada/count-peladas organization-id db)]
+    (pagination/with-pagination-headers peladas total-count page per-page)))
 
 (s/defn begin-pelada :- responses.pelada/PeladaBeginResponse
   "Generate matches for a pelada, transition it to running, and seed lineups."
