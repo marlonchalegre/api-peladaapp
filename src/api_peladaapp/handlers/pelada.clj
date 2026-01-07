@@ -1,20 +1,22 @@
 (ns api-peladaapp.handlers.pelada
-  (:require [api-peladaapp.adapters.pelada :as adapter.pelada]
-            [api-peladaapp.controllers.pelada :as controller.pelada]
-            [api-peladaapp.helpers.exception :as exception]
-            [api-peladaapp.helpers.responses :refer [created ok updated deleted]]
-            [api-peladaapp.logic.authorization :as auth]))
+  (:require
+   [api-peladaapp.adapters.pelada :as adapter.pelada]
+   [api-peladaapp.controllers.pelada :as controller.pelada]
+   [api-peladaapp.helpers.exception :as exception]
+   [api-peladaapp.helpers.responses :refer [created deleted ok updated]]
+   [api-peladaapp.logic.authorization :as auth]))
 
 (defn create [request]
   (try (let [db (:database request)
              body (:body request)
-             pelada (adapter.pelada/in->model body)
+             pelada (adapter.pelada/create-request->model body)
              user-id (auth/get-user-id-from-request request)
              org-id (:organization_id pelada)]
          ;; Only admins can create peladas
          (auth/require-organization-admin! user-id org-id db)
-         (let [id (controller.pelada/create-pelada pelada db)]
-           (created {:id id})))
+         (-> (controller.pelada/create-pelada pelada db)
+             adapter.pelada/model->response
+             created))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn get-by-id [request]
@@ -25,7 +27,9 @@
              org-id (:organization_id pelada)]
          ;; Members can view peladas
          (auth/require-organization-member! user-id org-id db)
-         (ok pelada))
+         (-> pelada
+             adapter.pelada/model->response
+             ok))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn get-full-details [request]
@@ -36,6 +40,7 @@
              org-id (get-in pelada-data [:pelada :organization_id])]
          ;; Members can view peladas
          (auth/require-organization-member! user-id org-id db)
+         ;; Returning as is (map) since it's a complex response defined in controller return type
          (ok pelada-data))
        (catch Exception e (exception/api-exception-handler e))))
 
@@ -48,7 +53,9 @@
              org-id (:organization_id pelada)]
          ;; Only admins can update peladas
          (auth/require-organization-admin! user-id org-id db)
-         (updated (controller.pelada/update-pelada id body db)))
+         (-> (controller.pelada/update-pelada id (adapter.pelada/update-request->model body) db)
+             adapter.pelada/model->response
+             updated))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn delete [request]
@@ -68,7 +75,8 @@
              user-id (auth/get-user-id-from-request request)]
          ;; Members can list peladas
          (auth/require-organization-member! user-id org-id db)
-         (ok (controller.pelada/list-peladas org-id db)))
+         (let [peladas (controller.pelada/list-peladas org-id db)]
+           (ok (map adapter.pelada/model->response peladas))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn begin [request]
@@ -94,7 +102,9 @@
              org-id (:organization_id pelada)]
          ;; Only admins can close peladas
          (auth/require-organization-admin! user-id org-id db)
-         (ok (controller.pelada/close-pelada id db)))
+         (-> (controller.pelada/close-pelada id db)
+             adapter.pelada/model->response
+             ok))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn get-dashboard-data [request]

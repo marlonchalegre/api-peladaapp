@@ -1,14 +1,16 @@
 (ns api-peladaapp.controllers.pelada
-  (:require [api-peladaapp.db.match :as db.match]
-            [api-peladaapp.db.match-event :as db.match-event]
-            [api-peladaapp.db.match-lineup :as db.match-lineup]
-            [api-peladaapp.db.pelada :as db.pelada]
-            [api-peladaapp.db.player :as db.player]
-            [api-peladaapp.db.team :as db.team]
-            [api-peladaapp.db.user :as db.user]
-            [api-peladaapp.models.user :as models.user]
-            [api-peladaapp.logic.pelada :as pelada.logic]
-            [schema.core :as s]))
+  (:require
+   [api-peladaapp.db.match :as db.match]
+   [api-peladaapp.db.match-event :as db.match-event]
+   [api-peladaapp.db.match-lineup :as db.match-lineup]
+   [api-peladaapp.db.pelada :as db.pelada]
+   [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.db.team :as db.team]
+   [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.logic.pelada :as pelada.logic]
+   [api-peladaapp.models.pelada :as models.pelada]
+   [api-peladaapp.responses.pelada :as responses.pelada]
+   [schema.core :as s]))
 
 (defn- auto-create-teams!
   [pelada-id team-count db]
@@ -36,31 +38,41 @@
        (map :id)
        (run! #(db.match-lineup/ensure-seeded % db))))
 
-(s/defn create-pelada :- s/Int
-  "Create pelada and optionally seed default teams. Returns pelada id."
-  [pelada db]
+(s/defn create-pelada :- models.pelada/Pelada
+  "Create pelada and optionally seed default teams. Returns pelada model."
+  [pelada :- models.pelada/Pelada
+   db]
   (let [pelada-id (db.pelada/insert-pelada pelada db)]
     (when-let [team-count (:num_teams pelada)]
       (auto-create-teams! pelada-id team-count db))
-    pelada-id))
+    (db.pelada/get-pelada pelada-id db)))
 
-(s/defn get-pelada :- s/Any
+(s/defn get-pelada :- models.pelada/Pelada
   [pelada-id :- s/Int db]
-  (db.pelada/get-pelada pelada-id db))
+  (let [pelada (db.pelada/get-pelada pelada-id db)]
+    (if (nil? pelada)
+      (throw (ex-info nil {:type :not-found :message "Pelada not found"}))
+      pelada)))
 
-(s/defn update-pelada :- s/Int
-  [pelada-id :- s/Int pelada db]
-  (db.pelada/update-pelada pelada-id pelada db))
+(s/defn update-pelada :- models.pelada/Pelada
+  [pelada-id :- s/Int pelada :- models.pelada/Pelada db]
+  (let [rows (db.pelada/update-pelada pelada-id pelada db)]
+    (if (zero? rows)
+      (throw (ex-info nil {:type :not-found :message "Pelada not found"}))
+      (db.pelada/get-pelada pelada-id db))))
 
 (s/defn delete-pelada :- s/Int
   [pelada-id :- s/Int db]
-  (db.pelada/delete-pelada pelada-id db))
+  (let [rows (db.pelada/delete-pelada pelada-id db)]
+    (if (zero? rows)
+      (throw (ex-info nil {:type :not-found :message "Pelada not found"}))
+      rows)))
 
-(s/defn list-peladas :- [s/Any]
+(s/defn list-peladas :- [models.pelada/Pelada]
   [organization-id :- s/Int db]
   (db.pelada/list-peladas organization-id db))
 
-(s/defn begin-pelada :- {:matches-created s/Int}
+(s/defn begin-pelada :- responses.pelada/PeladaBeginResponse
   "Generate matches for a pelada, transition it to running, and seed lineups."
   [pelada-id :- s/Int db & [opts]]
   (let [matches-per-team (:matches_per_team (or opts {}))
@@ -71,29 +83,15 @@
     (persist-match-plan! pelada-id match-plan db)
     (db.pelada/update-pelada pelada-id {:status "running"} db)
     (seed-lineups-from-teams! pelada-id db)
-    {:matches-created (count match-plan)}))
+    {:matches_created (count match-plan)}))
 
-(s/defschema PeladaClosedResponse {:updated s/Int})
-
-(s/defn close-pelada :- PeladaClosedResponse
+(s/defn close-pelada :- models.pelada/Pelada
   [pelada-id :- s/Int db]
   (db.match/finish-all-by-pelada pelada-id db)
-  {:updated (db.pelada/update-pelada pelada-id {:status "closed" :closed_at (str (java.time.Instant/now))} db)})
+  (db.pelada/update-pelada pelada-id {:status "closed" :closed_at (str (java.time.Instant/now))} db)
+  (db.pelada/get-pelada pelada-id db))
 
-(s/defschema TeamLineupSchema {(s/pred int? "int-key") [s/Any]})
-
-(s/defschema PeladaDashboardResponse
-  {:pelada s/Any
-   :matches [s/Any]
-   :teams [s/Any]
-   :users [models.user/PublicUser]
-   :organization-players [s/Any]
-   :match-events [s/Any]
-   :player-stats (s/maybe [s/Any])
-   :team-players-map {s/Int [s/Any]}
-   :match-lineups-map {s/Int TeamLineupSchema}})
-
-(s/defn get-pelada-dashboard-data :- PeladaDashboardResponse
+(s/defn get-pelada-dashboard-data :- responses.pelada/PeladaDashboardResponse
   [pelada-id :- s/Int db]
   (let [pelada (db.pelada/get-pelada pelada-id db)
         organization-id (:organization_id pelada)
@@ -103,8 +101,8 @@
         organization-players (db.player/list-players-by-organization organization-id db)
         match-events (db.match-event/list-events-by-pelada pelada-id db)
         player-stats (try (db.match-event/list-player-stats-by-pelada pelada-id db) (catch Exception _ nil))
-        team-players (db.team/list-team-players-by-pelada pelada-id db) ; New function
-        match-lineups (db.match-lineup/list-match-lineups-by-pelada pelada-id db) ; New function
+        team-players (db.team/list-team-players-by-pelada pelada-id db)
+        match-lineups (db.match-lineup/list-match-lineups-by-pelada pelada-id db)
 
         ;; Transform team-players into a map
         team-players-map (group-by :team_id team-players)
@@ -124,7 +122,7 @@
      :team_players_map team-players-map
      :match_lineups_map match-lineups-map}))
 
-(s/defn get-pelada-full-details-controller :- s/Any
+(s/defn get-pelada-full-details-controller :- responses.pelada/PeladaFullDetailsResponse
   [pelada-id :- s/Int
    user-id :- s/Int
    db]

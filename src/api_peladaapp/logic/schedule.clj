@@ -1,6 +1,7 @@
 (ns api-peladaapp.logic.schedule
-  (:require [clojure.math.combinatorics :as combo]
-            [clojure.set :as set]))
+  (:require
+   [clojure.math.combinatorics :as combo]
+   [clojure.set :as set]))
 
 (defn update-stats-for-play [stats team-id]
   (let [current-stats (get stats team-id)

@@ -1,12 +1,14 @@
 (ns api-peladaapp.votes-test
-  (:require [clojure.test :refer [deftest is testing use-fixtures]]
-            [ring.mock.request :as mock]
-            [clojure.data.json :as json]
-            [clojure.string :as str]
-            [next.jdbc :as jdbc]
-            [next.jdbc.sql :as sql]
-            [api-peladaapp.test-helpers :as th])
-  (:import [java.time Instant Duration]))
+  (:require
+   [api-peladaapp.test-helpers :as th]
+   [clojure.data.json :as json]
+   [clojure.string :as str]
+   [clojure.test :refer [deftest is testing use-fixtures]]
+   [next.jdbc :as jdbc]
+   [next.jdbc.sql :as sql]
+   [ring.mock.request :as mock])
+  (:import
+   [java.time Duration Instant]))
 
 (use-fixtures :each th/test-system-fixture)
 
@@ -102,7 +104,7 @@
                             (mock/json-body {:voter_id 1 :votes votes})))
               body (decode-body resp)]
           (is (= 200 (:status resp)))
-          (is (= 3 (:votes-cast body)))))
+          (is (= 3 (:votes_cast body)))))
 
       (testing "Voting info after voting"
         (let [resp (app (-> (mock/request :get "/api/peladas/1/voters/1/voting-info") auth))

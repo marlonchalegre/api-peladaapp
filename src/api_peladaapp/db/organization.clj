@@ -1,8 +1,9 @@
 (ns api-peladaapp.db.organization
-  (:require [api-peladaapp.adapters.organization :as adapter.organization]
-            [next.jdbc :as jdbc]
-            [next.jdbc.sql :as sql]
-            [schema.core :as s]))
+  (:require
+   [api-peladaapp.adapters.organization :as adapter.organization]
+   [next.jdbc :as jdbc]
+   [next.jdbc.sql :as sql]
+   [schema.core :as s]))
 
 (defn- affected-rows-count [result]
   (-> result vals first))

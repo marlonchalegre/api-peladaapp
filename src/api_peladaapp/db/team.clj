@@ -1,8 +1,9 @@
 (ns api-peladaapp.db.team
-  (:require [api-peladaapp.adapters.team :as adapter.team]
-            [next.jdbc :as jdbc]
-            [next.jdbc.sql :as sql]
-            [schema.core :as s]))
+  (:require
+   [api-peladaapp.adapters.team :as adapter.team]
+   [next.jdbc :as jdbc]
+   [next.jdbc.sql :as sql]
+   [schema.core :as s]))
 
 (defn- unqualify-row [row]
   (into {}

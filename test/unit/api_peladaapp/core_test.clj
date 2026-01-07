@@ -1,6 +1,7 @@
 (ns api-peladaapp.core-test
-  (:require [clojure.test :refer [deftest is testing]]
-            [api-peladaapp.core :as core]))
+  (:require
+   [api-peladaapp.core :as core]
+   [clojure.test :refer [deftest is testing]]))
 
 (deftest sanity
   (testing "-main is defined"

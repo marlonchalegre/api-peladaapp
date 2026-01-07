@@ -1,13 +1,12 @@
 (ns api-peladaapp.db.pelada
   (:require
    [api-peladaapp.adapters.pelada :as adapter.pelada]
+   [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.db.team :as db.team]
+   [api-peladaapp.db.user :as db.user]
    [next.jdbc :as jdbc]
    [next.jdbc.sql :as sql]
-   [schema.core :as s]
-   [api-peladaapp.db.team :as db.team]
-   [api-peladaapp.db.player :as db.player]
-   [api-peladaapp.db.user :as db.user]
-   [medley.core :as medley.core]))
+   [schema.core :as s]))
 
 (defn- affected-rows-count
   [result]
@@ -65,10 +64,10 @@
         ; Add players to teams
         teams-with-players (map (fn [team]
                                   (assoc team :players (map (fn [team-player]
-                                                               (let [player (first (filter #(= (:player_id team-player) (:id %)) all-org-players))
-                                                                     user (get users-map (:user_id player))]
-                                                                 (assoc player :user user)))
-                                                             (get team-players-grouped (:id team) []))))
+                                                              (let [player (first (filter #(= (:player_id team-player) (:id %)) all-org-players))
+                                                                    user (get users-map (:user_id player))]
+                                                                (assoc player :user user)))
+                                                            (get team-players-grouped (:id team) []))))
                                 teams)
 
         ; Identify players already assigned to teams

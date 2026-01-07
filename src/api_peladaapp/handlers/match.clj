@@ -1,10 +1,12 @@
 (ns api-peladaapp.handlers.match
-  (:require [api-peladaapp.controllers.match :as match-controller]
-            [api-peladaapp.controllers.pelada :as pelada-controller]
-            [api-peladaapp.db.match :as db.match]
-            [api-peladaapp.helpers.exception :as exception]
-            [api-peladaapp.helpers.responses :refer [ok updated]]
-            [api-peladaapp.logic.authorization :as auth]))
+  (:require
+   [api-peladaapp.adapters.match :as adapter.match]
+   [api-peladaapp.controllers.match :as match-controller]
+   [api-peladaapp.controllers.pelada :as pelada-controller]
+   [api-peladaapp.db.match :as db.match]
+   [api-peladaapp.helpers.exception :as exception]
+   [api-peladaapp.helpers.responses :refer [ok updated]]
+   [api-peladaapp.logic.authorization :as auth]))
 
 (defn list-by-pelada [request]
   (try (let [db (:database request)
@@ -14,7 +16,8 @@
              org-id (:organization_id pelada)]
          ;; Members can view matches
          (auth/require-organization-member! user-id org-id db)
-         (ok (match-controller/list-matches pelada-id db)))
+         (let [matches (match-controller/list-matches pelada-id db)]
+           (ok (map adapter.match/model->response matches))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn list-events-by-pelada [request]
@@ -25,7 +28,8 @@
              org-id (:organization_id pelada)]
          ;; Members can view events
          (auth/require-organization-member! user-id org-id db)
-         (ok (match-controller/list-events-by-pelada pelada-id db)))
+         (let [events (match-controller/list-events-by-pelada pelada-id db)]
+           (ok (map adapter.match/event->response events))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn list-player-stats-by-pelada [request]
@@ -36,7 +40,8 @@
              org-id (:organization_id pelada)]
          ;; Members can view stats
          (auth/require-organization-member! user-id org-id db)
-         (ok (match-controller/list-player-stats-by-pelada pelada-id db)))
+         (let [stats (match-controller/list-player-stats-by-pelada pelada-id db)]
+           (ok (map adapter.match/stats->response stats))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn update-score [request]
@@ -49,7 +54,9 @@
              org-id (:organization_id pelada)]
          ;; Only admins can update scores
          (auth/require-organization-admin! user-id org-id db)
-         (updated (match-controller/update-score id body db)))
+         (-> (match-controller/update-score id (adapter.match/update-score-request->model body) db)
+             adapter.match/model->response
+             updated))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn create-event [request]
@@ -62,7 +69,9 @@
              org-id (:organization_id pelada)]
          ;; Only admins can create events
          (auth/require-organization-admin! user-id org-id db)
-         (updated (match-controller/create-event id body db)))
+         (-> (match-controller/create-event id (adapter.match/create-event-request->model body) db)
+             adapter.match/event->response
+             updated))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn delete-event [request]
@@ -76,7 +85,7 @@
           org-id (:organization_id pelada)]
       ;; Only admins can delete events
       (auth/require-organization-admin! user-id org-id db)
-      (updated (match-controller/delete-last-event id body db)))
+      (updated (match-controller/delete-last-event id (adapter.match/delete-event-request->model body) db)))
     (catch Exception e
       (exception/api-exception-handler e))))
 
@@ -98,40 +107,40 @@
   (try
     (let [db (:database request)
           id (Integer/parseInt (clojure.core/str (get-in request [:params :id])))
-          {:keys [team_id player_id]} (:body request)
+          body (:body request)
           user-id (auth/get-user-id-from-request request)
           match (db.match/get-match id db)
           pelada (pelada-controller/get-pelada (:pelada_id match) db)
           org-id (:organization_id pelada)]
       ;; Only admins can modify lineups
       (auth/require-organization-admin! user-id org-id db)
-      (updated (match-controller/add-lineup-player id {:team_id team_id :player_id player_id} db)))
+      (updated (match-controller/add-lineup-player id (adapter.match/add-lineup-request->model body) db)))
     (catch Exception e (exception/api-exception-handler e))))
 
 (defn remove-lineup-player [request]
   (try
     (let [db (:database request)
           id (Integer/parseInt (clojure.core/str (get-in request [:params :id])))
-          {:keys [team_id player_id]} (:body request)
+          body (:body request)
           user-id (auth/get-user-id-from-request request)
           match (db.match/get-match id db)
           pelada (pelada-controller/get-pelada (:pelada_id match) db)
           org-id (:organization_id pelada)]
       ;; Only admins can modify lineups
       (auth/require-organization-admin! user-id org-id db)
-      (updated (match-controller/remove-lineup-player id {:team_id team_id :player_id player_id} db)))
+      (updated (match-controller/remove-lineup-player id (adapter.match/remove-lineup-request->model body) db)))
     (catch Exception e (exception/api-exception-handler e))))
 
 (defn replace-lineup-player [request]
   (try
     (let [db (:database request)
           id (Integer/parseInt (clojure.core/str (get-in request [:params :id])))
-          {:keys [team_id out_player_id in_player_id]} (:body request)
+          body (:body request)
           user-id (auth/get-user-id-from-request request)
           match (db.match/get-match id db)
           pelada (pelada-controller/get-pelada (:pelada_id match) db)
           org-id (:organization_id pelada)]
       ;; Only admins can modify lineups
       (auth/require-organization-admin! user-id org-id db)
-      (updated (match-controller/replace-lineup-player id {:team_id team_id :out_player_id out_player_id :in_player_id in_player_id} db)))
+      (updated (match-controller/replace-lineup-player id (adapter.match/replace-lineup-request->model body) db)))
     (catch Exception e (exception/api-exception-handler e))))

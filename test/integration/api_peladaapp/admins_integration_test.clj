@@ -1,8 +1,9 @@
 (ns api-peladaapp.admins-integration-test
-  (:require [clojure.test :refer [deftest is testing use-fixtures]]
-            [ring.mock.request :as mock]
-            [api-peladaapp.test-helpers :as th]
-            [next.jdbc :as jdbc]))
+  (:require
+   [api-peladaapp.test-helpers :as th]
+   [clojure.test :refer [deftest is testing use-fixtures]]
+   [next.jdbc :as jdbc]
+   [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 

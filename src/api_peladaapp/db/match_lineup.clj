@@ -1,9 +1,9 @@
 (ns api-peladaapp.db.match-lineup
-  (:require [api-peladaapp.db.match :as db.match]
-            [api-peladaapp.db.team :as db.team]
-            [next.jdbc.sql :as sql]
-            [next.jdbc :as jdbc]
-            [schema.core :as s]))
+  (:require
+   [api-peladaapp.db.match :as db.match]
+   [api-peladaapp.db.team :as db.team]
+   [next.jdbc.sql :as sql]
+   [schema.core :as s]))
 
 (defn- unqualify-row [row]
   (into {}

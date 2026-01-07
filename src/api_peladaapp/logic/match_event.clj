@@ -1,5 +1,6 @@
 (ns api-peladaapp.logic.match-event
-  (:require [clojure.string :as str]))
+  (:require
+   [clojure.string :as str]))
 
 (def ^:private allowed-event-types
   #{"assist" "goal" "own_goal"})

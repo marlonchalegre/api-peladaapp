@@ -1,10 +1,11 @@
 (ns api-peladaapp.pelada-close-test
-  (:require [api-peladaapp.controllers.pelada :as pelada.controller]
-            [clojure.test :refer [deftest is use-fixtures]]
-            [ring.mock.request :as mock]
-            [clojure.data.json :as json]
-            [next.jdbc :as jdbc]
-            [api-peladaapp.test-helpers :as th]))
+  (:require
+   [api-peladaapp.controllers.pelada :as pelada.controller]
+   [api-peladaapp.test-helpers :as th]
+   [clojure.data.json :as json]
+   [clojure.test :refer [deftest is use-fixtures]]
+   [next.jdbc :as jdbc]
+   [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 
@@ -53,7 +54,8 @@
                                     auth))
                 body (decode-body close-resp)]
             (is (= 200 (:status close-resp)))
-            (is (= {:updated 1} body))
+            (is (= "closed" (:status body)))
+            (is (not (nil? (:closed_at body))))
 
             (let [pelada (pelada.controller/get-pelada pelada-id ds)]
               (is (= "closed" (:status pelada)))

@@ -1,7 +1,8 @@
 (ns api-peladaapp.substitutions-test
-  (:require [clojure.test :refer [deftest is testing use-fixtures]]
-            [ring.mock.request :as mock]
-            [api-peladaapp.test-helpers :as th]))
+  (:require
+   [api-peladaapp.test-helpers :as th]
+   [clojure.test :refer [deftest is testing use-fixtures]]
+   [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 

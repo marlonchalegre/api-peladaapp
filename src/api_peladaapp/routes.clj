@@ -1,17 +1,17 @@
 (ns api-peladaapp.routes
   (:require
-   [api-peladaapp.handlers.auth :as auth]
    [api-peladaapp.handlers.admin :as handler.admin]
+   [api-peladaapp.handlers.auth :as auth]
    [api-peladaapp.handlers.match :as handler.match]
    [api-peladaapp.handlers.organization :as handler.organization]
    [api-peladaapp.handlers.pelada :as handler.pelada]
    [api-peladaapp.handlers.player :as handler.player]
-   [api-peladaapp.handlers.team :as handler.team]
-   [api-peladaapp.handlers.substitution :as handler.substitution]
-   [api-peladaapp.handlers.vote :as handler.vote]
-   [api-peladaapp.handlers.user :as handler.user]
    [api-peladaapp.handlers.randomize :as handlers.randomize]
    [api-peladaapp.handlers.score :as handlers.score]
+   [api-peladaapp.handlers.substitution :as handler.substitution]
+   [api-peladaapp.handlers.team :as handler.team]
+   [api-peladaapp.handlers.user :as handler.user]
+   [api-peladaapp.handlers.vote :as handler.vote]
    [compojure.core     :refer [context defroutes DELETE GET POST PUT routes]]
    [compojure.route    :refer [not-found]]))
 

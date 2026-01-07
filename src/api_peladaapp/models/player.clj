@@ -1,5 +1,6 @@
 (ns api-peladaapp.models.player
-  (:require [schema.core :as s]))
+  (:require
+   [schema.core :as s]))
 
 (s/defschema Player
   {:id s/Int

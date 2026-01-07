@@ -1,10 +1,10 @@
 (ns api-peladaapp.user-profile-test
-  (:require [clojure.test :refer [deftest is testing use-fixtures]]
-            [ring.mock.request :as mock]
-            [clojure.data.json :as json]
-            [clojure.string :as str]
-            [api-peladaapp.test-helpers :as th]
-            [buddy.hashers :as hashers]))
+  (:require
+   [api-peladaapp.test-helpers :as th]
+   [clojure.data.json :as json]
+   [clojure.string :as str]
+   [clojure.test :refer [deftest is testing use-fixtures]]
+   [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 

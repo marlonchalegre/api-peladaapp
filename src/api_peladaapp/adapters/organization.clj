@@ -1,13 +1,23 @@
 (ns api-peladaapp.adapters.organization
-  (:require [api-peladaapp.helpers.misc :as misc]
-            [schema.core :as s]))
+  (:require
+   [api-peladaapp.helpers.misc :as misc]
+   [api-peladaapp.models.organization :as models.organization]
+   [api-peladaapp.requests.organization :as requests.organization]
+   [api-peladaapp.responses.organization :as responses.organization]
+   [schema.core :as s]))
 
-(defn in->model [{:keys [name]}]
-  (cond-> {}
-    name (assoc :name name)))
+(s/defn create-request->model :- models.organization/Organization
+  [request :- requests.organization/CreateOrganizationRequest]
+  (select-keys request [:name]))
 
-(s/defn model->out [o]
-  (some-> o (select-keys [:id :name])))
+(s/defn update-request->model :- models.organization/Organization
+  [request :- requests.organization/UpdateOrganizationRequest]
+  (select-keys request [:name]))
 
-(s/defn db->model [o]
+(s/defn model->response :- responses.organization/OrganizationResponse
+  [model :- models.organization/Organization]
+  (select-keys model [:id :name]))
+
+(s/defn db->model :- models.organization/Organization
+  [o]
   (some-> o misc/unamespace (select-keys [:id :name])))

@@ -4,7 +4,6 @@
    [api-peladaapp.models.user :as models.user]
    [medley.core :as medley.core]
    [next.jdbc.sql :as sql]
-   [next.jdbc :as jdbc]
    [schema.core :as s]))
 
 (defn- affected-rows-count

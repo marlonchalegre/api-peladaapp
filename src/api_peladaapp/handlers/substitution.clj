@@ -1,7 +1,8 @@
 (ns api-peladaapp.handlers.substitution
-  (:require [api-peladaapp.controllers.substitution :as controller.substitution]
-            [api-peladaapp.helpers.exception :as exception]
-            [api-peladaapp.helpers.responses :refer [created ok]]))
+  (:require
+   [api-peladaapp.controllers.substitution :as controller.substitution]
+   [api-peladaapp.helpers.exception :as exception]
+   [api-peladaapp.helpers.responses :refer [created ok]]))
 
 (defn create [request]
   (try (let [db (:database request)

@@ -1,9 +1,10 @@
 (ns api-peladaapp.randomize-test
-  (:require [clojure.test :refer :all]
-            [api-peladaapp.logic.randomize :as logic.randomize]
-            [api-peladaapp.test-helpers :as th]
-            [next.jdbc.sql :as sql]
-            [next.jdbc :as jdbc]))
+  (:require
+   [api-peladaapp.logic.randomize :as logic.randomize]
+   [api-peladaapp.test-helpers :as th]
+   [clojure.test :refer :all]
+   [next.jdbc :as jdbc]
+   [next.jdbc.sql :as sql]))
 
 (use-fixtures :each th/test-system-fixture)
 

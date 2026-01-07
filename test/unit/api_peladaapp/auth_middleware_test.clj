@@ -1,8 +1,8 @@
 (ns api-peladaapp.auth-middleware-test
-  (:require [clojure.test :refer [deftest is testing]]
-            [api-peladaapp.handlers.auth :as auth]
-            [buddy.auth :as buddy-auth]
-            [buddy.auth.accessrules :as accessrules]))
+  (:require
+   [api-peladaapp.handlers.auth :as auth]
+   [buddy.auth :as buddy-auth]
+   [clojure.test :refer [deftest is testing]]))
 
 (deftest authenticated-access-with-valid-token
   (testing "authenticated-access returns true when request is authenticated"

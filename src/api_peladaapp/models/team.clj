@@ -1,5 +1,6 @@
 (ns api-peladaapp.models.team
-  (:require [schema.core :as s]))
+  (:require
+   [schema.core :as s]))
 
 (s/defschema Team
   {:id s/Int

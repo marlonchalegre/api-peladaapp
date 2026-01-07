@@ -1,12 +1,12 @@
 (ns api-peladaapp.controllers.user
   (:require
    [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.logic.user :as logic.user]
    [api-peladaapp.models.user :as models.user]
-   [api-peladaapp.helpers.pagination :as pagination]
    [schema.core :as s]))
 
-(s/defn create-user
+(s/defn create-user :- models.user/User
   [user :- models.user/NewUser
    db]
   (let [user? (-> (db.user/find-user-by-email (:email user) db)
@@ -18,8 +18,8 @@
         (db.user/insert-user $ db)
         (assoc user :id $)))))
 
-(s/defn update-user
-  [user :- models.user/User
+(s/defn update-user :- models.user/User
+  [user :- models.user/UserProfileUpdate
    user-id :- s/Int
    db]
   (let [existing-user (-> (db.user/find-user-by-id user-id db)
@@ -55,9 +55,9 @@
         offset (* (- page 1) per-page)
         users (db.user/list-users db offset per-page)
         total-count (db.user/count-users db)]
-    (pagination/with-pagination-headers (map #(dissoc % :password) users) total-count page per-page)))
+    (pagination/with-pagination-headers users total-count page per-page)))
 
-(s/defn update-user-profile
+(s/defn update-user-profile :- models.user/User
   "Update user profile - only allows updating name, email, and password. Score is protected."
   [profile-data :- models.user/UserProfileUpdate
    user-id :- s/Int

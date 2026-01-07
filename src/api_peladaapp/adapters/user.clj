@@ -2,32 +2,28 @@
   (:require
    [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.models.user :as models.user]
-   [medley.core :as medley.core]
+   [api-peladaapp.requests.user :as requests.user]
+   [api-peladaapp.responses.user :as responses.user]
    [schema.core :as s]))
 
-;TODO define wires (which lib we should use?)
-(defn in->model
-  [{:keys [name email password]}]
-  (medley.core/assoc-some {}
-                          :name name
-                          :email email
-                          :password password))
+(s/defn create-request->model :- models.user/NewUser
+  [request :- requests.user/CreateUserRequest]
+  (select-keys request [:name :email :password]))
 
-(s/defn model->out
+(s/defn update-request->model :- models.user/UserProfileUpdate
+  [request :- requests.user/UpdateUserRequest]
+  (select-keys request [:name :email :password]))
+
+(s/defn update-profile-request->model :- models.user/UserProfileUpdate
+  [request :- requests.user/UpdateProfileRequest]
+  (select-keys request [:name :email :password]))
+
+(s/defn model->response :- responses.user/UserResponse
   [user :- models.user/User]
-  (some-> user
-          (select-keys [:id :name :email])))
+  (select-keys user [:id :name :email]))
 
 (s/defn db->model :- models.user/User
   [user]
   (some-> user
           misc/unamespace
           (select-keys [:id :name :email :password])))
-
-(defn in->profile-update
-  "Convert input to profile update model - only allows name, email, password"
-  [{:keys [name email password]}]
-  (medley.core/assoc-some {}
-                          :name name
-                          :email email
-                          :password password))

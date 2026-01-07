@@ -1,5 +1,6 @@
 (ns api-peladaapp.logic.vote
-  (:import [java.time Instant Duration]))
+  (:import
+   [java.time Duration Instant]))
 
 (defn ensure-not-self-vote
   [voter-id target-id]

@@ -1,22 +1,26 @@
 (ns api-peladaapp.handlers.admin
-  (:require [api-peladaapp.adapters.admin :as adapter.admin]
-            [api-peladaapp.controllers.admin :as controller.admin]
-            [api-peladaapp.helpers.exception :as exception]
-            [api-peladaapp.helpers.responses :refer [created ok deleted]]))
+  (:require
+   [api-peladaapp.adapters.admin :as adapter.admin]
+   [api-peladaapp.controllers.admin :as controller.admin]
+   [api-peladaapp.helpers.exception :as exception]
+   [api-peladaapp.helpers.responses :refer [created deleted ok]]))
 
 (defn add-admin [request]
   (try (let [db (:database request)
              org-id (Integer/parseInt (str (get-in request [:params :organization_id])))
              body (:body request)
-             user-id (:user_id body)
-             admin {:organization_id org-id :user_id user-id}]
-         (created (controller.admin/add-organization-admin admin db)))
+             admin (adapter.admin/create-request->model body org-id)]
+         (-> (controller.admin/add-organization-admin admin db)
+             adapter.admin/model->response
+             created))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn get-by-id [request]
   (try (let [db (:database request)
              id (get-in request [:params :id])]
-         (ok (controller.admin/get-organization-admin id db)))
+         (-> (controller.admin/get-organization-admin id db)
+             adapter.admin/model->response
+             ok))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn remove-admin [request]
@@ -35,13 +39,15 @@
 (defn list-by-organization [request]
   (try (let [db (:database request)
              org-id (Integer/parseInt (str (get-in request [:params :organization_id])))]
-         (ok (controller.admin/list-organization-admins org-id db)))
+         (let [admins (controller.admin/list-organization-admins org-id db)]
+           (ok (map adapter.admin/model->response admins))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn list-by-user [request]
   (try (let [db (:database request)
              user-id (Integer/parseInt (str (get-in request [:params :user_id])))]
-         (ok (controller.admin/list-user-admin-organizations user-id db)))
+         (let [admins (controller.admin/list-user-admin-organizations user-id db)]
+           (ok (map adapter.admin/model->response admins))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn check-is-admin [request]

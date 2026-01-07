@@ -1,5 +1,6 @@
 (ns api-peladaapp.models.user
-  (:require [schema.core :as s]))
+  (:require
+   [schema.core :as s]))
 
 (s/defschema NewUser
   {:name s/Str

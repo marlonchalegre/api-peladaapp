@@ -1,10 +1,11 @@
 (ns api-peladaapp.score-test
-  (:require [clojure.test :refer :all]
-            [api-peladaapp.logic.score :as logic.score]
-            [api-peladaapp.test-helpers :as th]
-            [next.jdbc :as jdbc]
-            [next.jdbc.sql :as sql])
-  (:import [java.time Instant Duration]))
+  (:require
+   [api-peladaapp.logic.score :as logic.score]
+   [api-peladaapp.test-helpers :as th]
+   [clojure.test :refer :all]
+   [next.jdbc :as jdbc])
+  (:import
+   [java.time Duration Instant]))
 
 (use-fixtures :each th/test-system-fixture)
 

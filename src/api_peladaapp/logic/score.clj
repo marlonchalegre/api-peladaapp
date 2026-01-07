@@ -1,7 +1,8 @@
 (ns api-peladaapp.logic.score
-  (:require [clojure.string :as str]
-            [next.jdbc :as jdbc]
-            [next.jdbc.result-set :as rs]))
+  (:require
+   [clojure.string :as str]
+   [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]))
 
 (defn get-normalized-scores
   "Fetches normalized scores for a list of player IDs.

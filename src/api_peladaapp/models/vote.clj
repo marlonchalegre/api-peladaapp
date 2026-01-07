@@ -1,5 +1,6 @@
 (ns api-peladaapp.models.vote
-  (:require [schema.core :as s]))
+  (:require
+   [schema.core :as s]))
 
 (s/defschema Vote
   {:id s/Int

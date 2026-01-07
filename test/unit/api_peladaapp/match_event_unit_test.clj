@@ -1,6 +1,7 @@
 (ns api-peladaapp.match-event-unit-test
-  (:require [clojure.test :refer [deftest is]]
-            [api-peladaapp.db.match-event :as match-event-db]))
+  (:require
+   [api-peladaapp.db.match-event :as match-event-db]
+   [clojure.test :refer [deftest is]]))
 
 (deftest unqualify-row-drops-namespaces
   (let [row {:MatchEvents/player_id 13

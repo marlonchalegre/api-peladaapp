@@ -1,11 +1,11 @@
 (ns api-peladaapp.peladas-test
-  (:require [clojure.test :refer [deftest is use-fixtures]]
-            [ring.mock.request :as mock]
-            [clojure.data.json :as json]
-            [clojure.string :as str]
-            [next.jdbc :as jdbc]
-            [next.jdbc.sql :as sql]
-            [api-peladaapp.test-helpers :as th]))
+  (:require
+   [api-peladaapp.test-helpers :as th]
+   [clojure.data.json :as json]
+   [clojure.string :as str]
+   [clojure.test :refer [deftest is use-fixtures]]
+   [next.jdbc :as jdbc]
+   [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 
@@ -56,7 +56,7 @@
         (let [resp (app (-> (mock/request :post "/api/peladas/1/begin") auth))
               body (decode-body resp)]
           (is (= 200 (:status resp)))
-          (is (pos? (:matches-created body))))
+          (is (pos? (:matches_created body))))
 
         ;; List matches (user is member, can view)
         (let [resp (app (-> (mock/request :get "/api/peladas/1/matches") auth))

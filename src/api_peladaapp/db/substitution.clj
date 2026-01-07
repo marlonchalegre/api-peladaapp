@@ -1,6 +1,7 @@
 (ns api-peladaapp.db.substitution
-  (:require [next.jdbc.sql :as sql]
-            [schema.core :as s]))
+  (:require
+   [next.jdbc.sql :as sql]
+   [schema.core :as s]))
 
 (defn- affected-rows-count [result]
   (-> result vals first))

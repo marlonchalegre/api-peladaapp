@@ -1,5 +1,6 @@
 (ns api-peladaapp.models.admin
-  (:require [schema.core :as s]))
+  (:require
+   [schema.core :as s]))
 
 (s/defschema OrganizationAdmin
   {:id s/Int

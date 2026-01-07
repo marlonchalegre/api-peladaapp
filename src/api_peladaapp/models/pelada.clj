@@ -1,5 +1,6 @@
 (ns api-peladaapp.models.pelada
-  (:require [schema.core :as s]))
+  (:require
+   [schema.core :as s]))
 
 (s/defschema Pelada
   {:id s/Int

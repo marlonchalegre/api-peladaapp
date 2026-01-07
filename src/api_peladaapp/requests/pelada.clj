@@ -1,0 +1,22 @@
+(ns api-peladaapp.requests.pelada
+  (:require
+   [schema.core :as s]))
+
+(s/defschema CreatePeladaRequest
+  {:organization_id s/Int
+   (s/optional-key :scheduled_at) s/Str
+   (s/optional-key :when) s/Str
+   (s/optional-key :num_teams) s/Int
+   (s/optional-key :players_per_team) s/Int
+   (s/optional-key :status) s/Str})
+
+(s/defschema UpdatePeladaRequest
+  {(s/optional-key :organization_id) s/Int
+   (s/optional-key :scheduled_at) s/Str
+   (s/optional-key :when) s/Str
+   (s/optional-key :num_teams) s/Int
+   (s/optional-key :players_per_team) s/Int
+   (s/optional-key :status) s/Str})
+
+(s/defschema BeginPeladaRequest
+  {(s/optional-key :matches_per_team) s/Int})

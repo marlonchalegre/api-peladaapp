@@ -1,8 +1,9 @@
 (ns api-peladaapp.logic.randomize
-  (:require [api-peladaapp.db.pelada :as db.pelada]
-            [api-peladaapp.db.player :as db.player]
-            [api-peladaapp.db.team :as db.team]
-            [next.jdbc :as jdbc]))
+  (:require
+   [api-peladaapp.db.pelada :as db.pelada]
+   [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.db.team :as db.team]
+   [next.jdbc :as jdbc]))
 
 (defn randomize-teams!
   "Randomly assigns provided players to empty slots in the pelada's teams."

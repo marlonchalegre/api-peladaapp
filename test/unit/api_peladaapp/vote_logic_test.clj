@@ -1,7 +1,9 @@
 (ns api-peladaapp.vote-logic-test
-  (:require [clojure.test :refer [deftest is testing]]
-            [api-peladaapp.logic.vote :as vote.logic])
-  (:import [java.time Instant Duration]))
+  (:require
+   [api-peladaapp.logic.vote :as vote.logic]
+   [clojure.test :refer [deftest is testing]])
+  (:import
+   [java.time Duration Instant]))
 
 (deftest test-ensure-not-self-vote
   (testing "Self vote should throw exception"

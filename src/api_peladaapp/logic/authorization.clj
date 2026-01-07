@@ -1,7 +1,8 @@
 (ns api-peladaapp.logic.authorization
-  (:require [api-peladaapp.db.admin :as db.admin]
-            [api-peladaapp.db.player :as db.player]
-            [schema.core :as s]))
+  (:require
+   [api-peladaapp.db.admin :as db.admin]
+   [api-peladaapp.db.player :as db.player]
+   [schema.core :as s]))
 
 (s/defn user-can-admin-organization? :- s/Bool
   "Check if user has admin permissions for an organization"

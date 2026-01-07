@@ -1,11 +1,11 @@
 (ns api-peladaapp.player-access-test
-  (:require [clojure.test :refer [deftest is testing use-fixtures]]
-            [ring.mock.request :as mock]
-            [clojure.data.json :as json]
-            [clojure.string :as str]
-            [next.jdbc :as jdbc]
-            [next.jdbc.sql :as sql]
-            [api-peladaapp.test-helpers :as th]))
+  (:require
+   [api-peladaapp.test-helpers :as th]
+   [clojure.data.json :as json]
+   [clojure.string :as str]
+   [clojure.test :refer [deftest is testing use-fixtures]]
+   [next.jdbc :as jdbc]
+   [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 
@@ -196,7 +196,7 @@
               (let [begin-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin"))
                                         admin-auth))]
                 (is (= 200 (:status begin-resp)))
-                (is (pos? (:matches-created (decode-body begin-resp)))))
+                (is (pos? (:matches_created (decode-body begin-resp)))))
 
               ;; Player can list matches
               (let [list-matches-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/matches"))

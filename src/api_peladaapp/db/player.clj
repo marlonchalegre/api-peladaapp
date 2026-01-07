@@ -1,8 +1,8 @@
 (ns api-peladaapp.db.player
-  (:require [api-peladaapp.adapters.player :as adapter.player]
-            [next.jdbc.sql :as sql]
-            [next.jdbc :as jdbc]
-            [schema.core :as s]))
+  (:require
+   [api-peladaapp.adapters.player :as adapter.player]
+   [next.jdbc.sql :as sql]
+   [schema.core :as s]))
 
 (defn- affected-rows-count [result]
   (-> result vals first))
@@ -11,24 +11,24 @@
   [{:keys [user_id organization_id grade position_id]}
    db]
   (-> (sql/insert! db :organizationplayers {:user_id user_id
-                                                :organization_id organization_id
-                                                :grade grade
-                                                :position_id position_id})
-        affected-rows-count))
+                                            :organization_id organization_id
+                                            :grade grade
+                                            :position_id position_id})
+      affected-rows-count))
 
 (s/defn update-player :- s/Int
   [id player db]
   (-> (sql/update! db :organizationplayers (select-keys player [:grade :position_id]) {:id id})
-        affected-rows-count))
+      affected-rows-count))
 
 (s/defn delete-player :- s/Int
   [id db]
   (-> (sql/delete! db :organizationplayers {:id id})
-        affected-rows-count))
+      affected-rows-count))
 
 (s/defn get-player [id db]
   (-> (sql/get-by-id db :organizationplayers id)
-        adapter.player/db->model))
+      adapter.player/db->model))
 
 (s/defn get-org-player-by-user-id :- s/Any
   [user-id organization-id db]

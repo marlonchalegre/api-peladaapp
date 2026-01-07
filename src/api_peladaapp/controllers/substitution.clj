@@ -1,9 +1,10 @@
 (ns api-peladaapp.controllers.substitution
-  (:require [api-peladaapp.db.match :as db.match]
-            [api-peladaapp.db.substitution :as db.substitution]
-            [api-peladaapp.db.team :as db.team]
-            [api-peladaapp.logic.substitution :as substitution.logic]
-            [schema.core :as s]))
+  (:require
+   [api-peladaapp.db.match :as db.match]
+   [api-peladaapp.db.substitution :as db.substitution]
+   [api-peladaapp.db.team :as db.team]
+   [api-peladaapp.logic.substitution :as substitution.logic]
+   [schema.core :as s]))
 
 (defn- pelada-player-ids [pelada-id db]
   (->> (db.team/list-pelada-teams pelada-id db)

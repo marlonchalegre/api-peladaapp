@@ -1,6 +1,7 @@
 (ns api-peladaapp.schedule-limit-test
-  (:require [clojure.test :refer [deftest is testing]]
-            [api-peladaapp.logic.schedule :as sch]))
+  (:require
+   [api-peladaapp.logic.schedule :as sch]
+   [clojure.test :refer [deftest is testing]]))
 
 (defn- get-team-states [schedule teams]
   (let [initial-state (zipmap teams (repeat {:played 0 :consecutive-plays 0 :consecutive-rests 0}))]

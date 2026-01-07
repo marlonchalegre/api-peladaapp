@@ -1,6 +1,7 @@
 (ns api-peladaapp.admin-unit-test
-  (:require [clojure.test :refer [deftest is testing]]
-            [api-peladaapp.adapters.admin :as adapter.admin]))
+  (:require
+   [api-peladaapp.adapters.admin :as adapter.admin]
+   [clojure.test :refer [deftest is testing]]))
 
 (deftest test-admin-adapter
   (testing "db->model adapter includes user details when present"

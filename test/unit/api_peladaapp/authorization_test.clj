@@ -1,6 +1,7 @@
 (ns api-peladaapp.authorization-test
-  (:require [clojure.test :refer [deftest testing is]]
-            [api-peladaapp.logic.authorization :as auth]))
+  (:require
+   [api-peladaapp.logic.authorization :as auth]
+   [clojure.test :refer [deftest is testing]]))
 
 (deftest test-get-user-id-from-request
   (testing "Extract user ID from request identity"

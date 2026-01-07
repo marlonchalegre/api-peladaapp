@@ -1,9 +1,10 @@
 (ns api-peladaapp.user-profile-unit-test
-  (:require [clojure.test :refer [deftest is testing]]
-            [api-peladaapp.controllers.user :as controllers.user]
-            [api-peladaapp.db.user :as db.user]
-            [api-peladaapp.handlers.user]
-            [buddy.hashers :as hashers]))
+  (:require
+   [api-peladaapp.controllers.user :as controllers.user]
+   [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.handlers.user]
+   [buddy.hashers :as hashers]
+   [clojure.test :refer [deftest is testing]]))
 
 (deftest update-user-profile-updates-name
   (testing "Updates user name only"

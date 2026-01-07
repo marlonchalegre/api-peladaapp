@@ -1,30 +1,45 @@
 (ns api-peladaapp.controllers.team
-  (:require [api-peladaapp.db.team :as db.team]
-            [schema.core :as s]))
+  (:require
+   [api-peladaapp.db.team :as db.team]
+   [api-peladaapp.models.team :as models.team]
+   [api-peladaapp.responses.team :as responses.team]
+   [schema.core :as s]))
 
-(s/defn create-team :- s/Int
-  [team db]
-  (db.team/insert-team team db))
+(s/defn create-team :- models.team/Team
+  [team :- models.team/Team
+   db]
+  (let [id (db.team/insert-team team db)]
+    (db.team/get-team id db)))
 
-(s/defn get-team :- s/Any
+(s/defn get-team :- models.team/Team
   [team-id :- s/Int db]
-  (db.team/get-team team-id db))
+  (let [team (db.team/get-team team-id db)]
+    (if (nil? team)
+      (throw (ex-info nil {:type :not-found :message "Team not found"}))
+      team)))
 
-(s/defn update-team :- s/Int
-  [team-id :- s/Int team db]
-  (db.team/update-team team-id team db))
+(s/defn update-team :- models.team/Team
+  [team-id :- s/Int team :- models.team/Team db]
+  (let [rows (db.team/update-team team-id team db)]
+    (if (zero? rows)
+      (throw (ex-info nil {:type :not-found :message "Team not found"}))
+      (db.team/get-team team-id db))))
 
 (s/defn delete-team :- s/Int
   [team-id :- s/Int db]
-  (db.team/delete-team team-id db))
+  (let [rows (db.team/delete-team team-id db)]
+    (if (zero? rows)
+      (throw (ex-info nil {:type :not-found :message "Team not found"}))
+      rows)))
 
-(s/defn list-teams :- [s/Any]
+(s/defn list-teams :- [models.team/Team]
   [pelada-id :- s/Int db]
   (db.team/list-pelada-teams pelada-id db))
 
-(s/defn add-player :- s/Int
+(s/defn add-player :- responses.team/TeamPlayerResponse
   [team-id :- s/Int player-id :- s/Int db]
-  (db.team/add-player-to-team team-id player-id db))
+  (db.team/add-player-to-team team-id player-id db)
+  {:team_id team-id :player_id player-id})
 
 (s/defn remove-player :- s/Int
   [team-id :- s/Int player-id :- s/Int db]

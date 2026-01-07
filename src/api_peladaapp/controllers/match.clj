@@ -1,27 +1,32 @@
 (ns api-peladaapp.controllers.match
-  (:require [api-peladaapp.db.match :as db.match]
-            [api-peladaapp.db.match-event :as db.match-event]
-            [api-peladaapp.db.match-lineup :as db.match-lineup]
-            [api-peladaapp.logic.match :as match.logic]
-            [api-peladaapp.logic.match-event :as match-event.logic]
-            [schema.core :as s]))
+  (:require
+   [api-peladaapp.db.match :as db.match]
+   [api-peladaapp.db.match-event :as db.match-event]
+   [api-peladaapp.db.match-lineup :as db.match-lineup]
+   [api-peladaapp.logic.match :as match.logic]
+   [api-peladaapp.logic.match-event :as match-event.logic]
+   [api-peladaapp.models.match :as models.match]
+   [api-peladaapp.models.match-event :as models.match-event]
+   [schema.core :as s]))
 
-(s/defn list-matches :- [s/Any]
+(s/defn list-matches :- [models.match/Match]
   [pelada-id :- s/Int db]
   (db.match/list-matches-by-pelada pelada-id db))
 
-(s/defn update-score :- s/Int
+(s/defn update-score :- models.match/Match
   [match-id :- s/Int score-update db]
   (let [validated-update (match.logic/build-score-update score-update)]
-    (db.match/update-score match-id validated-update db)))
+    (db.match/update-score match-id validated-update db)
+    (db.match/get-match match-id db)))
 
-(s/defn create-event :- s/Int
+(s/defn create-event :- models.match-event/MatchEvent
   [match-id :- s/Int {:keys [player_id event_type]} db]
   (let [player-id (match-event.logic/ensure-player-id player_id)
-        canonical-type (match-event.logic/canonical-type event_type)]
-    (db.match-event/insert-event match-id player-id canonical-type db)))
+        canonical-type (match-event.logic/canonical-type event_type)
+        event-id (db.match-event/insert-event match-id player-id canonical-type db)]
+    (db.match-event/get-event event-id db)))
 
-(s/defn list-events-by-pelada :- [s/Any]
+(s/defn list-events-by-pelada :- [models.match-event/MatchEvent]
   [pelada-id :- s/Int db]
   (db.match-event/list-events-by-pelada pelada-id db))
 
@@ -31,7 +36,7 @@
         canonical-type (match-event.logic/canonical-type event_type)]
     (db.match-event/delete-last-event match-id player-id canonical-type db)))
 
-(s/defn list-player-stats-by-pelada :- [s/Any]
+(s/defn list-player-stats-by-pelada :- [models.match/PlayerStats]
   [pelada-id :- s/Int db]
   (db.match-event/list-player-stats-by-pelada pelada-id db))
 

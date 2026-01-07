@@ -1,9 +1,10 @@
 (ns api-peladaapp.logic.pelada
-  (:require [api-peladaapp.logic.schedule :as schedule]
-            [api-peladaapp.db.pelada :as db.pelada]
-            [api-peladaapp.db.vote :as db.vote]
-            [api-peladaapp.logic.vote :as logic.vote]
-            [schema.core :as s]))
+  (:require
+   [api-peladaapp.db.pelada :as db.pelada]
+   [api-peladaapp.db.vote :as db.vote]
+   [api-peladaapp.logic.schedule :as schedule]
+   [api-peladaapp.logic.vote :as logic.vote]
+   [schema.core :as s]))
 
 (defn ensure-open
   "Ensure pelada can start. Returns pelada or throws with :bad-request."

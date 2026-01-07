@@ -1,16 +1,32 @@
 (ns api-peladaapp.adapters.player
-  (:require [api-peladaapp.helpers.misc :as misc]
-            [schema.core :as s]))
+  (:require
+   [api-peladaapp.helpers.misc :as misc]
+   [api-peladaapp.models.player :as models.player]
+   [api-peladaapp.requests.player :as requests.player]
+   [api-peladaapp.responses.player :as responses.player]
+   [medley.core :as medley.core]
+   [schema.core :as s]))
 
-(defn in->model [{:keys [user_id organization_id grade position_id]}]
-  (cond-> {}
-    user_id (assoc :user_id user_id)
-    organization_id (assoc :organization_id organization_id)
-    (some? grade) (assoc :grade grade)
-    (some? position_id) (assoc :position_id position_id)))
+(s/defn create-request->model :- models.player/Player
+  [request :- requests.player/CreatePlayerRequest]
+  (medley.core/assoc-some {}
+                          :user_id (:user_id request)
+                          :organization_id (:organization_id request)
+                          :grade (:grade request)
+                          :position_id (:position_id request)))
 
-(s/defn model->out [p]
-  (some-> p (select-keys [:id :user_id :organization_id :grade :position_id])))
+(s/defn update-request->model :- models.player/Player
+  [request :- requests.player/UpdatePlayerRequest]
+  (medley.core/assoc-some {}
+                          :user_id (:user_id request)
+                          :organization_id (:organization_id request)
+                          :grade (:grade request)
+                          :position_id (:position_id request)))
 
-(s/defn db->model [p]
+(s/defn model->response :- responses.player/PlayerResponse
+  [model :- models.player/Player]
+  (select-keys model [:id :user_id :organization_id :grade :position_id]))
+
+(s/defn db->model :- models.player/Player
+  [p]
   (some-> p misc/unamespace (select-keys [:id :user_id :organization_id :grade :position_id])))

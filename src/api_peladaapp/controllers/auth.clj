@@ -4,10 +4,11 @@
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.logic.user :as logic.user]
    [api-peladaapp.models.credential :as models.credential]
+   [api-peladaapp.models.user :as models.user]
    [buddy.hashers :as hashers]
    [schema.core :as s]))
 
-(s/defn authenticate
+(s/defn authenticate :- {:token s/Str :user models.user/User}
   "Authenticate a user by email/password and return a JWT token with user info."
   [{:keys [email password]} :- models.credential/Credential
    db]

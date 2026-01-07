@@ -1,8 +1,9 @@
 (ns api-peladaapp.handlers.randomize
-  (:require [api-peladaapp.helpers.responses :as helper.response]
-            [api-peladaapp.logic.randomize :as logic.randomize]
-            [ring.util.response :as response]
-            [schema.core :as s]))
+  (:require
+   [api-peladaapp.helpers.responses :as helper.response]
+   [api-peladaapp.logic.randomize :as logic.randomize]
+   [ring.util.response :as response]
+   [schema.core :as s]))
 
 (s/defschema RandomizeTeamsBody
   {:player_ids [s/Int]

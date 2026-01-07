@@ -1,6 +1,7 @@
 (ns api-peladaapp.helpers.exception
   (:require
-   [api-peladaapp.helpers.responses :refer [bad-request server-error not-found forbidden]]))
+   [api-peladaapp.helpers.responses :refer [bad-request forbidden not-found
+                                            server-error]]))
 
 (defn- exception->map [^Throwable e]
   (let [sw (java.io.StringWriter.)

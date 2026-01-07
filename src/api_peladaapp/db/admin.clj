@@ -1,8 +1,9 @@
 (ns api-peladaapp.db.admin
-  (:require [api-peladaapp.adapters.admin :as adapter.admin]
-            [next.jdbc :as jdbc]
-            [next.jdbc.sql :as sql]
-            [schema.core :as s]))
+  (:require
+   [api-peladaapp.adapters.admin :as adapter.admin]
+   [next.jdbc :as jdbc]
+   [next.jdbc.sql :as sql]
+   [schema.core :as s]))
 
 (defn- affected-rows-count [result]
   (-> result vals first))
@@ -24,7 +25,7 @@
 (s/defn delete-organization-admin-by-org-and-user :- s/Int
   [organization_id user_id db]
   (-> (sql/delete! db :OrganizationAdmins {:organization_id organization_id
-                                             :user_id user_id})
+                                           :user_id user_id})
       affected-rows-count))
 
 (s/defn list-admins-by-organization [organization_id db]

@@ -1,9 +1,10 @@
 (ns api-peladaapp.auth-unit-test
-  (:require [clojure.test :refer [deftest is]]
-            [api-peladaapp.controllers.auth :as controllers.auth]
-            [api-peladaapp.db.user :as db.user]
-            [api-peladaapp.config :as config]
-            [buddy.hashers :as hashers]))
+  (:require
+   [api-peladaapp.config :as config]
+   [api-peladaapp.controllers.auth :as controllers.auth]
+   [api-peladaapp.db.user :as db.user]
+   [buddy.hashers :as hashers]
+   [clojure.test :refer [deftest is]]))
 
 (deftest authenticate-checks-password-and-returns-token
   (let [plain "s3cret"

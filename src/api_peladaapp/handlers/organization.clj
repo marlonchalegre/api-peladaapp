@@ -1,30 +1,37 @@
 (ns api-peladaapp.handlers.organization
-  (:require [api-peladaapp.adapters.organization :as adapter.organization]
-            [api-peladaapp.controllers.organization :as controller.organization]
-            [api-peladaapp.helpers.exception :as exception]
-            [api-peladaapp.helpers.pagination :as pagination]
-            [api-peladaapp.helpers.responses :refer [created ok updated deleted]]
-            [api-peladaapp.logic.authorization :as auth]))
+  (:require
+   [api-peladaapp.adapters.organization :as adapter.organization]
+   [api-peladaapp.controllers.organization :as controller.organization]
+   [api-peladaapp.helpers.exception :as exception]
+   [api-peladaapp.helpers.pagination :as pagination]
+   [api-peladaapp.helpers.responses :refer [created deleted ok updated]]
+   [api-peladaapp.logic.authorization :as auth]))
 
 (defn create [request]
   (try (let [db (:database request)
              body (:body request)
-             org (adapter.organization/in->model body)
+             org (adapter.organization/create-request->model body)
              user-id (auth/get-user-id-from-request request)]
-         (created (controller.organization/create-organization org user-id db)))
+         (-> (controller.organization/create-organization org user-id db)
+             adapter.organization/model->response
+             created))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn get-by-id [request]
   (try (let [db (:database request)
              id (get-in request [:params :id])]
-         (ok (controller.organization/get-organization id db)))
+         (-> (controller.organization/get-organization id db)
+             adapter.organization/model->response
+             ok))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn update-by-id [request]
   (try (let [db (:database request)
              id (get-in request [:params :id])
              body (:body request)]
-         (updated (controller.organization/update-organization id body db)))
+         (-> (controller.organization/update-organization id (adapter.organization/update-request->model body) db)
+             adapter.organization/model->response
+             updated))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn delete [request]
@@ -36,6 +43,9 @@
 (defn list-all [request]
   (try (let [db (:database request)
              query-params (:query-params request)
-             {:keys [page per-page]} (pagination/parse-pagination-params query-params)]
-         (ok (controller.organization/list-organizations db page per-page)))
+             pagination (pagination/parse-pagination-params query-params)
+             orgs-data (controller.organization/list-organizations db pagination)
+             orgs-models (:data orgs-data)
+             orgs-responses (map adapter.organization/model->response orgs-models)]
+         (ok orgs-responses (:headers orgs-data)))
        (catch Exception e (exception/api-exception-handler e))))

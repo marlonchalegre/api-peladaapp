@@ -4,12 +4,12 @@
    [api-peladaapp.routes     :as routes]
    [buddy.auth.accessrules   :refer [wrap-access-rules]]
    [buddy.auth.middleware    :refer [wrap-authentication wrap-authorization]]
+   [clojure.java.io          :as io]
+   [clojure.string           :as str]
    [migratus.core            :as migratus]
    [next.jdbc                :as jdbc]
-   [clojure.string           :as str]
-   [clojure.java.io          :as io]
-   [ring.middleware.params   :refer [wrap-params]]
-   [ring.middleware.json     :refer [wrap-json-body wrap-json-response]])
+   [ring.middleware.json     :refer [wrap-json-body wrap-json-response]]
+   [ring.middleware.params   :refer [wrap-params]])
   (:gen-class))
 
 (defn on-error

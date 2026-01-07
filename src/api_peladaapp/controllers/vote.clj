@@ -1,20 +1,24 @@
 (ns api-peladaapp.controllers.vote
-  (:require [api-peladaapp.db.vote :as db.vote]
-            [api-peladaapp.db.pelada :as db.pelada]
-            [api-peladaapp.db.team :as db.team]
-            [api-peladaapp.logic.vote :as vote.logic]
-            [schema.core :as s]))
+  (:require
+   [api-peladaapp.db.pelada :as db.pelada]
+   [api-peladaapp.db.team :as db.team]
+   [api-peladaapp.db.vote :as db.vote]
+   [api-peladaapp.logic.vote :as vote.logic]
+   [api-peladaapp.models.vote :as models.vote]
+   [api-peladaapp.responses.vote :as responses.vote]
+   [schema.core :as s]))
 
-(s/defn cast-vote :- s/Int
-  [{:keys [voter_id target_id stars pelada_id] :as vote} db]
+(s/defn cast-vote :- models.vote/Vote
+  [{:keys [voter_id target_id stars pelada_id] :as vote} :- models.vote/Vote db]
   ;; Validate pelada voting eligibility
   (let [pelada (db.pelada/get-pelada pelada_id db)]
     (vote.logic/validate-voting-eligibility pelada))
   ;; Validate individual vote
   (vote.logic/validate-vote vote)
-  (db.vote/insert-vote vote db))
+  (let [id (db.vote/insert-vote vote db)]
+    (db.vote/get-vote id db)))
 
-(s/defn batch-cast-votes :- {:votes-cast s/Int}
+(s/defn batch-cast-votes :- responses.vote/BatchVoteResponse
   "Cast multiple votes at once. Replaces any existing votes by this voter."
   [pelada-id :- s/Int voter-id :- s/Int votes :- [{:target_id s/Int :stars s/Int}] db]
   ;; Validate pelada voting eligibility
@@ -30,22 +34,19 @@
                      :stars (:stars vote)}]
       (vote.logic/validate-vote full-vote)
       (db.vote/insert-vote full-vote db)))
-  {:votes-cast (count votes)})
+  {:votes_cast (count votes)})
 
-(s/defn list-votes :- [s/Any]
+(s/defn list-votes :- [models.vote/Vote]
   [pelada-id :- s/Int db]
   (db.vote/list-votes-by-pelada pelada-id db))
 
-(s/defn compute-normalized-score :- {:player_id s/Int :score s/Num}
+(s/defn compute-normalized-score :- responses.vote/NormalizedScoreResponse
   "Normalize a player's average stars (1..5) into 1..10 scale."
   [pelada-id :- s/Int player-id :- s/Int db]
   (let [votes (db.vote/list-votes-for-player pelada-id player-id db)]
     (vote.logic/normalized-score player-id votes)))
 
-(s/defn get-voting-info :- {:can_vote s/Bool
-                            :has_voted s/Bool
-                            :eligible_players [s/Int]
-                            (s/optional-key :message) s/Str}
+(s/defn get-voting-info :- responses.vote/VotingInfoResponse
   "Get voting eligibility info for a voter in a pelada."
   [pelada-id :- s/Int voter-id :- s/Int db]
   (let [pelada (db.pelada/get-pelada pelada-id db)]

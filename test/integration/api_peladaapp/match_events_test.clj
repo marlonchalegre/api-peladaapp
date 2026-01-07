@@ -1,9 +1,10 @@
 (ns api-peladaapp.match-events-test
-  (:require [clojure.test :refer [deftest is use-fixtures]]
-            [ring.mock.request :as mock]
-            [next.jdbc :as jdbc]
-            [next.jdbc.sql :as sql]
-            [api-peladaapp.test-helpers :as th]))
+  (:require
+   [api-peladaapp.test-helpers :as th]
+   [clojure.test :refer [deftest is use-fixtures]]
+   [next.jdbc :as jdbc]
+   [next.jdbc.sql :as sql]
+   [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 
@@ -25,4 +26,4 @@
     (let [resp (app (-> (mock/request :get "/api/peladas/1/player-stats") auth))
           body (th/decode-body resp)]
       (is (= 200 (:status resp)))
-      (is (= [{:player_id 13 :goals 1 :assists 0 :own_goals 0}] body)))))
+      (is (= [{:player_id 13 :user_id user-id :name "Stats User" :goals 1 :assists 0 :own_goals 0}] body)))))

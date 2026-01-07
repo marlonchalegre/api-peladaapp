@@ -2,12 +2,11 @@
   "Test helpers for the api-peladaapp project."
   (:require
    [api-peladaapp.components :as components]
-   [com.stuartsierra.component :as component]
    [clojure.data.json :as json]
    [clojure.string :as str]
+   [com.stuartsierra.component :as component]
    [next.jdbc :as jdbc]
-   [ring.mock.request :as mock]
-   [clojure.test :refer [use-fixtures]]))
+   [ring.mock.request :as mock]))
 
 (def ^:dynamic *test-system* nil)
 

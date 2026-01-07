@@ -10,9 +10,9 @@
   (let [body (-> request :body)
         db (-> request :database)]
     (-> body
-        adapter.user/in->model
+        adapter.user/create-request->model
         (controller.user/create-user db)
-        adapter.user/model->out)))
+        adapter.user/model->response)))
 
 (defn create [request]
   (try (-> request
@@ -25,7 +25,7 @@
   (let [user-id (-> request :params :id)
         db (-> request :database)]
     (-> (controller.user/get-user user-id db)
-        adapter.user/model->out)))
+        adapter.user/model->response)))
 
 (defn get-by-id [request]
   (try
@@ -40,9 +40,9 @@
         body (-> request :body)
         db (-> request :database)]
     (-> body
-        adapter.user/in->model
+        adapter.user/update-request->model
         (controller.user/update-user user-id db)
-        adapter.user/model->out)))
+        adapter.user/model->response)))
 
 (defn update-by-id [request]
   (try (-> request
@@ -68,8 +68,13 @@
     (let [db (-> request :database)
           query-params (:query-params request)
           pagination (pagination/parse-pagination-params query-params)
-          users-data (controller.user/list-users db pagination)]
-      (responses/ok (:data users-data) (:headers users-data)))
+          ;; Controller should return models. We will handle transformation here.
+          ;; Assuming controller.user/list-users logic is updated or we handle existing.
+          ;; Currently controller returns a map with :data (users) and pagination headers.
+          users-data (controller.user/list-users db pagination)
+          users-models (:data users-data)
+          users-responses (map adapter.user/model->response users-models)]
+      (responses/ok users-responses (:headers users-data)))
     (catch Exception e
       (exception/api-exception-handler e))))
 
@@ -83,9 +88,9 @@
       (throw (ex-info nil {:type :forbidden :message "You can only update your own profile"})))
     ;; The controller will handle checking if user exists
     (-> body
-        adapter.user/in->profile-update
+        adapter.user/update-profile-request->model
         (controller.user/update-user-profile user-id db)
-        adapter.user/model->out)))
+        adapter.user/model->response)))
 
 (defn update-profile [request]
   (try (-> request

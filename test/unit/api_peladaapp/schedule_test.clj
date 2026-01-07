@@ -1,6 +1,7 @@
 (ns api-peladaapp.schedule-test
-  (:require [clojure.test :refer [deftest is testing]]
-            [api-peladaapp.logic.schedule :as schedule]))
+  (:require
+   [api-peladaapp.logic.schedule :as schedule]
+   [clojure.test :refer [deftest is testing]]))
 
 (deftest schedule-generates-balanced-sequence
   (testing "basic round-robin generation"

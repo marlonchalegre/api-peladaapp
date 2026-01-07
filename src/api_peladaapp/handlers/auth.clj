@@ -13,26 +13,14 @@
                                 :token-name "Token"
                                 :options {:alg :hs512}}))
 
-;; (defn authenticate
-;;   "Checks if request (with username/password :query-params)
-;;   or username/password is valid"
-;;   ([request]
-;;    (let [username (get-in request [:body :username])
-;;          password (get-in request [:body :password])]
-;;      (authenticate username password)))
-;;   ([username password]
-;;    (if (and username password)
-;;      true #_(user/login? username password)
-;;      false)))
-
 (defn auth-handler
   [request]
   (let [body (-> request :body)
         db (-> request :database)]
     (try (let [{:keys [token user]} (-> body
-                                        adapters.credential/in->model
+                                        adapters.credential/login-request->model
                                         (controllers.auth/authenticate db))]
-           (-> (adapters.credential/->out token user)
+           (-> (adapters.credential/model->response token user)
                ok))
          (catch Exception e
            (exception/api-exception-handler e)))))

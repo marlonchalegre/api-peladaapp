@@ -1,7 +1,8 @@
 (ns api-peladaapp.handlers.score
-  (:require [api-peladaapp.logic.score :as logic.score]
-            [ring.util.response :as response]
-            [schema.core :as s]))
+  (:require
+   [api-peladaapp.logic.score :as logic.score]
+   [ring.util.response :as response]
+   [schema.core :as s]))
 
 (s/defschema BulkScoreRequest
   {:player_ids [s/Int]})
