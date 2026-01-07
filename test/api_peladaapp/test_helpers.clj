@@ -37,7 +37,7 @@
 (defn make-system []
   (let [db-file (temp-db-file)
         _ (migrate! db-file)
-        system (components/system {:db-spec {:dbname db-file} :skip-migrations true})]
+        system (dissoc (components/system {:db-spec {:dbname db-file} :skip-migrations true}) :server)]
     (assoc system :db-file db-file)))
 
 (defn test-system-fixture [f]

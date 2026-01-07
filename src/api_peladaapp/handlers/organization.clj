@@ -28,7 +28,9 @@
 (defn update-by-id [request]
   (try (let [db (:database request)
              id (get-in request [:params :id])
-             body (:body request)]
+             body (:body request)
+             user-id (auth/get-user-id-from-request request)]
+         (auth/require-organization-admin! user-id id db)
          (-> (controller.organization/update-organization id (adapter.organization/update-request->model body) db)
              adapter.organization/model->response
              updated))
@@ -36,7 +38,9 @@
 
 (defn delete [request]
   (try (let [db (:database request)
-             id (get-in request [:params :id])]
+             id (get-in request [:params :id])
+             user-id (auth/get-user-id-from-request request)]
+         (auth/require-organization-admin! user-id id db)
          (deleted (controller.organization/delete-organization id db)))
        (catch Exception e (exception/api-exception-handler e))))
 
