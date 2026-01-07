@@ -5,10 +5,11 @@
             [next.jdbc.sql :as sql]
             [next.jdbc :as jdbc]))
 
+(use-fixtures :each th/test-system-fixture)
+
 (deftest randomize-teams-logic-test
-  (let [{:keys [db-file]} (th/make-app!)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
-        db-fn (constantly ds)]
+  (let [db-file (:db-file th/*test-system*)
+        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
     ;; Setup Data
     (jdbc/execute! ds ["INSERT INTO Organizations (name) VALUES ('Org')"])
     (jdbc/execute! ds ["INSERT INTO Peladas (organization_id, scheduled_at) VALUES (1, '2023-01-01')"])
@@ -26,7 +27,7 @@
             players-per-team 3
             org-player-ids (set (map :organizationplayers/id (sql/query ds ["SELECT id FROM OrganizationPlayers"])))]
 
-        (logic.randomize/randomize-teams! pelada-id player-ids players-per-team db-fn)
+        (logic.randomize/randomize-teams! pelada-id player-ids players-per-team ds)
 
         (let [t1-players (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 1"])
               t2-players (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 2"])]

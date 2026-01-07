@@ -1,10 +1,12 @@
 (ns api-peladaapp.protected-endpoints-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [ring.mock.request :as mock]
             [next.jdbc :as jdbc]
             [next.jdbc.sql :as sql]
             [buddy.hashers :as hashers]
             [api-peladaapp.test-helpers :as th]))
+
+(use-fixtures :each th/test-system-fixture)
 
 (def protected-endpoints
   "List of protected API endpoints that require authentication"
@@ -32,7 +34,7 @@
 
 (deftest protected-endpoints-require-authentication
   (testing "All protected endpoints return 401 when no token is provided"
-    (let [{:keys [app]} (th/make-app!)]
+    (let [app (-> th/*test-system* :app :handler)]
       (doseq [{:keys [method path]} protected-endpoints]
         (let [req (mock/request method path)
               resp (app req)]
@@ -45,7 +47,7 @@
 
 (deftest protected-endpoints-reject-invalid-token
   (testing "All protected endpoints return 401 when invalid token is provided"
-    (let [{:keys [app]} (th/make-app!)]
+    (let [app (-> th/*test-system* :app :handler)]
       (doseq [{:keys [method path]} protected-endpoints]
         (let [req (-> (mock/request method path)
                       (mock/header "Authorization" "Token invalid-token-12345"))
@@ -55,7 +57,8 @@
 
 (deftest protected-endpoints-accept-valid-token
   (testing "Protected endpoints accept valid authentication tokens"
-    (let [{:keys [app db-file]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
+          db-file (:db-file th/*test-system*)
           ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
       ;; Create a user and get valid token
       (sql/insert! ds :users {:name "Test User"
@@ -76,7 +79,7 @@
 
 (deftest login-and-register-are-public
   (testing "Login and register endpoints are accessible without authentication"
-    (let [{:keys [app]} (th/make-app!)]
+    (let [app (-> th/*test-system* :app :handler)]
       ;; Login endpoint should be accessible
       (let [login-req (-> (mock/request :post "/auth/login")
                           (mock/json-body {:email "nonexistent@example.com"
@@ -98,7 +101,7 @@
 
 (deftest missing-authorization-header-format
   (testing "Requests with malformed Authorization header return 401"
-    (let [{:keys [app]} (th/make-app!)]
+    (let [app (-> th/*test-system* :app :handler)]
       ;; Missing "Token" prefix
       (let [req (-> (mock/request :get "/api/users")
                     (mock/header "Authorization" "just-a-token"))
@@ -115,7 +118,7 @@
 
 (deftest expired-token-handling
   (testing "Expired tokens should be rejected"
-    (let [{:keys [app]} (th/make-app!)]
+    (let [app (-> th/*test-system* :app :handler)]
       ;; This is a token that has a past expiration date
       ;; In a real scenario, you would generate a token with exp in the past
       (let [req (-> (mock/request :get "/api/users")

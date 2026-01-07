@@ -1,11 +1,13 @@
 (ns api-peladaapp.users-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [clojure.test :refer [deftest is use-fixtures]]
             [ring.mock.request :as mock]
             [clojure.data.json :as json]
             [clojure.string :as str]
             [next.jdbc :as jdbc]
             [next.jdbc.sql :as sql]
             [api-peladaapp.test-helpers :as th]))
+
+(use-fixtures :each th/test-system-fixture)
 
 (defn- register! [app {:keys [name email password]}]
   (app (-> (mock/request :post "/auth/register")
@@ -24,7 +26,7 @@
       :else nil)))
 
 (deftest users-crud-flow
-  (let [{:keys [app]} (th/make-app!)
+  (let [app (-> th/*test-system* :app :handler)
         email "ana@example.com"
         password "topsecret"]
     (let [reg (register! app {:name "Ana" :email email :password password})]
@@ -55,7 +57,8 @@
         (is (= 404 (:status resp)))))))
 
 (deftest users-pagination
-  (let [{:keys [app db-file]} (th/make-app!)
+  (let [app (-> th/*test-system* :app :handler)
+        db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
         token (th/register-and-login! app {:name "U" :email "u@e.com" :password "p"})
         auth (th/auth-header token)]

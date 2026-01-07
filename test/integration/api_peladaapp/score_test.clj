@@ -6,10 +6,11 @@
             [next.jdbc.sql :as sql])
   (:import [java.time Instant Duration]))
 
+(use-fixtures :each th/test-system-fixture)
+
 (deftest get-normalized-scores-test
-  (let [{:keys [db-file]} (th/make-app!)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
-        db-fn (constantly ds)]
+  (let [db-file (:db-file th/*test-system*)
+        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
 
     ;; Setup Schema and Data
     (jdbc/execute! ds ["INSERT INTO Organizations (name) VALUES ('Org')"])
@@ -24,6 +25,6 @@
 
     (testing "Fetches scores for given player IDs"
       (let [player-ids [1 2]
-            scores (logic.score/get-normalized-scores player-ids db-fn)]
+            scores (logic.score/get-normalized-scores player-ids ds)]
         (is (= 4.0 (get scores 1)))
         (is (= 4.0 (get scores 2)))))))

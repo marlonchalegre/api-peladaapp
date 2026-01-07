@@ -1,10 +1,12 @@
 (ns api-peladaapp.user-profile-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [ring.mock.request :as mock]
             [clojure.data.json :as json]
             [clojure.string :as str]
             [api-peladaapp.test-helpers :as th]
             [buddy.hashers :as hashers]))
+
+(use-fixtures :each th/test-system-fixture)
 
 (defn- register! [app {:keys [name email password]}]
   (app (-> (mock/request :post "/auth/register")
@@ -24,7 +26,7 @@
 
 (deftest user-profile-update-name
   (testing "User can update their name via profile endpoint"
-    (let [{:keys [app]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
           email "john@example.com"
           password "password123"]
       ;; Register user
@@ -53,7 +55,7 @@
 
 (deftest user-profile-update-email
   (testing "User can update their email via profile endpoint"
-    (let [{:keys [app]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
           email "jane@example.com"
           new-email "jane.updated@example.com"
           password "password123"]
@@ -76,7 +78,7 @@
 
 (deftest user-profile-update-password
   (testing "User can update their password via profile endpoint"
-    (let [{:keys [app db]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
           email "bob@example.com"
           old-password "oldpass123"
           new-password "newpass456"]
@@ -102,7 +104,7 @@
 
 (deftest user-profile-update-multiple-fields
   (testing "User can update name and email together"
-    (let [{:keys [app]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
           email "alice@example.com"
           password "password123"]
       ;; Register user
@@ -124,7 +126,7 @@
 
 (deftest user-profile-update-not-found
   (testing "Returns 403 when user tries to update another user (even if non-existent)"
-    (let [{:keys [app]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
           email "test@example.com"
           password "password123"]
       ;; Register and login as user 1
@@ -142,7 +144,7 @@
 
 (deftest user-profile-update-empty-body
   (testing "Handles empty update gracefully"
-    (let [{:keys [app]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
           email "empty@example.com"
           password "password123"]
       ;; Register user
@@ -164,7 +166,7 @@
 
 (deftest user-profile-update-authorization-own-profile
   (testing "User can update their own profile"
-    (let [{:keys [app]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
           email "auth-test@example.com"
           password "password123"]
       ;; Register user with ID 1
@@ -185,7 +187,7 @@
 
 (deftest user-profile-update-authorization-blocks-other-users
   (testing "User cannot update another user's profile"
-    (let [{:keys [app]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
           email1 "user1@example.com"
           email2 "user2@example.com"
           password "password123"]

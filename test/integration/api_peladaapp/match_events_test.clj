@@ -1,12 +1,15 @@
 (ns api-peladaapp.match-events-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [clojure.test :refer [deftest is use-fixtures]]
             [ring.mock.request :as mock]
             [next.jdbc :as jdbc]
             [next.jdbc.sql :as sql]
             [api-peladaapp.test-helpers :as th]))
 
+(use-fixtures :each th/test-system-fixture)
+
 (deftest player-stats-endpoint-returns-unqualified-columns
-  (let [{:keys [app db-file]} (th/make-app!)
+  (let [app (-> th/*test-system* :app :handler)
+        db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
         email "stats@example.com"
         token (th/register-and-login! app {:name "Stats User" :email email :password "secret"})

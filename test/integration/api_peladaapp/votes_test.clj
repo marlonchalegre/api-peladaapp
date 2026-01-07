@@ -1,5 +1,5 @@
 (ns api-peladaapp.votes-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [ring.mock.request :as mock]
             [clojure.data.json :as json]
             [clojure.string :as str]
@@ -7,6 +7,8 @@
             [next.jdbc.sql :as sql]
             [api-peladaapp.test-helpers :as th])
   (:import [java.time Instant Duration]))
+
+(use-fixtures :each th/test-system-fixture)
 
 (defn- decode-body [resp]
   (let [b (:body resp)]
@@ -17,7 +19,8 @@
       :else nil)))
 
 (deftest votes-and-normalization
-  (let [{:keys [app db-file]} (th/make-app!)
+  (let [app (-> th/*test-system* :app :handler)
+        db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
     ;; seed org and players
     (sql/insert! ds :Organizations {:name "Org"})
@@ -54,7 +57,8 @@
         (is (= 400 (:status resp)))))))
 
 (deftest batch-voting-and-eligibility
-  (let [{:keys [app db-file]} (th/make-app!)
+  (let [app (-> th/*test-system* :app :handler)
+        db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
     ;; seed org, players, and teams
     (sql/insert! ds :Organizations {:name "Org"})
@@ -122,7 +126,8 @@
             (is (= 1 (:stars (first player-2-votes))))))))))
 
 (deftest voting-window-validation
-  (let [{:keys [app db-file]} (th/make-app!)
+  (let [app (-> th/*test-system* :app :handler)
+        db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
     ;; seed org and players
     (sql/insert! ds :Organizations {:name "Org"})

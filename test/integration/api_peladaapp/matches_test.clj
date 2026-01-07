@@ -1,10 +1,12 @@
 (ns api-peladaapp.matches-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [ring.mock.request :as mock]
             [clojure.data.json :as json]
             [clojure.string :as str]
             [next.jdbc :as jdbc]
             [api-peladaapp.test-helpers :as th]))
+
+(use-fixtures :each th/test-system-fixture)
 
 (defn- decode-body [resp]
   (let [b (:body resp)]
@@ -21,7 +23,8 @@
 
 (deftest matches-flow
   (testing "Complete matches workflow with authorization"
-    (let [{:keys [app db-file]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
+          db-file (:db-file th/*test-system*)
           ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
 
       ;; Register and login

@@ -1,10 +1,12 @@
 (ns api-peladaapp.pelada-close-test
   (:require [api-peladaapp.controllers.pelada :as pelada.controller]
-            [clojure.test :refer [deftest is]]
+            [clojure.test :refer [deftest is use-fixtures]]
             [ring.mock.request :as mock]
             [clojure.data.json :as json]
             [next.jdbc :as jdbc]
             [api-peladaapp.test-helpers :as th]))
+
+(use-fixtures :each th/test-system-fixture)
 
 (defn- decode-body [resp]
   (let [b (:body resp)]
@@ -20,7 +22,8 @@
       :else nil)))
 
 (deftest pelada-close-test
-  (let [{:keys [app db-file]} (th/make-app!)
+  (let [app (-> th/*test-system* :app :handler)
+        db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
     ;; Register and login user
     (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Test User" :email "test@user.com" :password "password"})))
@@ -52,6 +55,6 @@
             (is (= 200 (:status close-resp)))
             (is (= {:updated 1} body))
 
-            (let [pelada (pelada.controller/get-pelada pelada-id (fn [] ds))]
+            (let [pelada (pelada.controller/get-pelada pelada-id ds)]
               (is (= "closed" (:status pelada)))
               (is (not (nil? (:closed_at pelada)))))))))))

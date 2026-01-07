@@ -1,11 +1,13 @@
 (ns api-peladaapp.player-access-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [ring.mock.request :as mock]
             [clojure.data.json :as json]
             [clojure.string :as str]
             [next.jdbc :as jdbc]
             [next.jdbc.sql :as sql]
             [api-peladaapp.test-helpers :as th]))
+
+(use-fixtures :each th/test-system-fixture)
 
 (defn- decode-body [resp]
   (let [b (:body resp)]
@@ -22,7 +24,8 @@
 
 (deftest player-can-view-organization-data
   (testing "A player belonging to an organization can view organization data"
-    (let [{:keys [app db-file]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
+          db-file (:db-file th/*test-system*)
           ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
 
       ;; Register admin user
@@ -84,7 +87,8 @@
 
 (deftest player-can-view-peladas
   (testing "A player belonging to an organization can view peladas of that organization"
-    (let [{:keys [app db-file]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
+          db-file (:db-file th/*test-system*)
           ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
 
       ;; Register admin user
@@ -145,7 +149,8 @@
 
 (deftest player-can-view-matches
   (testing "A player belonging to an organization can view matches of peladas"
-    (let [{:keys [app db-file]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
+          db-file (:db-file th/*test-system*)
           ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
 
       ;; Register admin user
@@ -230,7 +235,8 @@
 
 (deftest player-cannot-modify-peladas-or-matches
   (testing "A player (non-admin) cannot modify peladas or matches"
-    (let [{:keys [app db-file]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
+          db-file (:db-file th/*test-system*)
           ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
 
       ;; Register admin user
@@ -326,7 +332,8 @@
 
 (deftest non-member-cannot-view-organization-data
   (testing "A user who is not a member of an organization cannot view its data"
-    (let [{:keys [app db-file]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
+          db-file (:db-file th/*test-system*)
           ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
 
       ;; Register admin user

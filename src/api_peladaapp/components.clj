@@ -10,22 +10,23 @@
 
 (def ^:private db-spec {:dbtype "sqlite" :dbname "peladaapp.db"})
 
-(defrecord Database [database connection]
+(defrecord Database [database connection db-spec skip-migrations]
   component/Lifecycle
-  (start [component]
-    (let [ds (component/start (connection/component HikariDataSource db-spec))]
-      ;; Run DB migrations on startup (idempotent)
-      (migratus/migrate {:store :database
-                         ;; Use classpath resource dir name for jar compatibility
-                         :migration-dir "migrations"
-                         :db {:dbtype "sqlite" :dbname "peladaapp.db"}})
-      (assoc component :database ds)))
-  (stop [component]
-    (-> component :database component/stop)
-    component))
+  (start [this]
+    (let [final-db-spec (merge {:dbtype "sqlite" :dbname "peladaapp.db"} db-spec)
+          ds (connection/component HikariDataSource final-db-spec)]
+      (when-not skip-migrations
+        (migratus/migrate {:store :database
+                           :migration-dir "migrations"
+                           :db final-db-spec}))
+      (assoc this :database (component/start ds))))
+  (stop [this]
+    (when-let [ds (:database this)]
+      (component/stop ds))
+    (assoc this :database nil)))
 
-(defn new-database []
-  (map->Database {}))
+(defn new-database [db-spec skip-migrations]
+  (map->Database {:db-spec db-spec :skip-migrations skip-migrations}))
 
 (defrecord WebServer [port app]
   component/Lifecycle
@@ -53,13 +54,10 @@
   component/Lifecycle
 
   (start [component]
-    (let [database (-> component :database :database)
-          ;; The rest of the codebase expects `:database` in the request to be a
-          ;; zero-arg function returning a javax.sql.DataSource. In tests we
-          ;; inject such a function; do the same in the running app.
-          database-fn (fn [] database)]
+    (let [db-val (-> component :database :database)
+          database (if (fn? db-val) (db-val) db-val)]
       (assoc component :handler
-             (wrap-assoc handler :database database-fn))))
+             (wrap-assoc handler :database database))))
   (stop [component]
     component))
 
@@ -68,9 +66,9 @@
    (map->App {:handler handler})
    [:database]))
 
-(defn system [_]
+(defn system [{:keys [db-spec skip-migrations]}]
   (component/system-map
-   :database (new-database)
+   :database (new-database db-spec skip-migrations)
    :app      (new-app server/app)
    :server   (new-web-server)))
 

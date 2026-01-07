@@ -1,11 +1,15 @@
 (ns api-peladaapp.test-helpers
+  "Test helpers for the api-peladaapp project."
   (:require
    [api-peladaapp.components :as components]
-   [api-peladaapp.server :as server]
+   [com.stuartsierra.component :as component]
    [clojure.data.json :as json]
    [clojure.string :as str]
    [next.jdbc :as jdbc]
-   [ring.mock.request :as mock]))
+   [ring.mock.request :as mock]
+   [clojure.test :refer [use-fixtures]]))
+
+(def ^:dynamic *test-system* nil)
 
 (defn- temp-db-file []
   (let [f (java.io.File/createTempFile "peladaapp-test-" ".db")]
@@ -31,13 +35,19 @@
               stmt statements]
         (jdbc/execute! conn [stmt])))))
 
-(defn make-app! []
+(defn make-system []
   (let [db-file (temp-db-file)
         _ (migrate! db-file)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
-        db-fn (fn [] ds)
-        app (components/wrap-assoc server/app :database db-fn)]
-    {:app app :db-file db-file}))
+        system (components/system {:db-spec {:dbname db-file} :skip-migrations true})]
+    (assoc system :db-file db-file)))
+
+(defn test-system-fixture [f]
+  (let [system (component/start (make-system))]
+    (binding [*test-system* system]
+      (try
+        (f)
+        (finally
+          (component/stop system))))))
 
 (defn decode-body [resp]
   (let [b (:body resp)]

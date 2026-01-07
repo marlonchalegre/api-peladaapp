@@ -1,10 +1,12 @@
 (ns api-peladaapp.organizations-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [clojure.test :refer [deftest is use-fixtures]]
             [ring.mock.request :as mock]
             [api-peladaapp.test-helpers :as th]))
 
+(use-fixtures :each th/test-system-fixture)
+
 (deftest organizations-crud
-  (let [{:keys [app]} (th/make-app!)
+  (let [app (-> th/*test-system* :app :handler)
         token (th/register-and-login! app {:name "U" :email "u@e.com" :password "p"})
         auth (th/auth-header token)]
     ;; create

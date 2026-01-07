@@ -71,7 +71,7 @@
             ))))
     ds))
 
-(defn- wrap-assoc [handler key value]
+(defn wrap-assoc [handler key value]
   (fn [request]
     ;; Only set the key if not already provided (e.g., tests inject :database)
     (let [request* (if (contains? request key)

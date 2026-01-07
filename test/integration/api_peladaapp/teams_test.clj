@@ -1,12 +1,15 @@
 (ns api-peladaapp.teams-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [clojure.test :refer [deftest is use-fixtures]]
             [ring.mock.request :as mock]
             [next.jdbc :as jdbc]
             [next.jdbc.sql :as sql]
             [api-peladaapp.test-helpers :as th]))
 
+(use-fixtures :each th/test-system-fixture)
+
 (deftest team-crud-and-players
-  (let [{:keys [app db-file]} (th/make-app!)
+  (let [app (-> th/*test-system* :app :handler)
+        db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
         token (th/register-and-login! app {:name "U" :email "u@e.com" :password "p"})
         auth (th/auth-header token)]
@@ -36,7 +39,8 @@
       (is (= {} (th/decode-body resp))))))
 
 (deftest cannot-add-player-from-different-organization
-  (let [{:keys [app db-file]} (th/make-app!)
+  (let [app (-> th/*test-system* :app :handler)
+        db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
         token (th/register-and-login! app {:name "U" :email "u@e.com" :password "p"})
         auth (th/auth-header token)]

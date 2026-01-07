@@ -1,12 +1,15 @@
 (ns api-peladaapp.admins-integration-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [ring.mock.request :as mock]
             [api-peladaapp.test-helpers :as th]
             [next.jdbc :as jdbc]))
 
+(use-fixtures :each th/test-system-fixture)
+
 (deftest test-organization-admin-workflow
   (testing "Complete admin workflow: create org, add admin, list admins, remove admin"
-    (let [{:keys [app db-file]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
+          db-file (:db-file th/*test-system*)
           ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
 
           ;; Register and login first user
@@ -90,7 +93,8 @@
 
 (deftest test-pelada-authorization
   (testing "Only admins can create peladas"
-    (let [{:keys [app db-file]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
+          db-file (:db-file th/*test-system*)
           ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
 
           ;; Register admin user
@@ -127,7 +131,8 @@
 
 (deftest test-authorization-logic
   (testing "Authorization functions work correctly"
-    (let [{:keys [app db-file]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
+          db-file (:db-file th/*test-system*)
           ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
 
           token1 (th/register-and-login! app {:name "User1" :email "u1@test.com" :password "p"})
@@ -156,7 +161,8 @@
 
 (deftest test-multiple-organizations-and-admins
   (testing "User can be admin of multiple organizations and organizations can have multiple admins"
-    (let [{:keys [app db-file]} (th/make-app!)
+    (let [app (-> th/*test-system* :app :handler)
+          db-file (:db-file th/*test-system*)
           ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
 
           ;; Register three users

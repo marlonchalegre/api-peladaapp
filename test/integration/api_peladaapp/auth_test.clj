@@ -1,5 +1,5 @@
 (ns api-peladaapp.auth-test
-  (:require [clojure.test :refer [deftest is]]
+  (:require [clojure.test :refer [deftest is use-fixtures]]
             [ring.mock.request :as mock]
             [next.jdbc :as jdbc]
             [next.jdbc.sql :as sql]
@@ -7,6 +7,8 @@
             [clojure.data.json :as json]
             [clojure.string :as str]
             [api-peladaapp.test-helpers :as th]))
+
+(use-fixtures :each th/test-system-fixture)
 
 (defn- decode-body [resp]
   (let [b (:body resp)]
@@ -17,7 +19,8 @@
       :else nil)))
 
 (deftest login-success-returns-jwt
-  (let [{:keys [app db-file]} (th/make-app!)
+  (let [app (-> th/*test-system* :app :handler)
+        db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
     (sql/insert! ds :users {:name "John"
                             :email "john@example.com"
@@ -29,7 +32,8 @@
       (is (string? (:token body))))))
 
 (deftest login-fails-with-wrong-password
-  (let [{:keys [app db-file]} (th/make-app!)
+  (let [app (-> th/*test-system* :app :handler)
+        db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
     (sql/insert! ds :users {:name "John"
                             :email "john@example.com"
