@@ -1,7 +1,8 @@
 (ns api-peladaapp.unauthorized-access-test
-  (:require [clojure.test :refer [deftest is testing use-fixtures]]
-            [ring.mock.request :as mock]
-            [api-peladaapp.test-helpers :as th]))
+  (:require
+   [api-peladaapp.test-helpers :as th]
+   [clojure.test :refer [deftest is testing use-fixtures]]
+   [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 
@@ -12,13 +13,13 @@
         user-token (th/register-and-login! app {:name "User" :email "user@test.com" :password "pass"})
         admin-auth (th/auth-header admin-token)
         user-auth (th/auth-header user-token)]
-    
+
     ;; Admin creates an organization
     (let [org-resp (app (-> (mock/request :post "/api/organizations")
                             (mock/json-body {:name "Restricted Org"})
                             admin-auth))
           org-id (:id (th/decode-body org-resp))]
-      
+
       (testing "Regular user cannot delete organization"
         (let [resp (app (-> (mock/request :delete (str "/api/organizations/" org-id))
                             user-auth))]
