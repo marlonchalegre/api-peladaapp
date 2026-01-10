@@ -36,11 +36,13 @@
   [id :- s/Int
    year :- s/Int
    db]
-  (sql/query db ["SELECT me.event_type, count(*) as count
+  (sql/query db ["SELECT me.player_id, u.name as player_name, me.event_type, count(*) as count
                   FROM \"MatchEvents\" me
                   JOIN \"Matches\" m ON me.match_id = m.id
                   JOIN \"Peladas\" p ON m.pelada_id = p.id
+                  JOIN \"OrganizationPlayers\" op ON me.player_id = op.id
+                  JOIN \"Users\" u ON op.user_id = u.id
                   WHERE p.organization_id = ?
                     AND strftime('%Y', p.scheduled_at) = ?
-                  GROUP BY me.event_type"
+                  GROUP BY me.player_id, u.name, me.event_type"
                  id (str year)]))

@@ -54,8 +54,17 @@
   [id :- s/Int
    year :- s/Int
    db]
-  (let [stats (db.organization/get-statistics id year db)]
-    (reduce (fn [acc {:keys [event_type count]}]
-              (assoc acc (keyword event_type) count))
-            {:goal 0 :assist 0 :own_goal 0}
-            stats)))
+  (let [rows (db.organization/get-statistics id year db)]
+    (->> rows
+         (group-by :player_id)
+         (map (fn [[_ player-rows]]
+                (let [first-row (first player-rows)
+                      base {:player_id (:player_id first-row)
+                            :player_name (:player_name first-row)
+                            :goal 0
+                            :assist 0
+                            :own_goal 0}]
+                  (reduce (fn [acc {:keys [event_type count]}]
+                            (assoc acc (keyword event_type) count))
+                          base
+                          player-rows)))))))
