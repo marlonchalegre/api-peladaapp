@@ -4,7 +4,7 @@
    [api-peladaapp.controllers.organization :as controller.organization]
    [api-peladaapp.helpers.exception :as exception]
    [api-peladaapp.helpers.pagination :as pagination]
-   [api-peladaapp.helpers.responses :refer [created deleted ok updated]]
+   [api-peladaapp.helpers.responses :refer [bad-request created deleted ok updated]]
    [api-peladaapp.logic.authorization :as auth]))
 
 (defn create [request]
@@ -52,4 +52,13 @@
              orgs-models (:data orgs-data)
              orgs-responses (map adapter.organization/model->response orgs-models)]
          (ok orgs-responses (:headers orgs-data)))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn get-statistics [request]
+  (try (let [db (:database request)
+             id (Integer/parseInt (get-in request [:params :id]))
+             year (Integer/parseInt (get-in request [:query-params "year"]))]
+         (-> (controller.organization/get-statistics id year db)
+             ok))
+       (catch NumberFormatException _ (bad-request "Invalid ID or Year format"))
        (catch Exception e (exception/api-exception-handler e))))

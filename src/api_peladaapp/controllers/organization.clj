@@ -49,3 +49,13 @@
         orgs   (db.organization/list-organizations db per-page offset)
         total  (db.organization/count-organizations db)]
     (pagination/with-pagination-headers orgs total page per-page)))
+
+(s/defn get-statistics
+  [id :- s/Int
+   year :- s/Int
+   db]
+  (let [stats (db.organization/get-statistics id year db)]
+    (reduce (fn [acc {:keys [event_type count]}]
+              (assoc acc (keyword event_type) count))
+            {:goal 0 :assist 0 :own_goal 0}
+            stats)))

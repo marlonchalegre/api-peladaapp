@@ -31,3 +31,16 @@
 (s/defn count-organizations :- s/Int
   [db]
   (-> (sql/query db ["select count(*) as count from organizations"]) first :count))
+
+(s/defn get-statistics
+  [id :- s/Int
+   year :- s/Int
+   db]
+  (sql/query db ["SELECT me.event_type, count(*) as count
+                  FROM \"MatchEvents\" me
+                  JOIN \"Matches\" m ON me.match_id = m.id
+                  JOIN \"Peladas\" p ON m.pelada_id = p.id
+                  WHERE p.organization_id = ?
+                    AND strftime('%Y', p.scheduled_at) = ?
+                  GROUP BY me.event_type"
+                 id (str year)]))

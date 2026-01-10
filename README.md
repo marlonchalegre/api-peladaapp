@@ -73,12 +73,18 @@ docker run --rm -p 8080:8080 api-peladaapp:latest
 ```text
 /                      # Project root
 ├─ project.clj         # Leiningen config (deps, main, test paths, migratus)
+├─ Dockerfile          # Multi-stage production build
+├─ Dockerfile.dev      # Development Docker build
+├─ dev/                # Development helpers (REPL, user.clj)
+├─ doc/                # Documentation
+├─ scripts/            # SQL scripts for data seeding/fixing
 ├─ resources/
 │  ├─ config.json      # App configuration (JWT secret, etc.)
 │  └─ migrations/      # SQL migrations (Migratus)
 ├─ src/api_peladaapp/
 │  ├─ core.clj         # Entry point (-main) starting the Component system
 │  ├─ components.clj   # System wiring: DB, App, WebServer (Jetty)
+│  ├─ config.clj       # Configuration loading
 │  ├─ server.clj       # Ring app stack (middleware) and `app`
 │  ├─ routes.clj       # Compojure routes & access rules
 │  ├─ handlers/        # HTTP handlers mapping to controllers
@@ -87,11 +93,13 @@ docker run --rm -p 8080:8080 api-peladaapp:latest
 │  ├─ db/              # next.jdbc data access (CRUD, queries)
 │  ├─ models/          # Schema definitions (Prismatic)
 │  ├─ adapters/        # Data transformation (DB <-> Model <-> API)
+│  ├─ requests/        # Input schema validation/coercion
+│  ├─ responses/       # Output schema validation/formatting
 │  ├─ helpers/         # Shared helpers (responses, pagination, etc.)
 ├─ test/
+│  ├─ api_peladaapp/   # Test helpers
 │  ├─ unit/            # Unit tests
 │  ├─ integration/     # End-to-end HTTP tests
-└─ Dockerfile          # Multi-stage production build
 ```
 
 ---
@@ -99,7 +107,7 @@ docker run --rm -p 8080:8080 api-peladaapp:latest
 ### License
 MIT License. See `LICENSE`.
 
-- **Database schema (consolidated)** includes: `Users`, `Organizations`, `Positions`, `OrganizationPlayers`, `Peladas`, `Teams`, `TeamPlayers`, `Matches`, `MatchSubstitutions`, `Statistics`, `Votes`.
+- **Database schema (consolidated)** includes: `Users`, `Organizations`, `Positions`, `OrganizationPlayers`, `OrganizationAdmins`, `Peladas`, `Teams`, `TeamPlayers`, `Matches`, `MatchEvents`, `MatchLineups`, `MatchSubstitutions`, `Statistics`, `Votes`.
 - **Access control** via Buddy access rules; only `/auth/register` and `/auth/login` are public.
 - **JSON responses** enforced centrally in `helpers/responses.clj`.
 
@@ -116,8 +124,9 @@ flowchart TD
     A[Ring/Compojure Routes]
     M[Middleware\nJSON, AuthN/Z, Access Rules]
     H[Handlers]
-    C[Controllers]
     D[Adapters]
+    C[Controllers]
+    L[Logic]
     S[Schemas]
   end
 
@@ -125,8 +134,12 @@ flowchart TD
     DB[(SQLite)]
   end
 
-  U -->|HTTP| A --> M --> H --> C --> D --> DB
+  U -->|HTTP| A --> M --> H
+  H --> D
+  H --> C
+  C --> L
   C --> S
+  C --> DB
 ```
 
 ---
@@ -136,14 +149,14 @@ flowchart TD
 - `GET /api/users` (paginated)
 - `GET/PUT/DELETE /api/user/:id`
 - `POST/GET /api/organizations` (GET paginated)
-- `POST/GET /api/players`
+- `POST /api/players`, `GET /api/organizations/:id/players`
 - `POST/GET /api/peladas`, `POST /api/peladas/:id/begin`, `POST /api/peladas/:id/close`, `POST /api/peladas/:id/teams/randomize`
 - `POST/GET /api/teams`
-- `GET/PUT /api/matches` and `/api/matches/:id`
-- `POST /api/matches/:pelada_id/events`
-- `DELETE /api/matches/:id/events`
-- `POST /api/substitutions`
-- `POST/GET /api/votes`
+- `GET /api/peladas/:id/matches`, `PUT /api/matches/:id/score`
+- `POST /api/matches/:id/events`, `DELETE /api/matches/:id/events`
+- `POST /api/matches/:id/lineups`
+- `POST /api/matches/:id/substitutions`
+- `POST /api/votes`, `GET /api/peladas/:id/votes`
 - `POST /api/scores/normalized`
 
 All `/api/**` require `Authorization: Token <jwt>`.
