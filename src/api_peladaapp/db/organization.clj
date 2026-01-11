@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.adapters.organization :as adapter.organization]
    [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
@@ -36,13 +37,49 @@
   [id :- s/Int
    year :- s/Int
    db]
-  (sql/query db ["SELECT me.player_id, u.name as player_name, me.event_type, count(*) as count
-                  FROM \"MatchEvents\" me
-                  JOIN \"Matches\" m ON me.match_id = m.id
-                  JOIN \"Peladas\" p ON m.pelada_id = p.id
-                  JOIN \"OrganizationPlayers\" op ON me.player_id = op.id
-                  JOIN \"Users\" u ON op.user_id = u.id
-                  WHERE p.organization_id = ?
-                    AND strftime('%Y', p.scheduled_at) = ?
-                  GROUP BY me.player_id, u.name, me.event_type"
-                 id (str year)]))
+  (let [where-year (if (pos? year) " AND strftime('%Y', p.scheduled_at) = ?" "")
+        base-params (if (pos? year) [id (str year)] [id])
+        params (into [] (concat base-params base-params base-params))
+        sql (str "
+WITH RawParticipation AS (
+    SELECT ml.player_id, m.pelada_id
+    FROM MatchLineups ml
+    JOIN Matches m ON ml.match_id = m.id
+    JOIN Peladas p ON m.pelada_id = p.id
+    WHERE p.organization_id = ? " where-year "
+
+    UNION
+
+    SELECT tp.player_id, m.pelada_id
+    FROM TeamPlayers tp
+    JOIN Teams t ON tp.team_id = t.id
+    JOIN Matches m ON (m.home_team_id = t.id OR m.away_team_id = t.id)
+    JOIN Peladas p ON m.pelada_id = p.id
+    WHERE p.organization_id = ? " where-year "
+      AND NOT EXISTS (SELECT 1 FROM MatchLineups sub_ml WHERE sub_ml.match_id = m.id)
+),
+PlayerParticipation AS (
+    SELECT player_id, COUNT(DISTINCT pelada_id) as peladas_count
+    FROM RawParticipation
+    GROUP BY player_id
+),
+PlayerEvents AS (
+    SELECT me.player_id, me.event_type, COUNT(*) as event_count
+    FROM MatchEvents me
+    JOIN Matches m ON me.match_id = m.id
+    JOIN Peladas p ON m.pelada_id = p.id
+    WHERE p.organization_id = ? " where-year "
+    GROUP BY me.player_id, me.event_type
+)
+SELECT 
+    pp.player_id, 
+    u.name as player_name, 
+    pp.peladas_count,
+    pe.event_type,
+    pe.event_count as count
+FROM PlayerParticipation pp
+JOIN OrganizationPlayers op ON pp.player_id = op.id
+JOIN Users u ON op.user_id = u.id
+LEFT JOIN PlayerEvents pe ON pp.player_id = pe.player_id
+")]
+    (sql/query db (into [sql] params) {:builder-fn rs/as-unqualified-lower-maps})))

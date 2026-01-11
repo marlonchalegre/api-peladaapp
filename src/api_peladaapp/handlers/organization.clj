@@ -4,7 +4,8 @@
    [api-peladaapp.controllers.organization :as controller.organization]
    [api-peladaapp.helpers.exception :as exception]
    [api-peladaapp.helpers.pagination :as pagination]
-   [api-peladaapp.helpers.responses :refer [bad-request created deleted ok updated]]
+   [api-peladaapp.helpers.responses :refer [bad-request created deleted ok
+                                            updated]]
    [api-peladaapp.logic.authorization :as auth]))
 
 (defn create [request]

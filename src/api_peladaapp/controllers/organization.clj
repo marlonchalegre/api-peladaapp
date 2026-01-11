@@ -61,10 +61,13 @@
                 (let [first-row (first player-rows)
                       base {:player_id (:player_id first-row)
                             :player_name (:player_name first-row)
+                            :peladas_played (:peladas_count first-row)
                             :goal 0
                             :assist 0
                             :own_goal 0}]
                   (reduce (fn [acc {:keys [event_type count]}]
-                            (assoc acc (keyword event_type) count))
+                            (if event_type
+                              (assoc acc (keyword event_type) count)
+                              acc))
                           base
                           player-rows)))))))
