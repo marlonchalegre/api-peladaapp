@@ -32,24 +32,24 @@
     (let [mock-db (fn [] nil)]
       (with-redefs [api-peladaapp.db.admin/is-user-admin-of-organization?
                     (fn [_ _ _] true)
-                    api-peladaapp.db.player/list-players-by-organization
-                    (fn [_ _] [])]
+                    api-peladaapp.db.player/get-org-player-by-user-id
+                    (fn [_ _ _] nil)]
         (is (true? (auth/user-is-in-organization? 1 1 mock-db))))))
 
   (testing "Returns true when user is player"
     (let [mock-db (fn [] nil)]
       (with-redefs [api-peladaapp.db.admin/is-user-admin-of-organization?
                     (fn [_ _ _] false)
-                    api-peladaapp.db.player/list-players-by-organization
-                    (fn [_ _] [{:user-id 1}])]
+                    api-peladaapp.db.player/get-org-player-by-user-id
+                    (fn [_ _ _] {:id 1})]
         (is (true? (auth/user-is-in-organization? 1 1 mock-db))))))
 
   (testing "Returns false when user is neither admin nor player"
     (let [mock-db (fn [] nil)]
       (with-redefs [api-peladaapp.db.admin/is-user-admin-of-organization?
                     (fn [_ _ _] false)
-                    api-peladaapp.db.player/list-players-by-organization
-                    (fn [_ _] [{:user-id 2}])]
+                    api-peladaapp.db.player/get-org-player-by-user-id
+                    (fn [_ _ _] nil)]
         (is (false? (auth/user-is-in-organization? 1 1 mock-db)))))))
 
 (deftest test-require-organization-admin!
@@ -72,16 +72,16 @@
     (let [mock-db (fn [] nil)]
       (with-redefs [api-peladaapp.db.admin/is-user-admin-of-organization?
                     (fn [_ _ _] true)
-                    api-peladaapp.db.player/list-players-by-organization
-                    (fn [_ _] [])]
+                    api-peladaapp.db.player/get-org-player-by-user-id
+                    (fn [_ _ _] nil)]
         (is (nil? (auth/require-organization-member! 1 1 mock-db))))))
 
   (testing "Throws exception when user is not member"
     (let [mock-db (fn [] nil)]
       (with-redefs [api-peladaapp.db.admin/is-user-admin-of-organization?
                     (fn [_ _ _] false)
-                    api-peladaapp.db.player/list-players-by-organization
-                    (fn [_ _] [])]
+                    api-peladaapp.db.player/get-org-player-by-user-id
+                    (fn [_ _ _] nil)]
         (is (thrown-with-msg? clojure.lang.ExceptionInfo
                               #"User is not a member of this organization"
                               (auth/require-organization-member! 1 1 mock-db)))))))
