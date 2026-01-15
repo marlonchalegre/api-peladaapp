@@ -1,5 +1,9 @@
 (ns api-peladaapp.controllers.pelada
   (:require
+   [api-peladaapp.adapters.match :as adapter.match]
+   [api-peladaapp.adapters.pelada :as adapter.pelada]
+   [api-peladaapp.adapters.player :as adapter.player]
+   [api-peladaapp.adapters.team :as adapter.team]
    [api-peladaapp.db.match :as db.match]
    [api-peladaapp.db.match-event :as db.match-event]
    [api-peladaapp.db.match-lineup :as db.match-lineup]
@@ -18,7 +22,7 @@
   (when (pos? team-count)
     (->> (range 1 (inc team-count))
          (map (fn [index]
-                {:pelada_id pelada-id
+                {:pelada-id pelada-id
                  :name (str "Time " index)}))
          (run! #(db.team/insert-team % db)))))
 
@@ -118,13 +122,13 @@
                                     (assoc-in acc [match_id team_id] (conj (get-in acc [match_id team_id] []) lineup)))
                                   {}
                                   match-lineups)]
-    {:pelada pelada
-     :matches matches
-     :teams teams
+    {:pelada (adapter.pelada/model->response pelada)
+     :matches (map adapter.match/model->response matches)
+     :teams (map adapter.team/model->response teams)
      :users users
-     :organization_players organization-players
-     :match_events match-events
-     :player_stats player-stats
+     :organization_players (map adapter.player/model->response organization-players)
+     :match_events (map adapter.match/event->response match-events)
+     :player_stats (when player-stats (map adapter.match/stats->response player-stats))
      :team_players_map team-players-map
      :match_lineups_map match-lineups-map}))
 
@@ -135,9 +139,23 @@
   (let [pelada-data (db.pelada/get-pelada-full-details pelada-id db)
         pelada (:pelada pelada-data)
         all-org-players (:org_players_map pelada-data)
-        current-player (some-> (filter #(= user-id (:user_id %)) (vals all-org-players)) first)
+        current-player (some-> (filter #(= user-id (:user-id %)) (vals all-org-players)) first)
         player-id (:id current-player)
         voting-info (if (and (= "closed" (:status pelada)) player-id)
                       (pelada.logic/get-voting-info pelada-id player-id db)
-                      nil)]
-    (assoc pelada-data :voting_info voting-info)))
+                      nil)
+        
+        ;; Map models back to response format
+        mapped-pelada (adapter.pelada/model->response pelada)
+        mapped-teams (map (fn [team]
+                            (assoc (adapter.team/model->response team)
+                                   :players (map (fn [p] (assoc (adapter.player/model->response p) :user (:user p))) 
+                                                 (:players team))))
+                          (:teams pelada-data))
+        mapped-available (map (fn [p] (assoc (adapter.player/model->response p) :user (:user p)))
+                              (:available_players pelada-data))]
+    (-> pelada-data
+        (assoc :pelada mapped-pelada
+               :teams mapped-teams
+               :available_players mapped-available
+               :voting_info voting-info))))

@@ -8,18 +8,21 @@
   (-> result vals first))
 
 (s/defn insert-player :- s/Int
-  [{:keys [user_id organization_id grade position_id]}
+  [{:keys [user-id organization-id grade position-id]}
    db]
-  (-> (sql/insert! db :organizationplayers {:user_id user_id
-                                            :organization_id organization_id
+  (-> (sql/insert! db :organizationplayers {:user_id user-id
+                                            :organization_id organization-id
                                             :grade grade
-                                            :position_id position_id})
+                                            :position_id position-id})
       affected-rows-count))
 
 (s/defn update-player :- s/Int
   [id player db]
-  (-> (sql/update! db :organizationplayers (select-keys player [:grade :position_id]) {:id id})
-      affected-rows-count))
+  (let [db-row (cond-> {}
+                 (contains? player :grade) (assoc :grade (:grade player))
+                 (contains? player :position-id) (assoc :position_id (:position-id player)))]
+    (-> (sql/update! db :organizationplayers db-row {:id id})
+        affected-rows-count)))
 
 (s/defn delete-player :- s/Int
   [id db]

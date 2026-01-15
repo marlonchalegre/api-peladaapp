@@ -13,12 +13,12 @@
 
 (defn build-score-update
   "Validate and sanitize score update payload. Returns map with non-nil fields."
-  [{:keys [home_score away_score status] :as payload}]
-  (ensure-non-negative home_score :home_score)
-  (ensure-non-negative away_score :away_score)
+  [{:keys [home-score away-score status] :as payload}]
+  (ensure-non-negative home-score :home-score)
+  (ensure-non-negative away-score :away-score)
   (let [update (cond-> {}
-                 (some? home_score) (assoc :home_score home_score)
-                 (some? away_score) (assoc :away_score away_score)
+                 (some? home-score) (assoc :home-score home-score)
+                 (some? away-score) (assoc :away-score away-score)
                  status (assoc :status status))]
     (if (seq update)
       update

@@ -52,8 +52,8 @@
 
 (s/defn remove-lineup-player :- s/Int
   [match-id :- s/Int {:keys [team-id player-id]} db]
-  (db.match-lineup/remove-player match-id (int team_id) (int player-id) db))
+  (db.match-lineup/remove-player match-id (int team-id) (int player-id) db))
 
 (s/defn replace-lineup-player :- s/Int
   [match-id :- s/Int {:keys [team-id out-player-id in-player-id]} db]
-  (db.match-lineup/replace-player match-id (int team_id) (int out-player-id) (int in-player-id) db))
+  (db.match-lineup/replace-player match-id (int team-id) (int out-player-id) (int in-player-id) db))

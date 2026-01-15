@@ -4,5 +4,5 @@
 
 (s/defschema Team
   {:id s/Int
-   :pelada_id s/Int
+   :pelada-id s/Int
    :name (s/maybe s/Str)})

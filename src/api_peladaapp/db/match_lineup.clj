@@ -22,8 +22,10 @@
 (s/defn list-by-match-grouped :- {s/Int [s/Any]}
   [match-id db]
   (let [rows (list-by-match match-id db)]
-    (reduce (fn [acc {:keys [matchlineups/team_id] :as row}]
-              (update acc team_id (fnil conj []) (update-keys row (comp keyword name))))
+    (reduce (fn [acc row]
+              (let [unqualified (update-keys row (comp keyword name))
+                    team-id (:team_id unqualified)]
+                (update acc team-id (fnil conj []) unqualified)))
             {} rows)))
 
 (s/defn ensure-seeded :- s/Int
@@ -34,10 +36,10 @@
     (if (seq existing)
       0
       (let [m (db.match/get-match match-id db)
-            home (:home_team_id m)
-            away (:away_team_id m)
-            home-players (map :teamplayers/player_id (db.team/list-team-players home db))
-            away-players (map :teamplayers/player_id (db.team/list-team-players away db))
+            home (:home-team-id m)
+            away (:away-team-id m)
+            home-players (map :player_id (db.team/list-team-players home db))
+            away-players (map :player_id (db.team/list-team-players away db))
             to-insert (concat (map (fn [pid] {:match_id match-id :team_id home :player_id pid}) home-players)
                               (map (fn [pid] {:match_id match-id :team_id away :player_id pid}) away-players))]
         (reduce (fn [acc row]

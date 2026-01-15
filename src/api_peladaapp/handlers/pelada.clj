@@ -12,7 +12,7 @@
              body (:body request)
              pelada (adapter.pelada/create-request->model body)
              user-id (auth/get-user-id-from-request request)
-             org-id (:organization_id pelada)]
+             org-id (:organization-id pelada)]
          ;; Only admins can create peladas
          (auth/require-organization-admin! user-id org-id db)
          (-> (controller.pelada/create-pelada pelada db)
@@ -25,7 +25,7 @@
              id (get-in request [:params :id])
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
-             org-id (:organization_id pelada)]
+             org-id (:organization-id pelada)]
          ;; Members can view peladas
          (auth/require-organization-member! user-id org-id db)
          (-> pelada
@@ -38,7 +38,7 @@
              id (Integer/parseInt (str (get-in request [:params :id])))
              user-id (auth/get-user-id-from-request request)
              pelada-data (controller.pelada/get-pelada-full-details-controller id user-id db)
-             org-id (get-in pelada-data [:pelada :organization_id])]
+             org-id (get-in pelada-data [:pelada :organization-id])]
          ;; Members can view peladas
          (auth/require-organization-member! user-id org-id db)
          ;; Returning as is (map) since it's a complex response defined in controller return type
@@ -51,7 +51,7 @@
              body (:body request)
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
-             org-id (:organization_id pelada)]
+             org-id (:organization-id pelada)]
          ;; Only admins can update peladas
          (auth/require-organization-admin! user-id org-id db)
          (-> (controller.pelada/update-pelada id (adapter.pelada/update-request->model body) db)
@@ -64,7 +64,7 @@
              id (get-in request [:params :id])
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
-             org-id (:organization_id pelada)]
+             org-id (:organization-id pelada)]
          ;; Only admins can delete peladas
          (auth/require-organization-admin! user-id org-id db)
          (deleted (controller.pelada/delete-pelada id db)))
@@ -91,7 +91,7 @@
              matches-per-team (some-> (:matches_per_team body) int)
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
-             org-id (:organization_id pelada)]
+             org-id (:organization-id pelada)]
          ;; Only admins can begin peladas
          (auth/require-organization-admin! user-id org-id db)
          (ok (if matches-per-team
@@ -104,7 +104,7 @@
              id (get-in request [:params :id])
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
-             org-id (:organization_id pelada)]
+             org-id (:organization-id pelada)]
          ;; Only admins can close peladas
          (auth/require-organization-admin! user-id org-id db)
          (-> (controller.pelada/close-pelada id db)
@@ -117,7 +117,7 @@
              id (get-in request [:params :id])
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
-             org-id (:organization_id pelada)]
+             org-id (:organization-id pelada)]
          ;; Members can view peladas
          (auth/require-organization-member! user-id org-id db)
          (ok (controller.pelada/get-pelada-dashboard-data id db)))

@@ -9,19 +9,29 @@
 (s/defn create-request->model :- models.admin/NewOrganizationAdmin
   [request :- requests.admin/AddAdminRequest
    organization-id :- s/Int]
-  {:organization_id organization-id
-   :user_id (:user_id request)})
+  {:organization-id organization-id
+   :user-id (:user_id request)})
 
 (s/defn model->response :- responses.admin/AdminResponse
-  [model :- models.admin/OrganizationAdmin]
-  (cond-> (select-keys model [:id :organization_id :user_id :created_at])
-    (:user_name model) (assoc :user_name (:user_name model))
-    (:user_email model) (assoc :user_email (:user_email model))
-    (:organization_name model) (assoc :organization_name (:organization_name model))))
+  [{:keys [id organization-id user-id created-at user_name user_email organization_name] :as model}]
+  (cond-> {:id id
+           :organization_id organization-id
+           :user_id user-id}
+    created-at (assoc :created_at created-at)
+    user_name (assoc :user_name user_name)
+    user_email (assoc :user_email user_email)
+    organization_name (assoc :organization_name organization_name)
+    ;; Sometimes these are kebab-cased in model if they come from joined results mapped to model
+    (:user-name model) (assoc :user_name (:user-name model))
+    (:user-email model) (assoc :user_email (:user-email model))
+    (:organization-name model) (assoc :organization_name (:organization-name model))))
 
 (s/defn db->model [db-admin]
-  (some-> db-admin
-          misc/unamespace
-          (select-keys [:id :organization_id :user_id :created_at :user_name :user_email :organization_name])
-          ;; Ensure created_at is string if needed, or keep as is.
-          ))
+  (when-let [p (some-> db-admin misc/unamespace)]
+    (cond-> {:id (:id p)
+             :organization-id (:organization_id p)
+             :user-id (:user_id p)}
+      (:created_at p) (assoc :created-at (:created_at p))
+      (:user_name p) (assoc :user-name (:user_name p))
+      (:user_email p) (assoc :user-email (:user_email p))
+      (:organization_name p) (assoc :organization-name (:organization_name p)))))

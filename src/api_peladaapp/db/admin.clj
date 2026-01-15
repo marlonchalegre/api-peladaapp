@@ -9,10 +9,10 @@
   (-> result vals first))
 
 (s/defn insert-organization-admin :- s/Int
-  [{:keys [organization_id user_id]} db]
+  [{:keys [organization-id user-id]} db]
   (with-open [conn (jdbc/get-connection db)]
-    (sql/insert! conn :OrganizationAdmins {:organization_id organization_id
-                                           :user_id user_id})
+    (sql/insert! conn :OrganizationAdmins {:organization_id organization-id
+                                           :user_id user-id})
     (-> (jdbc/execute-one! conn ["select last_insert_rowid() as id"]) :id int)))
 
 (s/defn get-organization-admin [id db]

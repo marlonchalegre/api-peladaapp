@@ -13,7 +13,7 @@
              pelada-id (get-in request [:params :pelada_id])
              user-id (auth/get-user-id-from-request request)
              pelada (pelada-controller/get-pelada pelada-id db)
-             org-id (:organization_id pelada)]
+             org-id (:organization-id pelada)]
          ;; Members can view matches
          (auth/require-organization-member! user-id org-id db)
          (let [matches (match-controller/list-matches pelada-id db)]
@@ -25,7 +25,7 @@
              pelada-id (Integer/parseInt (clojure.core/str (get-in request [:params :pelada_id])))
              user-id (auth/get-user-id-from-request request)
              pelada (pelada-controller/get-pelada pelada-id db)
-             org-id (:organization_id pelada)]
+             org-id (:organization-id pelada)]
          ;; Members can view events
          (auth/require-organization-member! user-id org-id db)
          (let [events (match-controller/list-events-by-pelada pelada-id db)]
@@ -37,7 +37,7 @@
              pelada-id (Integer/parseInt (clojure.core/str (get-in request [:params :pelada_id])))
              user-id (auth/get-user-id-from-request request)
              pelada (pelada-controller/get-pelada pelada-id db)
-             org-id (:organization_id pelada)]
+             org-id (:organization-id pelada)]
          ;; Members can view stats
          (auth/require-organization-member! user-id org-id db)
          (let [stats (match-controller/list-player-stats-by-pelada pelada-id db)]
@@ -50,8 +50,8 @@
              body (:body request)
              user-id (auth/get-user-id-from-request request)
              match (db.match/get-match id db)
-             pelada (pelada-controller/get-pelada (:pelada_id match) db)
-             org-id (:organization_id pelada)]
+             pelada (pelada-controller/get-pelada (:pelada-id match) db)
+             org-id (:organization-id pelada)]
          ;; Only admins can update scores
          (auth/require-organization-admin! user-id org-id db)
          (-> (match-controller/update-score id (adapter.match/update-score-request->model body) db)
@@ -65,8 +65,8 @@
              body (:body request)
              user-id (auth/get-user-id-from-request request)
              match (db.match/get-match id db)
-             pelada (pelada-controller/get-pelada (:pelada_id match) db)
-             org-id (:organization_id pelada)]
+             pelada (pelada-controller/get-pelada (:pelada-id match) db)
+             org-id (:organization-id pelada)]
          ;; Only admins can create events
          (auth/require-organization-admin! user-id org-id db)
          (-> (match-controller/create-event id (adapter.match/create-event-request->model body) db)
@@ -81,8 +81,8 @@
           body (:body request)
           user-id (auth/get-user-id-from-request request)
           match (db.match/get-match id db)
-          pelada (pelada-controller/get-pelada (:pelada_id match) db)
-          org-id (:organization_id pelada)]
+          pelada (pelada-controller/get-pelada (:pelada-id match) db)
+          org-id (:organization-id pelada)]
       ;; Only admins can delete events
       (auth/require-organization-admin! user-id org-id db)
       (updated (match-controller/delete-last-event id (adapter.match/delete-event-request->model body) db)))
@@ -96,8 +96,8 @@
           id (Integer/parseInt (clojure.core/str (get-in request [:params :id])))
           user-id (auth/get-user-id-from-request request)
           match (db.match/get-match id db)
-          pelada (pelada-controller/get-pelada (:pelada_id match) db)
-          org-id (:organization_id pelada)]
+          pelada (pelada-controller/get-pelada (:pelada-id match) db)
+          org-id (:organization-id pelada)]
       ;; Members can view lineups
       (auth/require-organization-member! user-id org-id db)
       (ok (match-controller/list-lineups-by-match id db)))
@@ -110,8 +110,8 @@
           body (:body request)
           user-id (auth/get-user-id-from-request request)
           match (db.match/get-match id db)
-          pelada (pelada-controller/get-pelada (:pelada_id match) db)
-          org-id (:organization_id pelada)]
+          pelada (pelada-controller/get-pelada (:pelada-id match) db)
+          org-id (:organization-id pelada)]
       ;; Only admins can modify lineups
       (auth/require-organization-admin! user-id org-id db)
       (updated (match-controller/add-lineup-player id (adapter.match/add-lineup-request->model body) db)))
@@ -124,8 +124,8 @@
           body (:body request)
           user-id (auth/get-user-id-from-request request)
           match (db.match/get-match id db)
-          pelada (pelada-controller/get-pelada (:pelada_id match) db)
-          org-id (:organization_id pelada)]
+          pelada (pelada-controller/get-pelada (:pelada-id match) db)
+          org-id (:organization-id pelada)]
       ;; Only admins can modify lineups
       (auth/require-organization-admin! user-id org-id db)
       (updated (match-controller/remove-lineup-player id (adapter.match/remove-lineup-request->model body) db)))
@@ -138,8 +138,8 @@
           body (:body request)
           user-id (auth/get-user-id-from-request request)
           match (db.match/get-match id db)
-          pelada (pelada-controller/get-pelada (:pelada_id match) db)
-          org-id (:organization_id pelada)]
+          pelada (pelada-controller/get-pelada (:pelada-id match) db)
+          org-id (:organization-id pelada)]
       ;; Only admins can modify lineups
       (auth/require-organization-admin! user-id org-id db)
       (updated (match-controller/replace-lineup-player id (adapter.match/replace-lineup-request->model body) db)))

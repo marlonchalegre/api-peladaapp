@@ -4,10 +4,10 @@
 
 (s/defschema OrganizationAdmin
   {:id s/Int
-   :organization_id s/Int
-   :user_id s/Int
-   (s/optional-key :created_at) s/Str})
+   :organization-id s/Int
+   :user-id s/Int
+   (s/optional-key :created-at) s/Str})
 
 (s/defschema NewOrganizationAdmin
-  {:organization_id s/Int
-   :user_id s/Int})
+  {:organization-id s/Int
+   :user-id s/Int})

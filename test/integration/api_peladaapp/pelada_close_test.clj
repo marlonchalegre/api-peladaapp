@@ -59,4 +59,4 @@
 
             (let [pelada (pelada.controller/get-pelada pelada-id ds)]
               (is (= "closed" (:status pelada)))
-              (is (not (nil? (:closed_at pelada)))))))))))
+              (is (not (nil? (:closed-at pelada)))))))))))

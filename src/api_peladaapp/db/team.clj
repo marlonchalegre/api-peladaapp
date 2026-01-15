@@ -16,9 +16,9 @@
   (-> result vals first))
 
 (s/defn insert-team :- s/Int
-  [{:keys [pelada_id name]}
+  [{:keys [pelada-id name]}
    db]
-  (-> (sql/insert! db :teams {:pelada_id pelada_id :name name})
+  (-> (sql/insert! db :teams {:pelada_id pelada-id :name name})
       affected-rows-count))
 
 (s/defn get-team [id db]
@@ -83,7 +83,10 @@
 
 (s/defn list-team-players [team-id db]
   (->> (sql/find-by-keys db :teamplayers {:team_id team-id})
-       (map (fn [m] (update-keys m (comp keyword name))))))
+       (map unqualify-row)
+       (map (fn [m]
+              {:team-id (:team_id m)
+               :player-id (:player_id m)}))))
 
 (s/defn list-team-players-by-pelada [pelada-id db]
   (->> (sql/query db ["SELECT tp.*, t.name as team_name, t.pelada_id

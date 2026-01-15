@@ -4,7 +4,7 @@
 
 (s/defschema Player
   {:id s/Int
-   :user_id s/Int
-   :organization_id s/Int
+   :user-id s/Int
+   :organization-id s/Int
    :grade (s/maybe s/Num)
-   :position_id (s/maybe s/Int)})
+   :position-id (s/maybe s/Int)})

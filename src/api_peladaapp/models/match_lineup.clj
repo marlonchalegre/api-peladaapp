@@ -3,6 +3,6 @@
    [schema.core :as s]))
 
 (s/defschema MatchLineupEntry
-  {:match_id s/Int
-   :team_id s/Int
-   :player_id s/Int})
+  {:match-id s/Int
+   :team-id s/Int
+   :player-id s/Int})

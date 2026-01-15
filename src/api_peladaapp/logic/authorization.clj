@@ -14,7 +14,7 @@
   [user-id organization-id db]
   (or (db.admin/is-user-admin-of-organization? user-id organization-id db)
       (let [players (db.player/list-players-by-organization organization-id db)]
-        (boolean (some #(= (:user_id %) user-id) players)))))
+        (boolean (some #(= (:user-id %) user-id) players)))))
 
 (s/defn require-organization-admin!
   "Throws exception if user is not an admin of the organization"

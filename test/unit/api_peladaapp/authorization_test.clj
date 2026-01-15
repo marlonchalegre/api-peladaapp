@@ -41,7 +41,7 @@
       (with-redefs [api-peladaapp.db.admin/is-user-admin-of-organization?
                     (fn [_ _ _] false)
                     api-peladaapp.db.player/list-players-by-organization
-                    (fn [_ _] [{:user_id 1}])]
+                    (fn [_ _] [{:user-id 1}])]
         (is (true? (auth/user-is-in-organization? 1 1 mock-db))))))
 
   (testing "Returns false when user is neither admin nor player"
@@ -49,7 +49,7 @@
       (with-redefs [api-peladaapp.db.admin/is-user-admin-of-organization?
                     (fn [_ _ _] false)
                     api-peladaapp.db.player/list-players-by-organization
-                    (fn [_ _] [{:user_id 2}])]
+                    (fn [_ _] [{:user-id 2}])]
         (is (false? (auth/user-is-in-organization? 1 1 mock-db)))))))
 
 (deftest test-require-organization-admin!

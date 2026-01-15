@@ -11,7 +11,7 @@
   (when (and players-per-team (pos? players-per-team) (seq player-ids))
     (jdbc/with-transaction [tx db]
       (let [pelada (db.pelada/get-pelada pelada-id tx)
-            org-id (:organization_id pelada)
+            org-id (:organization-id pelada)
             org-player-ids (->> player-ids
                                 (map #(db.player/get-org-player-by-user-id % org-id tx))
                                 (map :id)

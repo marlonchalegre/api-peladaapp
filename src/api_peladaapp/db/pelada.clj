@@ -19,7 +19,7 @@
   (let [row (cond-> {:organization_id organization-id}
               scheduled-at (assoc :scheduled_at scheduled-at)
               num-teams (assoc :num_teams num-teams)
-              players_per_team (assoc :players_per_team players-per-team))]
+              players-per-team (assoc :players_per_team players-per-team))]
     (sql/insert! db :Peladas row)
     (-> (jdbc/execute-one! db ["select last_insert_rowid() as id"]) :id int)))
 
@@ -82,7 +82,7 @@
         teams-with-players (map (fn [team]
                                   (assoc team :players (map (fn [team-player]
                                                               (let [player (first (filter #(= (:player_id team-player) (:id %)) all-org-players))
-                                                                    user (get users-map (:user_id player))]
+                                                                    user (get users-map (:user-id player))]
                                                                 (assoc player :user user)))
                                                             (get team-players-grouped (:id team) []))))
                                 teams)
@@ -95,7 +95,7 @@
 
         ; Add user info to available players
         available-players-with-users (map (fn [player]
-                                            (assoc player :user (get users-map (:user_id player))))
+                                            (assoc player :user (get users-map (:user-id player))))
                                           available-players)]
 
     {:pelada pelada
