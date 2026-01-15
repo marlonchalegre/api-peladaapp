@@ -20,10 +20,11 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Install Leiningen
-        uses: DeLaGuardo/setup-clojure@1.2.5
+      - name: Setup Clojure
+        uses: DeLaGuardo/setup-clojure@13
         with:
           lein: 'latest'
+          clj-kondo: 'latest'
 
       - name: Cache dependencies
         uses: actions/cache@v4
@@ -32,12 +33,6 @@ jobs:
           key: ${{ runner.os }}-maven-${{ hashFiles('project.clj') }}
           restore-keys: |
             ${{ runner.os }}-maven-
-
-      - name: Install clj-kondo
-        run: |
-          curl -sLO https://raw.githubusercontent.com/clj-kondo/clj-kondo/master/install
-          chmod +x install
-          ./install --dir .
 
       - name: Run Lint
         run: clj-kondo --lint src
