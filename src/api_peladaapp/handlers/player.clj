@@ -40,6 +40,5 @@
 (defn list-by-org [request]
   (try (let [db (:database request)
              org-id (get-in request [:params :organization_id])]
-         (let [players (controller.player/list-players org-id db)]
-           (ok (map adapter.player/model->response players))))
+         (ok (map adapter.player/model->response (controller.player/list-players org-id db))))
        (catch Exception e (exception/api-exception-handler e))))

@@ -15,7 +15,7 @@
        set))
 
 (s/defn create-substitution :- s/Int
-  [{:keys [match_id out_player_id in_player_id] :as sub} db]
+  [{:keys [match_id _out_player_id _in_player_id] :as sub} db]
   (let [match (db.match/get-match match_id db)]
     (when (nil? match)
       (throw (ex-info nil {:type :not-found :message "Match not found"})))

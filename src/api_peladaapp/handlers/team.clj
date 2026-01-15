@@ -41,8 +41,7 @@
 (defn list-by-pelada [request]
   (try (let [db (:database request)
              pelada-id (get-in request [:params :pelada_id])]
-         (let [teams (controller.team/list-teams pelada-id db)]
-           (ok (map adapter.team/model->response teams))))
+         (ok (map adapter.team/model->response (controller.team/list-teams pelada-id db))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn list-players [request]

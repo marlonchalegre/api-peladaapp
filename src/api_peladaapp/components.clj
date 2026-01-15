@@ -8,8 +8,6 @@
   (:import
    (com.zaxxer.hikari HikariDataSource)))
 
-(def ^:private db-spec {:dbtype "sqlite" :dbname "peladaapp.db"})
-
 (defrecord Database [database connection db-spec skip-migrations]
   component/Lifecycle
   (start [this]

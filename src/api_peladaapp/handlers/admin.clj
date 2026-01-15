@@ -39,15 +39,13 @@
 (defn list-by-organization [request]
   (try (let [db (:database request)
              org-id (Integer/parseInt (str (get-in request [:params :organization_id])))]
-         (let [admins (controller.admin/list-organization-admins org-id db)]
-           (ok (map adapter.admin/model->response admins))))
+         (ok (map adapter.admin/model->response (controller.admin/list-organization-admins org-id db))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn list-by-user [request]
   (try (let [db (:database request)
              user-id (Integer/parseInt (str (get-in request [:params :user_id])))]
-         (let [admins (controller.admin/list-user-admin-organizations user-id db)]
-           (ok (map adapter.admin/model->response admins))))
+         (ok (map adapter.admin/model->response (controller.admin/list-user-admin-organizations user-id db))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn check-is-admin [request]

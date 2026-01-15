@@ -9,7 +9,7 @@
    [schema.core :as s]))
 
 (s/defn cast-vote :- models.vote/Vote
-  [{:keys [voter_id target_id stars pelada_id] :as vote} :- models.vote/Vote db]
+  [{:keys [_voter_id _target_id _stars pelada_id] :as vote} :- models.vote/Vote db]
   ;; Validate pelada voting eligibility
   (let [pelada (db.pelada/get-pelada pelada_id db)]
     (vote.logic/validate-voting-eligibility pelada))

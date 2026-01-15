@@ -36,8 +36,7 @@
 (defn list-by-pelada [request]
   (try (let [db (:database request)
              pelada-id (Integer/parseInt (str (get-in request [:params :pelada_id])))]
-         (let [votes (controller.vote/list-votes pelada-id db)]
-           (ok (map adapter.vote/model->response votes))))
+         (ok (map adapter.vote/model->response (controller.vote/list-votes pelada-id db))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn normalize-score [request]

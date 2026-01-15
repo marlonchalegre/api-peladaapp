@@ -134,7 +134,7 @@
    db]
   (let [pelada-data (db.pelada/get-pelada-full-details pelada-id db)
         pelada (:pelada pelada-data)
-        org-id (:organization_id pelada)
+        _org-id (:organization_id pelada)
         all-org-players (:org_players_map pelada-data)
         current-player (some-> (filter #(= user-id (:user_id %)) (vals all-org-players)) first)
         player-id (:id current-player)
