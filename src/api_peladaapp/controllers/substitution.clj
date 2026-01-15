@@ -15,11 +15,11 @@
        set))
 
 (s/defn create-substitution :- s/Int
-  [{:keys [match_id _out_player_id _in_player_id] :as sub} db]
-  (let [match (db.match/get-match match_id db)]
+  [{:keys [match-id] :as sub} db]
+  (let [match (db.match/get-match match-id db)]
     (when (nil? match)
       (throw (ex-info nil {:type :not-found :message "Match not found"})))
-    (let [allowed (pelada-player-ids (:pelada_id match) db)]
+    (let [allowed (pelada-player-ids (:pelada-id match) db)]
       (substitution.logic/validate-substitution sub allowed)
       (db.substitution/insert-substitution sub db))))
 

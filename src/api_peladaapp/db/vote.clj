@@ -15,9 +15,9 @@
       adapter.vote/db->model))
 
 (s/defn insert-vote :- s/Int
-  [{:keys [pelada_id voter_id target_id stars]}
+  [{:keys [pelada-id voter-id target-id stars]}
    db]
-  (sql/insert! db :votes {:pelada_id pelada_id :voter_id voter_id :target_id target_id :stars stars})
+  (sql/insert! db :votes {:pelada_id pelada-id :voter_id voter-id :target_id target-id :stars stars})
   (-> (jdbc/execute-one! db ["select last_insert_rowid() as id"]) :id int))
 
 (s/defn list-votes-by-pelada :- [models.vote/Vote]

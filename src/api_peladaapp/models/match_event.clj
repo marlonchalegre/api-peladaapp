@@ -4,7 +4,7 @@
 
 (s/defschema MatchEvent
   {:id s/Int
-   :match_id s/Int
-   :player_id s/Int
-   :event_type s/Str
-   (s/optional-key :created_at) s/Any})
+   :match-id s/Int
+   :player-id s/Int
+   :event-type s/Str
+   (s/optional-key :created-at) s/Any})

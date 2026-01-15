@@ -11,26 +11,42 @@
   [request :- requests.pelada/CreatePeladaRequest]
   (let [scheduled-at (or (:scheduled_at request) (:when request))]
     (medley.core/assoc-some {}
-                            :organization_id (:organization_id request)
-                            :scheduled_at scheduled-at
-                            :num_teams (:num_teams request)
-                            :players_per_team (:players_per_team request)
+                            :organization-id (:organization_id request)
+                            :scheduled-at scheduled-at
+                            :num-teams (:num_teams request)
+                            :players-per-team (:players_per_team request)
                             :status (:status request))))
 
 (s/defn update-request->model :- models.pelada/Pelada
   [request :- requests.pelada/UpdatePeladaRequest]
   (let [scheduled-at (or (:scheduled_at request) (:when request))]
     (medley.core/assoc-some {}
-                            :organization_id (:organization_id request)
-                            :scheduled_at scheduled-at
-                            :num_teams (:num_teams request)
-                            :players_per_team (:players_per_team request)
+                            :organization-id (:organization_id request)
+                            :scheduled-at scheduled-at
+                            :num-teams (:num_teams request)
+                            :players-per-team (:players_per_team request)
                             :status (:status request))))
 
 (s/defn model->response :- responses.pelada/PeladaResponse
   [model :- models.pelada/Pelada]
-  (select-keys model [:id :organization_id :scheduled_at :num_teams :players_per_team :status :closed_at]))
+  (let [{:keys [id organization-id scheduled-at num-teams players-per-team status closed-at]} model]
+    (medley.core/assoc-some {}
+                            :id id
+                            :organization_id organization-id
+                            :scheduled_at scheduled-at
+                            :num_teams num-teams
+                            :players_per_team players-per-team
+                            :status status
+                            :closed_at closed-at)))
 
 (s/defn db->model :- models.pelada/Pelada
   [pelada]
-  (some-> pelada misc/unamespace (select-keys [:id :organization_id :scheduled_at :num_teams :players_per_team :status :closed_at])))
+  (when-let [p (some-> pelada misc/unamespace)]
+    (medley.core/assoc-some {}
+                            :id (:id p)
+                            :organization-id (:organization_id p)
+                            :scheduled-at (:scheduled_at p)
+                            :num-teams (:num_teams p)
+                            :players-per-team (:players_per_team p)
+                            :status (:status p)
+                            :closed-at (:closed_at p))))

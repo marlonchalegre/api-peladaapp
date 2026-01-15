@@ -64,4 +64,11 @@
                           group by e.player_id, p.user_id, u.name
                           order by goals desc, assists desc" pelada-id])
        (map unqualify-row)
+       (map (fn [row]
+              {:player-id (:player_id row)
+               :user-id (:user_id row)
+               :name (:name row)
+               :goals (:goals row)
+               :assists (:assists row)
+               :own-goals (:own_goals row)}))
        vec))

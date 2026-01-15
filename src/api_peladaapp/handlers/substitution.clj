@@ -8,7 +8,7 @@
   (try (let [db (:database request)
              match-id (Integer/parseInt (str (get-in request [:params :id])))
              {:keys [out_player_id in_player_id minute]} (:body request)
-             sub {:match_id match-id :out_player_id (Integer/parseInt (str out_player_id)) :in_player_id (Integer/parseInt (str in_player_id)) :minute minute}]
+             sub {:match-id match-id :out-player-id (Integer/parseInt (str out_player_id)) :in-player-id (Integer/parseInt (str in_player_id)) :minute minute}]
          (created (controller.substitution/create-substitution sub db)))
        (catch Exception e (exception/api-exception-handler e))))
 

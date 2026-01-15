@@ -7,9 +7,9 @@
   (-> result vals first))
 
 (s/defn insert-substitution :- s/Int
-  [{:keys [match_id minute out_player_id in_player_id]}
+  [{:keys [match-id minute out-player-id in-player-id]}
    db]
-  (-> (sql/insert! db :matchsubstitutions {:match_id match_id :minute minute :out_player_id out_player_id :in_player_id in_player_id})
+  (-> (sql/insert! db :matchsubstitutions {:match_id match-id :minute minute :out_player_id out-player-id :in_player_id in-player-id})
       affected-rows-count))
 
 (s/defn list-substitutions [match-id db]

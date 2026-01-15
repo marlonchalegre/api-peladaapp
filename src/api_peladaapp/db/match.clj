@@ -8,15 +8,15 @@
   (-> result vals first))
 
 (s/defn insert-match :- s/Int
-  [{:keys [pelada_id home_team_id away_team_id sequence status home_score away_score]}
+  [{:keys [pelada-id home-team-id away-team-id sequence status home-score away-score]}
    db]
-  (-> (sql/insert! db :matches {:pelada_id pelada_id
-                                :home_team_id home_team_id
-                                :away_team_id away_team_id
+  (-> (sql/insert! db :matches {:pelada_id pelada-id
+                                :home_team_id home-team-id
+                                :away_team_id away-team-id
                                 :sequence sequence
                                 :status status
-                                :home_score home_score
-                                :away_score away_score})
+                                :home_score home-score
+                                :away_score away-score})
       affected-rows-count))
 
 (s/defn list-matches-by-pelada :- [s/Any]
@@ -30,10 +30,10 @@
       adapter.match/db->model))
 
 (s/defn update-score :- s/Int
-  [id {:keys [home_score away_score status]} db]
+  [id {:keys [home-score away-score status]} db]
   (-> (sql/update! db :matches (cond-> {}
-                                 (some? home_score) (assoc :home_score home_score)
-                                 (some? away_score) (assoc :away_score away_score)
+                                 (some? home-score) (assoc :home_score home-score)
+                                 (some? away-score) (assoc :away_score away-score)
                                  status (assoc :status status))
                    {:id id})
       affected-rows-count))

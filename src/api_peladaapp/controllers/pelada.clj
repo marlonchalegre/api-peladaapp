@@ -44,7 +44,7 @@
   [pelada :- models.pelada/Pelada
    db]
   (let [pelada-id (db.pelada/insert-pelada pelada db)]
-    (when-let [team-count (:num_teams pelada)]
+    (when-let [team-count (:num-teams pelada)]
       (auto-create-teams! pelada-id team-count db))
     (db.pelada/get-pelada pelada-id db)))
 
@@ -94,13 +94,13 @@
 (s/defn close-pelada :- models.pelada/Pelada
   [pelada-id :- s/Int db]
   (db.match/finish-all-by-pelada pelada-id db)
-  (db.pelada/update-pelada pelada-id {:status "closed" :closed_at (str (java.time.Instant/now))} db)
+  (db.pelada/update-pelada pelada-id {:status "closed" :closed-at (str (java.time.Instant/now))} db)
   (db.pelada/get-pelada pelada-id db))
 
 (s/defn get-pelada-dashboard-data :- responses.pelada/PeladaDashboardResponse
   [pelada-id :- s/Int db]
   (let [pelada (db.pelada/get-pelada pelada-id db)
-        organization-id (:organization_id pelada)
+        organization-id (:organization-id pelada)
         matches (db.match/list-matches-by-pelada pelada-id db)
         teams (db.team/list-pelada-teams pelada-id db)
         users (map #(dissoc % :password :email) (db.user/list-users db 0 1000000))
@@ -134,7 +134,6 @@
    db]
   (let [pelada-data (db.pelada/get-pelada-full-details pelada-id db)
         pelada (:pelada pelada-data)
-        _org-id (:organization_id pelada)
         all-org-players (:org_players_map pelada-data)
         current-player (some-> (filter #(= user-id (:user_id %)) (vals all-org-players)) first)
         player-id (:id current-player)

@@ -9,53 +9,89 @@
 
 (defn in->model [{:keys [pelada_id home_team_id away_team_id sequence status home_score away_score]}]
   (cond-> {}
-    pelada_id (assoc :pelada_id pelada_id)
-    home_team_id (assoc :home_team_id home_team_id)
-    away_team_id (assoc :away_team_id away_team_id)
+    pelada_id (assoc :pelada-id pelada_id)
+    home_team_id (assoc :home-team-id home_team_id)
+    away_team_id (assoc :away-team-id away_team_id)
     sequence (assoc :sequence sequence)
     status (assoc :status status)
-    (some? home_score) (assoc :home_score home_score)
-    (some? away_score) (assoc :away_score away_score)))
+    (some? home_score) (assoc :home-score home_score)
+    (some? away_score) (assoc :away-score away_score)))
 
 (s/defn update-score-request->model :- (s/pred map?)
   [request :- requests.match/UpdateMatchScoreRequest]
-  (select-keys request [:home_score :away_score]))
+  {:home-score (:home_score request)
+   :away-score (:away_score request)})
 
 (s/defn create-event-request->model :- (s/pred map?)
   [request :- requests.match/CreateMatchEventRequest]
-  (select-keys request [:player_id :event_type]))
+  {:player-id (:player_id request)
+   :event-type (:event_type request)})
 
 (s/defn delete-event-request->model :- (s/pred map?)
   [request :- requests.match/DeleteMatchEventRequest]
-  (select-keys request [:player_id :event_type]))
+  {:player-id (:player_id request)
+   :event-type (:event_type request)})
 
 (s/defn add-lineup-request->model :- (s/pred map?)
   [request :- requests.match/AddLineupPlayerRequest]
-  (select-keys request [:team_id :player_id]))
+  {:team-id (:team_id request)
+   :player-id (:player_id request)})
 
 (s/defn remove-lineup-request->model :- (s/pred map?)
   [request :- requests.match/RemoveLineupPlayerRequest]
-  (select-keys request [:team_id :player_id]))
+  {:team-id (:team_id request)
+   :player-id (:player_id request)})
 
 (s/defn replace-lineup-request->model :- (s/pred map?)
   [request :- requests.match/ReplaceLineupPlayerRequest]
-  (select-keys request [:team_id :out_player_id :in_player_id]))
+  {:team-id (:team_id request)
+   :out-player-id (:out_player_id request)
+   :in-player-id (:in_player_id request)})
 
 (s/defn model->response :- responses.match/MatchResponse
-  [m :- models.match/Match]
-  (select-keys m [:id :pelada_id :home_team_id :away_team_id :sequence :status :home_score :away_score]))
+  [{:keys [id pelada-id home-team-id away-team-id sequence status home-score away-score]}]
+  (cond-> {:id id
+           :pelada_id pelada-id
+           :home_team_id home-team-id
+           :away_team_id away-team-id
+           :sequence sequence}
+    status (assoc :status status)
+    (some? home-score) (assoc :home_score home-score)
+    (some? away-score) (assoc :away_score away-score)))
 
 (s/defn event->response :- responses.match/MatchEventResponse
-  [e :- models.match-event/MatchEvent]
-  (select-keys e [:id :match_id :player_id :event_type :created_at]))
+  [{:keys [id match-id player-id event-type created-at]}]
+  (cond-> {:id id
+           :match_id match-id
+           :player_id player-id
+           :event_type event-type}
+    created-at (assoc :created_at created-at)))
 
 (s/defn stats->response :- responses.match/PlayerStatsResponse
-  [s :- models.match/PlayerStats]
-  (select-keys s [:player_id :user_id :name :goals :assists :own_goals]))
+  [{:keys [player-id user-id name goals assists own-goals]}]
+  {:player_id player-id
+   :user_id user-id
+   :name name
+   :goals goals
+   :assists assists
+   :own_goals own-goals})
 
 (s/defn db->model [m]
-  (some-> m misc/unamespace (select-keys [:id :pelada_id :home_team_id :away_team_id :sequence :status :home_score :away_score])))
+  (when-let [p (some-> m misc/unamespace)]
+    (cond-> {:id (:id p)
+             :pelada-id (:pelada_id p)
+             :home-team-id (:home_team_id p)
+             :away-team-id (:away_team_id p)
+             :sequence (:sequence p)}
+      (:status p) (assoc :status (:status p))
+      (some? (:home_score p)) (assoc :home-score (:home_score p))
+      (some? (:away_score p)) (assoc :away-score (:away_score p)))))
 
 (s/defn db-event->model :- models.match-event/MatchEvent
   [e]
-  (some-> e misc/unamespace (select-keys [:id :match_id :player_id :event_type :created_at])))
+  (when-let [p (some-> e misc/unamespace)]
+    (cond-> {:id (:id p)
+             :match-id (:match_id p)
+             :player-id (:player_id p)
+             :event-type (:event_type p)}
+      (:created_at p) (assoc :created-at (:created_at p)))))

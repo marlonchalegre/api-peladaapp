@@ -4,8 +4,8 @@
 
 (s/defschema Vote
   {:id s/Int
-   :pelada_id s/Int
-   :voter_id s/Int
-   :target_id s/Int
+   :pelada-id s/Int
+   :voter-id s/Int
+   :target-id s/Int
    :stars s/Int
-   :created_at (s/maybe s/Any)})
+   :created-at (s/maybe s/Any)})

@@ -4,6 +4,7 @@
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.team :as db.team]
    [api-peladaapp.db.user :as db.user]
+   [medley.core :as medley.core]
    [next.jdbc :as jdbc]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
@@ -13,12 +14,12 @@
   (-> result vals first))
 
 (s/defn insert-pelada :- s/Int
-  [{:keys [organization_id scheduled_at num_teams players_per_team]}
+  [{:keys [organization-id scheduled-at num-teams players-per-team]}
    db]
-  (let [row (cond-> {:organization_id organization_id}
-              scheduled_at (assoc :scheduled_at scheduled_at)
-              num_teams (assoc :num_teams num_teams)
-              players_per_team (assoc :players_per_team players_per_team))]
+  (let [row (cond-> {:organization_id organization-id}
+              scheduled-at (assoc :scheduled_at scheduled-at)
+              num-teams (assoc :num_teams num-teams)
+              players_per_team (assoc :players_per_team players-per-team))]
     (sql/insert! db :Peladas row)
     (-> (jdbc/execute-one! db ["select last_insert_rowid() as id"]) :id int)))
 
@@ -32,8 +33,15 @@
   [id :- s/Int
    pelada
    db]
-  (-> (sql/update! db :Peladas (select-keys pelada [:organization_id :scheduled_at :num_teams :players_per_team :status :closed_at]) {:id id})
-      affected-rows-count))
+  (let [db-row (medley.core/assoc-some {}
+                                      :organization_id (:organization-id pelada)
+                                      :scheduled_at (:scheduled-at pelada)
+                                      :num_teams (:num-teams pelada)
+                                      :players_per_team (:players-per-team pelada)
+                                      :status (:status pelada)
+                                      :closed_at (:closed-at pelada))]
+    (-> (sql/update! db :Peladas db-row {:id id})
+        affected-rows-count)))
 
 (s/defn delete-pelada :- s/Int
   [id :- s/Int
@@ -60,7 +68,7 @@
   [pelada-id :- s/Int
    db]
   (let [pelada (get-pelada pelada-id db)
-        organization-id (:organization_id pelada)
+        organization-id (:organization-id pelada)
         all-org-players (db.player/list-players-by-organization organization-id db)
         all-users (db.user/list-users db 0 100000) ;; Fetch a large number of users for now, can optimize later if needed
         users-map (into {} (map (juxt :id identity)) all-users)

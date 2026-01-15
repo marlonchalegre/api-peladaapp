@@ -20,9 +20,9 @@
     (db.match/get-match match-id db)))
 
 (s/defn create-event :- models.match-event/MatchEvent
-  [match-id :- s/Int {:keys [player_id event_type]} db]
-  (let [player-id (match-event.logic/ensure-player-id player_id)
-        canonical-type (match-event.logic/canonical-type event_type)
+  [match-id :- s/Int {:keys [player-id event-type]} db]
+  (let [player-id (match-event.logic/ensure-player-id player-id)
+        canonical-type (match-event.logic/canonical-type event-type)
         event-id (db.match-event/insert-event match-id player-id canonical-type db)]
     (db.match-event/get-event event-id db)))
 
@@ -31,9 +31,9 @@
   (db.match-event/list-events-by-pelada pelada-id db))
 
 (s/defn delete-last-event :- s/Int
-  [match-id :- s/Int {:keys [player_id event_type]} db]
-  (let [player-id (match-event.logic/ensure-player-id player_id)
-        canonical-type (match-event.logic/canonical-type event_type)]
+  [match-id :- s/Int {:keys [player-id event-type]} db]
+  (let [player-id (match-event.logic/ensure-player-id player-id)
+        canonical-type (match-event.logic/canonical-type event-type)]
     (db.match-event/delete-last-event match-id player-id canonical-type db)))
 
 (s/defn list-player-stats-by-pelada :- [models.match/PlayerStats]
@@ -47,13 +47,13 @@
       (db.match-lineup/list-by-match-grouped match-id db)))
 
 (s/defn add-lineup-player :- s/Int
-  [match-id :- s/Int {:keys [team_id player_id]} db]
-  (db.match-lineup/add-player match-id (int team_id) (int player_id) db))
+  [match-id :- s/Int {:keys [team-id player-id]} db]
+  (db.match-lineup/add-player match-id (int team-id) (int player-id) db))
 
 (s/defn remove-lineup-player :- s/Int
-  [match-id :- s/Int {:keys [team_id player_id]} db]
-  (db.match-lineup/remove-player match-id (int team_id) (int player_id) db))
+  [match-id :- s/Int {:keys [team-id player-id]} db]
+  (db.match-lineup/remove-player match-id (int team_id) (int player-id) db))
 
 (s/defn replace-lineup-player :- s/Int
-  [match-id :- s/Int {:keys [team_id out_player_id in_player_id]} db]
-  (db.match-lineup/replace-player match-id (int team_id) (int out_player_id) (int in_player_id) db))
+  [match-id :- s/Int {:keys [team-id out-player-id in-player-id]} db]
+  (db.match-lineup/replace-player match-id (int team_id) (int out-player-id) (int in-player-id) db))

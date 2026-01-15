@@ -20,7 +20,7 @@
              pelada-id (Integer/parseInt (str (get-in request [:params :pelada_id])))
              body (:body request)
              voter-id (:voter_id body)
-             votes (:votes body)]
+             votes (map (fn [v] {:target-id (:target_id v) :stars (:stars v)}) (:votes body))]
          ;; Batch cast response is already in correct format
          (ok (controller.vote/batch-cast-votes pelada-id voter-id votes db)))
        (catch Exception e (exception/api-exception-handler e))))

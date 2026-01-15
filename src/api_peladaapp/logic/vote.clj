@@ -27,7 +27,7 @@
 (defn ensure-voting-window-open
   "Ensure voting is within 24 hours after pelada closed."
   [pelada]
-  (let [closed-at (:closed_at pelada)]
+  (let [closed-at (:closed-at pelada)]
     (when-not closed-at
       (throw (ex-info "Pelada has no closed_at timestamp"
                       {:type :bad-request
@@ -49,8 +49,8 @@
 
 (defn validate-vote
   "Ensure vote payload conforms to rules. Returns original vote map."
-  [{:keys [voter_id target_id stars] :as vote}]
-  (ensure-not-self-vote voter_id target_id)
+  [{:keys [voter-id target-id stars] :as vote}]
+  (ensure-not-self-vote voter-id target-id)
   (ensure-valid-stars stars)
   vote)
 
@@ -69,5 +69,5 @@
               (/ (reduce + stars) (count stars))
               0.0)
         normalized (* 2.0 avg)]
-    {:player_id player-id
+    {:player-id player-id
      :score normalized}))

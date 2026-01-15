@@ -8,12 +8,26 @@
 
 (s/defn create-request->model :- models.vote/Vote
   [request :- requests.vote/CastVoteRequest]
-  (select-keys request [:pelada_id :voter_id :target_id :stars]))
+  {:pelada-id (:pelada_id request)
+   :voter-id (:voter_id request)
+   :target-id (:target_id request)
+   :stars (:stars request)})
 
 (s/defn model->response :- responses.vote/VoteResponse
-  [v :- models.vote/Vote]
-  (select-keys v [:id :pelada_id :voter_id :target_id :stars :created_at]))
+  [{:keys [id pelada-id voter-id target-id stars created-at]}]
+  {:id id
+   :pelada_id pelada-id
+   :voter_id voter-id
+   :target_id target-id
+   :stars stars
+   :created_at created-at})
 
 (s/defn db->model :- models.vote/Vote
   [v]
-  (some-> v misc/unamespace (select-keys [:id :pelada_id :voter_id :target_id :stars :created_at])))
+  (when-let [p (some-> v misc/unamespace)]
+    {:id (:id p)
+     :pelada-id (:pelada_id p)
+     :voter-id (:voter_id p)
+     :target-id (:target_id p)
+     :stars (:stars p)
+     :created-at (:created_at p)}))

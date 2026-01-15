@@ -18,8 +18,8 @@
 
 (defn validate-substitution
   "Ensure substitution respects domain rules. Returns original substitution map."
-  [{:keys [out_player_id in_player_id] :as substitution}
+  [{:keys [out-player-id in-player-id] :as substitution}
    allowed-player-ids]
-  (ensure-distinct-players out_player_id in_player_id)
-  (ensure-players-belong allowed-player-ids [out_player_id in_player_id])
+  (ensure-distinct-players out-player-id in-player-id)
+  (ensure-players-belong allowed-player-ids [out-player-id in-player-id])
   substitution)

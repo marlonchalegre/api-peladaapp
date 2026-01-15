@@ -56,11 +56,11 @@
   "Convert scheduled matches into DB ready rows."
   [pelada-id scheduled-matches]
   (map-indexed (fn [index {:keys [home away]}]
-                 {:pelada_id pelada-id
-                  :home_team_id home
-                  :away_team_id away
+                 {:pelada-id pelada-id
+                  :home-team-id home
+                  :away-team-id away
                   :sequence (inc index)
                   :status "scheduled"
-                  :home_score 0
-                  :away_score 0})
+                  :home-score 0
+                  :away-score 0})
                scheduled-matches))
