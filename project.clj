@@ -32,7 +32,8 @@
              :init-script  "migrations/init.sql"
              :db {:dbtype "sqlite"
                   :dbname "peladaapp.db"}}
-  :profiles {:dev {:plugins      [[com.github.clojure-lsp/lein-clojure-lsp "1.4.9"]]
+  :profiles {:dev {:plugins      [[com.github.clojure-lsp/lein-clojure-lsp "1.4.9"]
+                                  [com.github.clj-kondo/lein-clj-kondo "0.2.5"]]
                    :dependencies [[com.stuartsierra/component.repl "1.0.0"]
                                   [prismatic/schema-generators "0.1.5"]
                                   [org.clojure/tools.namespace "1.4.4"]
