@@ -38,7 +38,8 @@
              id (Integer/parseInt (str (get-in request [:params :id])))
              user-id (auth/get-user-id-from-request request)
              pelada-data (controller.pelada/get-pelada-full-details-controller id user-id db)
-             org-id (get-in pelada-data [:pelada :organization-id])]
+             pelada (:pelada pelada-data)
+             org-id (or (:organization_id pelada) (:organization-id pelada))]
          ;; Members can view peladas
          (auth/require-organization-member! user-id org-id db)
          ;; Returning as is (map) since it's a complex response defined in controller return type
