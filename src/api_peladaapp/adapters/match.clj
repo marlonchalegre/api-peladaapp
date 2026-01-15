@@ -1,7 +1,6 @@
 (ns api-peladaapp.adapters.match
   (:require
    [api-peladaapp.helpers.misc :as misc]
-   [api-peladaapp.models.match :as models.match]
    [api-peladaapp.models.match-event :as models.match-event]
    [api-peladaapp.requests.match :as requests.match]
    [api-peladaapp.responses.match :as responses.match]
