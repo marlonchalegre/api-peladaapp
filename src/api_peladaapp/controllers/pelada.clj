@@ -15,6 +15,7 @@
    [api-peladaapp.logic.pelada :as pelada.logic]
    [api-peladaapp.models.pelada :as models.pelada]
    [api-peladaapp.responses.pelada :as responses.pelada]
+   [next.jdbc :as jdbc]
    [schema.core :as s]))
 
 (defn- auto-create-teams!
@@ -47,10 +48,11 @@
   "Create pelada and optionally seed default teams. Returns pelada model."
   [pelada :- models.pelada/Pelada
    db]
-  (let [pelada-id (db.pelada/insert-pelada pelada db)]
-    (when-let [team-count (:num-teams pelada)]
-      (auto-create-teams! pelada-id team-count db))
-    (db.pelada/get-pelada pelada-id db)))
+  (jdbc/with-transaction [tx db]
+    (let [pelada-id (db.pelada/insert-pelada pelada tx)]
+      (when-let [team-count (:num-teams pelada)]
+        (auto-create-teams! pelada-id team-count tx))
+      (db.pelada/get-pelada pelada-id tx))))
 
 (s/defn get-pelada :- models.pelada/Pelada
   [pelada-id :- s/Int db]

@@ -20,7 +20,7 @@
 
 (defn get-by-id [request]
   (try (let [db (:database request)
-             id (get-in request [:params :id])]
+             id (Integer/parseInt (str (get-in request [:params :id])))]
          (-> (controller.organization/get-organization id db)
              adapter.organization/model->response
              ok))
@@ -28,7 +28,7 @@
 
 (defn update-by-id [request]
   (try (let [db (:database request)
-             id (get-in request [:params :id])
+             id (Integer/parseInt (str (get-in request [:params :id])))
              body (:body request)
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id id db)
@@ -39,7 +39,7 @@
 
 (defn delete [request]
   (try (let [db (:database request)
-             id (get-in request [:params :id])
+             id (Integer/parseInt (str (get-in request [:params :id])))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id id db)
          (deleted (controller.organization/delete-organization id db)))

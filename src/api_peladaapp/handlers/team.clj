@@ -17,7 +17,7 @@
 
 (defn get-by-id [request]
   (try (let [db (:database request)
-             id (get-in request [:params :id])]
+             id (Integer/parseInt (str (get-in request [:params :id])))]
          (-> (controller.team/get-team id db)
              adapter.team/model->response
              ok))
@@ -25,7 +25,7 @@
 
 (defn update-by-id [request]
   (try (let [db (:database request)
-             id (get-in request [:params :id])
+             id (Integer/parseInt (str (get-in request [:params :id])))
              body (:body request)]
          (-> (controller.team/update-team id (adapter.team/update-request->model body) db)
              adapter.team/model->response
@@ -34,13 +34,13 @@
 
 (defn delete [request]
   (try (let [db (:database request)
-             id (get-in request [:params :id])]
+             id (Integer/parseInt (str (get-in request [:params :id])))]
          (deleted (controller.team/delete-team id db)))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn list-by-pelada [request]
   (try (let [db (:database request)
-             pelada-id (get-in request [:params :pelada_id])]
+             pelada-id (Integer/parseInt (str (get-in request [:params :pelada_id])))]
          (ok (map adapter.team/model->response (controller.team/list-teams pelada-id db))))
        (catch Exception e (exception/api-exception-handler e))))
 
