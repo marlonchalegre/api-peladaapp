@@ -6,11 +6,12 @@ A Clojure HTTP API to organize casual soccer (pelada) with friends: manage users
 
 ### 📖 Overview
 - **Authentication**: Register/login, JWT auth (`Authorization: Token <jwt>`). Only `/auth/register` and `/auth/login` are public.
-- **Users/Players**: Users are the system’s identities; players are users inside an organization.
-- **Organizations**: CRUD organizations; scope players and peladas per organization.
-- **Peladas (Game Days)**: Create, configure (`num_teams`, `players_per_team`), begin (generate schedule), close. 
+- **Users/Players**: Users are the system’s identities; players are users inside an organization. Users can update their profiles.
+- **Organizations**: CRUD organizations; scope players and peladas per organization. Manage organization admins and view statistics.
+- **Peladas (Game Days)**: Create, configure (`num_teams`, `players_per_team`), manage attendance, begin (generate schedule), and close.
+- **Match Management**: Manage matches, lineups, substitutions, and events (goals, cards).
 - **Team Randomization**: Randomly assign players to teams based on normalized scores and available slots.
-- **Voting & Scores**: 1–5 star votes (no self‑vote), compute normalized scores (1–10) based on weighted averages.
+- **Voting & Scores**: 1–5 star votes (no self‑vote), batch voting support, and normalized scores (1–10) based on weighted averages.
 - **JSON everywhere**: All endpoints always return JSON bodies, including errors and deletes.
 
 ---
@@ -148,11 +149,12 @@ flowchart TD
 - `POST /auth/register`, `POST /auth/login`
 - `GET /api/users` (paginated)
 - `GET/PUT/DELETE /api/user/:id`
-- `POST/GET /api/organizations` (GET paginated)
-- `POST /api/players`, `GET /api/organizations/:id/players`
-- `POST/GET /api/peladas`, `POST /api/peladas/:id/begin`, `POST /api/peladas/:id/close`, `POST /api/peladas/:id/teams/randomize`
-- `POST/GET /api/teams`
-- `GET /api/peladas/:id/matches`, `PUT /api/matches/:id/score`
+- POST/GET /api/organizations (GET paginated), GET /api/organizations/:id/statistics
+- POST /api/players, GET /api/organizations/:id/players
+- POST/GET /api/peladas, POST /api/peladas/:id/begin, POST /api/peladas/:id/close, POST /api/peladas/:id/teams/randomize
+- POST /api/peladas/:id/attendance, POST /api/peladas/:id/close-attendance, GET /api/peladas/:id/dashboard-data
+- POST/GET /api/teams
+- GET /api/peladas/:id/matches, GET /api/peladas/:id/player-stats, PUT /api/matches/:id/score
 - `POST /api/matches/:id/events`, `DELETE /api/matches/:id/events`
 - `POST /api/matches/:id/lineups`
 - `POST /api/matches/:id/substitutions`
