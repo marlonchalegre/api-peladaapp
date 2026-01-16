@@ -52,6 +52,9 @@
                                        (mock/json-body {:pelada_id 1 :name n})
                                        auth))))))
 
+        ;; Close attendance
+        (is (= 200 (:status (app (-> (mock/request :post "/api/peladas/1/close-attendance") auth)))))
+
         ;; Begin pelada (user is admin, can begin)
         (let [resp (app (-> (mock/request :post "/api/peladas/1/begin") auth))
               body (decode-body resp)]

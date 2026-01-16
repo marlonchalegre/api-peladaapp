@@ -45,7 +45,16 @@
                                    auth))
               pelada-id (:id (decode-body pelada-resp))]
 
-          ;; Begin pelada
+            ;; Create teams
+          (doseq [n ["A" "B"]]
+            (app (-> (mock/request :post "/api/teams")
+                     (mock/json-body {:pelada_id pelada-id :name n})
+                     auth)))
+
+            ;; Close attendance
+          (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth)))))
+
+            ;; Begin pelada
           (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin"))
                    auth))
 

@@ -9,8 +9,10 @@
 (defn ensure-open
   "Ensure pelada can start. Returns pelada or throws with :bad-request."
   [pelada]
-  (if (= "open" (:status pelada))
-    pelada
+  (case (:status pelada)
+    "open" pelada
+    "attendance" (throw (ex-info nil {:type :bad-request
+                                      :message "Attendance list is still open. Close it before starting the pelada."}))
     (throw (ex-info nil {:type :bad-request
                          :message "Pelada already started or closed"}))))
 

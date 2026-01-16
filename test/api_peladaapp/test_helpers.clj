@@ -21,7 +21,8 @@
    "resources/migrations/20251029183000-match_lineups.up.sql"
    "resources/migrations/20251029200000-organization_admins.up.sql"
    "resources/migrations/20251029210000-add_closed_at_to_peladas.up.sql"
-   "resources/migrations/20251029220000-create_player_scores_view.up.sql"])
+   "resources/migrations/20251029220000-create_player_scores_view.up.sql"
+   "resources/migrations/20260115000000-attendance.up.sql"])
 
 (defn migrate! [db-file]
   (let [ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]

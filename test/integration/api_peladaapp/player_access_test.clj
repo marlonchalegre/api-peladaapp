@@ -192,6 +192,10 @@
                                        admin-auth))
                   pelada-id (:id (decode-body pelada-resp))]
 
+              ;; Admin closes attendance
+              (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance"))
+                                           admin-auth)))))
+
               ;; Admin begins pelada to generate matches
               (let [begin-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin"))
                                         admin-auth))]
@@ -299,6 +303,10 @@
                 (is (or (= 403 (:status begin-resp))
                         (= 401 (:status begin-resp)))))
 
+              ;; Admin closes attendance
+              (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance"))
+                                           admin-auth)))))
+
               ;; Admin begins pelada
               (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin"))
                        admin-auth))
@@ -364,6 +372,10 @@
                                                         :num_teams 4})
                                        admin-auth))
                   pelada-id (:id (decode-body pelada-resp))]
+
+              ;; Admin closes attendance
+              (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance"))
+                                           admin-auth)))))
 
               ;; Admin begins pelada
               (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin"))

@@ -146,18 +146,26 @@
         voting-info (if (and (= "closed" (:status pelada)) player-id)
                       (pelada.logic/get-voting-info pelada-id player-id db)
                       nil)
-        
+
         ;; Map models back to response format
         mapped-pelada (adapter.pelada/model->response pelada)
         mapped-teams (map (fn [team]
                             (assoc (adapter.team/model->response team)
-                                   :players (map (fn [p] (assoc (adapter.player/model->response p) :user (:user p))) 
+                                   :players (map (fn [p] (assoc (adapter.player/model->response p) :user (:user p)))
                                                  (:players team))))
                           (:teams pelada-data))
-        mapped-available (map (fn [p] (assoc (adapter.player/model->response p) :user (:user p)))
-                              (:available_players pelada-data))]
+        mapped-available (map (fn [p]
+                                (assoc (adapter.player/model->response p)
+                                       :user (:user p)
+                                       :attendance_status (:attendance_status p)))
+                              (:available_players pelada-data))
+        mapped-attendance (map (fn [a]
+                                 (assoc a :player (assoc (adapter.player/model->response (:player a))
+                                                         :user (get-in a [:player :user]))))
+                               (:attendance pelada-data))]
     (-> pelada-data
         (assoc :pelada mapped-pelada
                :teams mapped-teams
                :available_players mapped-available
+               :attendance mapped-attendance
                :voting_info voting-info))))

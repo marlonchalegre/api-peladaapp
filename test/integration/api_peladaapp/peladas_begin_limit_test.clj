@@ -55,6 +55,9 @@
                        (mock/json-body {:pelada_id pelada-id :name n})
                        auth)))
 
+            ;; Close attendance
+            (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth)))))
+
             ;; Begin pelada with matches_per_team = 2
             (let [begin-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin"))
                                       (mock/json-body {:matches_per_team 2})

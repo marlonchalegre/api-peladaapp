@@ -55,6 +55,9 @@
                        (mock/json-body {:pelada_id pelada-id :name n})
                        auth)))
 
+            ;; Close attendance
+            (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth)))))
+
             ;; Begin pelada to generate matches
             (let [begin-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin")) auth))]
               (is (= 200 (:status begin-resp))))

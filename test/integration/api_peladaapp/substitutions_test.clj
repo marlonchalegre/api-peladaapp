@@ -39,18 +39,21 @@
           (is (= 201 (:status pelada-resp)))
 
           ;; Create teams
-          (doseq [n ["Team A" "Team B"]]
+          (doseq [n ["A" "B"]]
             (app (-> (mock/request :post "/api/teams")
                      (mock/json-body {:pelada_id pelada-id :name n})
                      auth)))
 
+          ;; Close attendance
+          (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth)))))
+
           ;; Begin pelada to generate matches
           (let [begin-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin")) auth))]
-            (is (= 200 (:status begin-resp)))))
+            (is (= 200 (:status begin-resp))))
 
-        ;; List substitutions (should be empty)
-        (let [list-resp (app (-> (mock/request :get "/api/matches/1/substitutions") auth))
-              subs (th/decode-body list-resp)]
-          (is (= 200 (:status list-resp)))
-          ;; It's ok if there are no substitutions yet
-          (is (vector? subs)))))))
+          ;; List substitutions (should be empty)
+          (let [list-resp (app (-> (mock/request :get "/api/matches/1/substitutions") auth))
+                subs (th/decode-body list-resp)]
+            (is (= 200 (:status list-resp)))
+            ;; It's ok if there are no substitutions yet
+            (is (vector? subs))))))))

@@ -1,6 +1,7 @@
 (ns api-peladaapp.routes
   (:require
    [api-peladaapp.handlers.admin :as handler.admin]
+   [api-peladaapp.handlers.attendance :as handler.attendance]
    [api-peladaapp.handlers.auth :as auth]
    [api-peladaapp.handlers.match :as handler.match]
    [api-peladaapp.handlers.organization :as handler.organization]
@@ -35,6 +36,8 @@
     (GET "/organizations/:organization_id/peladas" [] handler.pelada/list-by-org)
     (POST "/peladas/:id/begin" [] handler.pelada/begin)
     (POST "/peladas/:id/close" [] handler.pelada/close)
+    (POST "/peladas/:id/attendance" [] handler.attendance/update-attendance)
+    (POST "/peladas/:id/close-attendance" [] handler.attendance/close-attendance)
     (GET "/peladas/:id/dashboard-data" [] handler.pelada/get-dashboard-data)
     (POST "/scores/normalized" [] handlers.score/get-normalized-scores)))
 
