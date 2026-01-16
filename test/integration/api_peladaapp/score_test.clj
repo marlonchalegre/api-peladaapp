@@ -25,7 +25,8 @@
     (jdbc/execute! ds ["INSERT INTO Votes (pelada_id, voter_id, target_id, stars) VALUES (1, 1, 2, 4)"])
 
     (testing "Fetches scores for given player IDs"
-      (let [player-ids [1 2]
+      (let [player-ids [1 2 3]
             scores (logic.score/get-normalized-scores player-ids ds)]
-        (is (= 4.0 (get scores 1)))
-        (is (= 4.0 (get scores 2)))))))
+        (is (= 8.0 (get scores 1)))
+        (is (= 8.0 (get scores 2)))
+        (is (= 5.0 (get scores 3)))))))
