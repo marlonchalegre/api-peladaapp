@@ -3,6 +3,7 @@
    [api-peladaapp.handlers.admin :as handler.admin]
    [api-peladaapp.handlers.attendance :as handler.attendance]
    [api-peladaapp.handlers.auth :as auth]
+   [api-peladaapp.handlers.health :as handler.health]
    [api-peladaapp.handlers.match :as handler.match]
    [api-peladaapp.handlers.organization :as handler.organization]
    [api-peladaapp.handlers.pelada :as handler.pelada]
@@ -110,6 +111,9 @@
     (POST "/login" [] auth/auth-handler)
     (POST "/register" [] handler.user/create)))
 
+(defroutes api-health
+  (GET "/api/health" [] handler.health/check))
+
 (defroutes gen-routes
   (not-found "404"))
 
@@ -118,12 +122,15 @@
 
 (def access-rules [{:pattern #"^/auth/.*"
                     :handler any-access}
+                   {:pattern #"^/api/health"
+                    :handler any-access}
                    {:pattern #"^/api/.*"
                     :handler auth/authenticated-access}
                    {:pattern #"^/admin/.*"
                     :handler auth/admin-access}])
 
 (def app-handler (routes api-auth
+                         api-health
                          api-users
                          api-peladas
                          api-teams

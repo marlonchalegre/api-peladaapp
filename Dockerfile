@@ -12,6 +12,7 @@ RUN lein deps
 COPY . .
 
 # Build an uberjar and normalize name to app.jar
+ENV LEIN_JVM_OPTS="-DSKIP_DB_INIT=true"
 RUN lein uberjar \
     && ls -l target/uberjar \
     && mv target/uberjar/*-standalone.jar /app/app.jar

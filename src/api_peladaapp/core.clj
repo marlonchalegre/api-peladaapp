@@ -6,4 +6,6 @@
 
 (defn -main
   []
-  (component/start (core.components/system {})))
+  (let [options {:db-spec {:dbname (or (System/getenv "DB_NAME") "peladaapp.db")}
+                 :skip-migrations (= "true" (System/getenv "SKIP_MIGRATIONS"))}]
+    (component/start (core.components/system options))))

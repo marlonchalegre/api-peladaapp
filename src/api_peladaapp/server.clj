@@ -50,25 +50,28 @@
 
 (defonce ^:private datasource
   (let [ds (jdbc/get-datasource db-spec)]
-    ;; Try migratus, then ensure schema by applying the SQL file idempotently
-    (try
-      (migratus/migrate {:store :database
-                         :migration-dir "migrations"
-                         :db db-spec})
-      (catch Exception e
-        (.printStackTrace e)
-        ;; ignore, fall through to manual ensure
-        ))
-    (try
-      ;; Prefer classpath resource path
-      (run-sql-file! ds "migrations/20251028150000-init_all.up.sql")
-      (catch Exception _
+    (if (= "true" (System/getProperty "SKIP_DB_INIT"))
+      (println "Skipping database initialization (SKIP_DB_INIT=true)")
+      (do
+        ;; Try migratus, then ensure schema by applying the SQL file idempotently
         (try
-          ;; Fallback to relative file path
-          (run-sql-file! ds "resources/migrations/20251028150000-init_all.up.sql")
+          (migratus/migrate {:store :database
+                             :migration-dir "migrations"
+                             :db db-spec})
+          (catch Exception e
+            (.printStackTrace e)
+            ;; ignore, fall through to manual ensure
+            ))
+        (try
+          ;; Prefer classpath resource path
+          (run-sql-file! ds "migrations/20251028150000-init_all.up.sql")
           (catch Exception _
-            ;; ignore if file not found; best-effort
-            ))))
+            (try
+              ;; Fallback to relative file path
+              (run-sql-file! ds "resources/migrations/20251028150000-init_all.up.sql")
+              (catch Exception _
+                ;; ignore if file not found; best-effort
+                ))))))
     ds))
 
 (defn wrap-assoc [handler key value]
