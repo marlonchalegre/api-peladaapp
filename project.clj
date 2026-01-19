@@ -25,7 +25,7 @@
             [migratus-lein "0.7.3"]]
   :repl-options {:init-ns api-peladaapp.core}
   :test-paths ["test" "test/unit" "test/integration"]
-  :main ^:skip-aot api-peladaapp.core
+  :main api-peladaapp.core
   :migratus {:store :database
              ;; Use classpath path for migrations
              :migration-dir "migrations"
