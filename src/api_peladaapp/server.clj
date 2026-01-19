@@ -65,15 +65,25 @@
             ;; ignore, fall through to manual ensure
             ))
         (try
-          ;; Prefer classpath resource path
-          (run-sql-file! ds "migrations/20251028150000-init_all.up.sql")
+          ;; Check if Peladas table exists before running init script
+          (let [table-exists? (try
+                                (jdbc/execute-one! ds ["SELECT 1 FROM Peladas LIMIT 1"])
+                                true
+                                (catch Exception _ false))]
+            (when-not table-exists?
+              ;; Prefer classpath resource path
+              (try
+                (run-sql-file! ds "migrations/20251028150000-init_all.up.sql")
+                (catch Exception _
+                  (try
+                    ;; Fallback to relative file path
+                    (run-sql-file! ds "resources/migrations/20251028150000-init_all.up.sql")
+                    (catch Exception _
+                      ;; ignore if file not found; best-effort
+                      ))))))
           (catch Exception _
-            (try
-              ;; Fallback to relative file path
-              (run-sql-file! ds "resources/migrations/20251028150000-init_all.up.sql")
-              (catch Exception _
-                ;; ignore if file not found; best-effort
-                ))))))
+            ;; ignore
+            ))))
     ds))
 
 (defn wrap-assoc [handler key value]
