@@ -4,7 +4,8 @@
 
 (s/defschema UpdateMatchScoreRequest
   {:home_score s/Int
-   :away_score s/Int})
+   :away_score s/Int
+   (s/optional-key :status) s/Str})
 
 (s/defschema CreateMatchEventRequest
   {:player_id s/Int

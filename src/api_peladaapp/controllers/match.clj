@@ -48,12 +48,15 @@
 
 (s/defn add-lineup-player :- s/Int
   [match-id :- s/Int {:keys [team-id player-id]} db]
-  (db.match-lineup/add-player match-id (int team-id) (int player-id) db))
+  (do (db.match-lineup/ensure-seeded match-id db)
+      (db.match-lineup/add-player match-id (int team-id) (int player-id) db)))
 
 (s/defn remove-lineup-player :- s/Int
   [match-id :- s/Int {:keys [team-id player-id]} db]
-  (db.match-lineup/remove-player match-id (int team-id) (int player-id) db))
+  (do (db.match-lineup/ensure-seeded match-id db)
+      (db.match-lineup/remove-player match-id (int team-id) (int player-id) db)))
 
 (s/defn replace-lineup-player :- s/Int
   [match-id :- s/Int {:keys [team-id out-player-id in-player-id]} db]
-  (db.match-lineup/replace-player match-id (int team-id) (int out-player-id) (int in-player-id) db))
+  (do (db.match-lineup/ensure-seeded match-id db)
+      (db.match-lineup/replace-player match-id (int team-id) (int out-player-id) (int in-player-id) db)))

@@ -19,7 +19,8 @@
 (s/defn update-score-request->model :- (s/pred map?)
   [request :- requests.match/UpdateMatchScoreRequest]
   {:home-score (:home_score request)
-   :away-score (:away_score request)})
+   :away-score (:away_score request)
+   :status (:status request)})
 
 (s/defn create-event-request->model :- (s/pred map?)
   [request :- requests.match/CreateMatchEventRequest]
