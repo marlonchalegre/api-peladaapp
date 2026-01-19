@@ -36,7 +36,8 @@
 
 ;; In dev (lein-ring), we don't start the Component system, so we must
 ;; initialize the database and inject it into every request ourselves.
-(def ^:private db-spec {:dbtype "sqlite" :dbname "peladaapp.db"})
+(def ^:private db-spec {:dbtype "sqlite" 
+                        :dbname (or (System/getenv "DB_NAME") "peladaapp.db")})
 
 (defn- run-sql-file! [ds path]
   (let [res    (or (io/resource path) (io/file path))
@@ -50,8 +51,9 @@
 
 (defonce ^:private datasource
   (let [ds (jdbc/get-datasource db-spec)]
-    (if (= "true" (System/getProperty "SKIP_DB_INIT"))
-      (println "Skipping database initialization (SKIP_DB_INIT=true)")
+    (if (or (= "true" (System/getProperty "SKIP_DB_INIT"))
+            (= "true" (System/getenv "SKIP_MIGRATIONS")))
+      (println "Skipping database initialization")
       (do
         ;; Try migratus, then ensure schema by applying the SQL file idempotently
         (try
