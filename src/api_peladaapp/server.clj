@@ -36,7 +36,7 @@
 
 ;; In dev (lein-ring), we don't start the Component system, so we must
 ;; initialize the database and inject it into every request ourselves.
-(def ^:private db-spec {:dbtype "sqlite" 
+(def ^:private db-spec {:dbtype "sqlite"
                         :dbname (or (System/getenv "DB_NAME") "peladaapp.db")})
 
 (defn- run-sql-file! [ds path]
