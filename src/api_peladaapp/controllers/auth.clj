@@ -1,6 +1,7 @@
 (ns api-peladaapp.controllers.auth
   (:require
    [api-peladaapp.config :as config]
+   [api-peladaapp.db.admin :as db.admin]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.logic.user :as logic.user]
    [api-peladaapp.models.credential :as models.credential]
@@ -19,5 +20,7 @@
       (throw (ex-info nil {:type :not-found :message "User not found"})))
     (when (or (nil? password) (nil? db-pass) (not (hashers/check password db-pass)))
       (throw (ex-info nil {:type :invalid-credentials :message "Invalid credentials"})))
-    {:token (logic.user/build-token user-db secret)
-     :user user-db}))
+    (let [admin-orgs (map :organization-id (db.admin/list-organizations-by-admin (:id user-db) db))
+          user-with-orgs (assoc user-db :admin-orgs admin-orgs)]
+      {:token (logic.user/build-token user-with-orgs secret)
+       :user user-db})))

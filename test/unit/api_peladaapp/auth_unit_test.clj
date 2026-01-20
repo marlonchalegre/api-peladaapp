@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.config :as config]
    [api-peladaapp.controllers.auth :as controllers.auth]
+   [api-peladaapp.db.admin :as db.admin]
    [api-peladaapp.db.user :as db.user]
    [buddy.hashers :as hashers]
    [clojure.test :refer [deftest is]]))
@@ -14,6 +15,7 @@
         ;; stub find-user-by-email
         find-called (atom nil)]
     (with-redefs [db.user/find-user-by-email (fn [_ _] (reset! find-called true) user)
+                  db.admin/list-organizations-by-admin (fn [_ _] [])
                   config/get-key (fn [_] "dev-secret")]
       (let [result (controllers.auth/authenticate {:email (:email user) :password plain} db)]
         (is (map? result))
@@ -27,5 +29,6 @@
         user {:id 1 :email "u@e.com" :password hashed}
         db (fn [] nil)]
     (with-redefs [db.user/find-user-by-email (fn [_ _] user)
+                  db.admin/list-organizations-by-admin (fn [_ _] [])
                   config/get-key (fn [_] "dev-secret")]
       (is (thrown? Exception (controllers.auth/authenticate {:email (:email user) :password plain} db))))))
