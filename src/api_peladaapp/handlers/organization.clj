@@ -55,6 +55,12 @@
          (ok orgs-responses (:headers orgs-data)))
        (catch Exception e (exception/api-exception-handler e))))
 
+(defn list-by-user [request]
+  (try (let [db (:database request)
+             user-id (Integer/parseInt (str (get-in request [:params :user_id])))]
+         (ok (controller.organization/list-user-organizations user-id db)))
+       (catch Exception e (exception/api-exception-handler e))))
+
 (defn get-statistics [request]
   (try (let [db (:database request)
              id (Integer/parseInt (get-in request [:params :id]))

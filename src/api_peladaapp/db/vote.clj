@@ -2,7 +2,6 @@
   (:require
    [api-peladaapp.adapters.vote :as adapter.vote]
    [api-peladaapp.models.vote :as models.vote]
-   [next.jdbc :as jdbc]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
@@ -17,8 +16,9 @@
 (s/defn insert-vote :- s/Int
   [{:keys [pelada-id voter-id target-id stars]}
    db]
-  (sql/insert! db :votes {:pelada_id pelada-id :voter_id voter-id :target_id target-id :stars stars})
-  (-> (jdbc/execute-one! db ["select last_insert_rowid() as id"]) :id int))
+  (-> (sql/insert! db :votes {:pelada_id pelada-id :voter_id voter-id :target_id target-id :stars stars})
+      affected-rows-count
+      int))
 
 (s/defn list-votes-by-pelada :- [models.vote/Vote]
   [pelada-id db]

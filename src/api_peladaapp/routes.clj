@@ -88,7 +88,8 @@
     (GET "/organizations/:id" [] handler.organization/get-by-id)
     (PUT "/organizations/:id" [] handler.organization/update-by-id)
     (DELETE "/organizations/:id" [] handler.organization/delete)
-    (GET "/organizations/:id/statistics" [] handler.organization/get-statistics)))
+    (GET "/organizations/:id/statistics" [] handler.organization/get-statistics)
+    (GET "/users/:user_id/organizations" [] handler.organization/list-by-user)))
 
 (defroutes api-admins
   (context "/api" []

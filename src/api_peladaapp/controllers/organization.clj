@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.db.admin :as db.admin]
    [api-peladaapp.db.organization :as db.organization]
+   [api-peladaapp.db.player :as db.player]
    [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.models.organization :as models.organization]
    [schema.core :as s]))
@@ -11,9 +12,10 @@
    user-id :- (s/maybe s/Int)
    db]
   (let [id (db.organization/insert-organization org db)]
-    ;; Add creator as admin (if user-id is provided)
+    ;; Add creator as admin and player (if user-id is provided)
     (when user-id
-      (db.admin/insert-organization-admin {:organization-id id :user-id user-id} db))
+      (db.admin/insert-organization-admin {:organization-id id :user-id user-id} db)
+      (db.player/insert-player {:user-id user-id :organization-id id :grade 5.0} db))
     (db.organization/get-organization id db)))
 
 (s/defn get-organization :- models.organization/Organization
@@ -49,6 +51,14 @@
         orgs   (db.organization/list-organizations db per-page offset)
         total  (db.organization/count-organizations db)]
     (pagination/with-pagination-headers orgs total page per-page)))
+
+(s/defn list-user-organizations
+  [user-id :- s/Int db]
+  (let [orgs (db.organization/list-by-user user-id db)]
+    (map (fn [org]
+           (let [is-admin (db.admin/is-user-admin-of-organization? user-id (:id org) db)]
+             (assoc org :role (if is-admin "admin" "player"))))
+         orgs)))
 
 (s/defn get-statistics
   [id :- s/Int

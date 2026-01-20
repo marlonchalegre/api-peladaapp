@@ -82,8 +82,8 @@
           (is (= 200 (:status list-org-resp)))
           (is (seq orgs))
           (is (= 200 (:status list-players-resp)))
-          (is (= 1 (count players)))
-          (is (= player-user-id (:user_id (first players)))))))))
+          (is (= 2 (count players)))
+          (is (some #(= player-user-id (:user_id %)) players)))))))
 
 (deftest player-can-view-peladas
   (testing "A player belonging to an organization can view peladas of that organization"

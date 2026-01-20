@@ -1,7 +1,6 @@
 (ns api-peladaapp.db.organization
   (:require
    [api-peladaapp.adapters.organization :as adapter.organization]
-   [next.jdbc :as jdbc]
    [next.jdbc.result-set :as rs]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
@@ -11,8 +10,9 @@
 
 (s/defn insert-organization :- s/Int
   [{:keys [name]} db]
-  (sql/insert! db :organizations {:name name})
-  (-> (jdbc/execute-one! db ["select last_insert_rowid() as id"]) :id int))
+  (-> (sql/insert! db :organizations {:name name})
+      affected-rows-count
+      int))
 
 (s/defn get-organization [id db]
   (-> (sql/get-by-id db :organizations id) adapter.organization/db->model))
@@ -27,6 +27,13 @@
 
 (s/defn list-organizations [db limit offset]
   (->> (sql/query db ["select * from organizations order by id limit ? offset ?" limit offset])
+       (map adapter.organization/db->model)))
+
+(s/defn list-by-user [user-id db]
+  (->> (sql/query db ["SELECT DISTINCT o.* FROM Organizations o
+                      LEFT JOIN OrganizationAdmins oa ON o.id = oa.organization_id
+                      LEFT JOIN OrganizationPlayers op ON o.id = op.organization_id
+                      WHERE oa.user_id = ? OR op.user_id = ?" user-id user-id])
        (map adapter.organization/db->model)))
 
 (s/defn count-organizations :- s/Int

@@ -24,10 +24,11 @@
 
 (s/defn insert-event :- s/Int
   [match-id :- s/Int player-id :- s/Int event-type :- s/Str db]
-  (sql/insert! db :matchevents {:match_id match-id
-                                :player_id player-id
-                                :event_type event-type})
-  (-> (jdbc/execute-one! db ["select last_insert_rowid() as id"]) :id int))
+  (-> (sql/insert! db :matchevents {:match_id match-id
+                                    :player_id player-id
+                                    :event_type event-type})
+      affected-rows-count
+      int))
 
 (s/defn list-events-by-pelada :- [models.match-event/MatchEvent]
   [pelada-id :- s/Int db]
