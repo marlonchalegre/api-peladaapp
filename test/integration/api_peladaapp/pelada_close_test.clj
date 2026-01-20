@@ -35,37 +35,37 @@
 
           ;; Create organization
           org-resp (app (-> (mock/request :post "/api/organizations")
-                              (mock/json-body {:name "Test Org"})
-                              auth))
+                            (mock/json-body {:name "Test Org"})
+                            auth))
           org-id (:id (decode-body org-resp))
 
           ;; Create pelada
           pelada-resp (app (-> (mock/request :post "/api/peladas")
-                                   (mock/json-body {:organization_id org-id :num_teams 2})
-                                   auth))
+                               (mock/json-body {:organization_id org-id :num_teams 2})
+                               auth))
           pelada-id (:id (decode-body pelada-resp))]
 
             ;; Create teams
-          (doseq [n ["A" "B"]]
-            (app (-> (mock/request :post "/api/teams")
-                     (mock/json-body {:pelada_id pelada-id :name n})
-                     auth)))
+      (doseq [n ["A" "B"]]
+        (app (-> (mock/request :post "/api/teams")
+                 (mock/json-body {:pelada_id pelada-id :name n})
+                 auth)))
 
             ;; Close attendance
-          (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth)))))
+      (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth)))))
 
             ;; Begin pelada
-          (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin"))
-                   auth))
+      (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin"))
+               auth))
 
           ;; Close pelada
-          (let [close-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close"))
-                                    auth))
-                body (decode-body close-resp)]
-            (is (= 200 (:status close-resp)))
-            (is (= "closed" (:status body)))
-            (is (not (nil? (:closed_at body))))
+      (let [close-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close"))
+                                auth))
+            body (decode-body close-resp)]
+        (is (= 200 (:status close-resp)))
+        (is (= "closed" (:status body)))
+        (is (not (nil? (:closed_at body))))
 
-            (let [pelada (pelada.controller/get-pelada pelada-id ds)]
-              (is (= "closed" (:status pelada)))
-              (is (not (nil? (:closed-at pelada)))))))))
+        (let [pelada (pelada.controller/get-pelada pelada-id ds)]
+          (is (= "closed" (:status pelada)))
+          (is (not (nil? (:closed-at pelada)))))))))

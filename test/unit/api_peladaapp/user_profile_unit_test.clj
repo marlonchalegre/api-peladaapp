@@ -165,3 +165,30 @@
           (is (= 200 (:status response)))
           (is (= "New Name" (-> response :body :name)))
           (is (= 1 (-> response :body :id))))))))
+
+(deftest delete-user-authorization-rejects-other-users
+  (testing "Handler validates that user can only delete their own account"
+    (let [user-id-in-url "1"
+          authenticated-user-id 2
+          request {:params {:id user-id-in-url}
+                   :identity {:id authenticated-user-id}
+                   :database (fn [] nil)}
+          response (api-peladaapp.handlers.user/delete request)]
+      ;; Should return 403 Forbidden
+      (is (= 403 (:status response)))
+      (is (= "You can only delete your own account" (:message (:body response)))))))
+
+(deftest delete-user-authorization-allows-own-profile
+  (testing "Handler allows user to delete their own account"
+    (let [user-id-in-url "1"
+          authenticated-user-id 1
+          request {:params {:id user-id-in-url}
+                   :identity {:id authenticated-user-id}
+                   :database (fn [] nil)}
+          delete-called (atom false)]
+      (with-redefs [controllers.user/delete-user (fn [id _]
+                                                   (reset! delete-called true)
+                                                   {:status 204 :body nil})]
+        (let [response (api-peladaapp.handlers.user/delete request)]
+          (is (= 200 (:status response)))
+          (is @delete-called))))))

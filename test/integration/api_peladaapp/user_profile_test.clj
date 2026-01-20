@@ -36,19 +36,19 @@
       (let [login (login! app {:email email :password password})
             body (decode-body login)
             token (:token body)
-        _ (is (= 200 (:status login)))
-        _ (is (string? token))
+            _ (is (= 200 (:status login)))
+            _ (is (string? token))
         ;; Update profile - name only
-        resp (app (-> (mock/request :put "/api/user/1/profile")
-                            (mock/header "authorization" (str "Token " token))
-                            (mock/json-body {:name "John Smith"})))
-        body (decode-body resp)
-        
+            resp (app (-> (mock/request :put "/api/user/1/profile")
+                          (mock/header "authorization" (str "Token " token))
+                          (mock/json-body {:name "John Smith"})))
+            body (decode-body resp)
+
         ;; Verify the update persisted
-        resp2 (app (-> (mock/request :get "/api/user/1")
-                            (mock/header "authorization" (str "Token " token))))
-        body2 (decode-body resp2)]
-        
+            resp2 (app (-> (mock/request :get "/api/user/1")
+                           (mock/header "authorization" (str "Token " token))))
+            body2 (decode-body resp2)]
+
         (is (= 200 (:status resp)))
         (is (= "John Smith" (:name body)))
         (is (= email (:email body)))

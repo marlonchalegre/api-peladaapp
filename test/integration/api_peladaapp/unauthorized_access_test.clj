@@ -15,22 +15,22 @@
         user-auth (th/auth-header user-token)
 
     ;; Admin creates an organization
-    org-resp (app (-> (mock/request :post "/api/organizations")
-                            (mock/json-body {:name "Restricted Org"})
-                            admin-auth))
-          org-id (:id (th/decode-body org-resp))]
+        org-resp (app (-> (mock/request :post "/api/organizations")
+                          (mock/json-body {:name "Restricted Org"})
+                          admin-auth))
+        org-id (:id (th/decode-body org-resp))]
 
-      (testing "Regular user cannot delete organization"
-        (let [resp (app (-> (mock/request :delete (str "/api/organizations/" org-id))
-                            user-auth))]
-          (is (= 403 (:status resp)))))
+    (testing "Regular user cannot delete organization"
+      (let [resp (app (-> (mock/request :delete (str "/api/organizations/" org-id))
+                          user-auth))]
+        (is (= 403 (:status resp)))))
 
-      (testing "Regular user cannot create pelada in org they don't admin"
-        (let [resp (app (-> (mock/request :post "/api/peladas")
-                            (mock/json-body {:organization_id org-id :num_teams 2})
-                            user-auth))]
-          (is (= 403 (:status resp)))))
+    (testing "Regular user cannot create pelada in org they don't admin"
+      (let [resp (app (-> (mock/request :post "/api/peladas")
+                          (mock/json-body {:organization_id org-id :num_teams 2})
+                          user-auth))]
+        (is (= 403 (:status resp)))))
 
-      (testing "Guest (no token) cannot list organizations"
-        (let [resp (app (-> (mock/request :get "/api/organizations")))]
-          (is (= 401 (:status resp)))))))
+    (testing "Guest (no token) cannot list organizations"
+      (let [resp (app (-> (mock/request :get "/api/organizations")))]
+        (is (= 401 (:status resp)))))))

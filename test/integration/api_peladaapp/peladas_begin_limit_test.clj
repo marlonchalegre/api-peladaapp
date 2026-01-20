@@ -4,7 +4,6 @@
    [clojure.data.json :as json]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [next.jdbc :as jdbc]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
@@ -37,35 +36,35 @@
 
             ;; Create organization (user becomes admin)
             org-resp (app (-> (mock/request :post "/api/organizations")
-                                (mock/json-body {:name "Test Org"})
-                                auth))
+                              (mock/json-body {:name "Test Org"})
+                              auth))
             org-id (:id (decode-body org-resp))
 
             ;; Create pelada
             pelada-resp (app (-> (mock/request :post "/api/peladas")
-                                     (mock/json-body {:organization_id org-id})
-                                     auth))
+                                 (mock/json-body {:organization_id org-id})
+                                 auth))
             pelada-id (:id (decode-body pelada-resp))]
 
             ;; Create 4 teams
-            (doseq [n ["A" "B" "C" "D"]]
-              (app (-> (mock/request :post "/api/teams")
-                       (mock/json-body {:pelada_id pelada-id :name n})
-                       auth)))
+        (doseq [n ["A" "B" "C" "D"]]
+          (app (-> (mock/request :post "/api/teams")
+                   (mock/json-body {:pelada_id pelada-id :name n})
+                   auth)))
 
             ;; Close attendance
-            (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth)))))
+        (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth)))))
 
             ;; Begin pelada with matches_per_team = 2
-            (let [begin-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin"))
-                                      (mock/json-body {:matches_per_team 2})
-                                      auth))
-                  begin-body (decode-body begin-resp)]
-              (is (= 200 (:status begin-resp)))
-              (is (pos? (:matches_created begin-body))) ;; Matches were created
+        (let [begin-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin"))
+                                  (mock/json-body {:matches_per_team 2})
+                                  auth))
+              begin-body (decode-body begin-resp)]
+          (is (= 200 (:status begin-resp)))
+          (is (pos? (:matches_created begin-body))) ;; Matches were created
 
               ;; Verify matches were created
-              (let [matches-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/matches")) auth))
-                    matches (decode-body matches-resp)]
-                (is (= 200 (:status matches-resp)))
-                (is (= (:matches_created begin-body) (count matches)))))))))
+          (let [matches-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/matches")) auth))
+                matches (decode-body matches-resp)]
+            (is (= 200 (:status matches-resp)))
+            (is (= (:matches_created begin-body) (count matches)))))))))

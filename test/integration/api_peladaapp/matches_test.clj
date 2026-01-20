@@ -35,39 +35,39 @@
 
             ;; Create organization (user becomes admin)
             org-resp (app (-> (mock/request :post "/api/organizations")
-                                (mock/json-body {:name "Test Org"})
-                                auth))
+                              (mock/json-body {:name "Test Org"})
+                              auth))
             org-id (:id (decode-body org-resp))
 
             ;; Create pelada
             pelada-resp (app (-> (mock/request :post "/api/peladas")
-                                     (mock/json-body {:organization_id org-id})
-                                     auth))
+                                 (mock/json-body {:organization_id org-id})
+                                 auth))
             pelada-id (:id (decode-body pelada-resp))]
 
             ;; Create teams
-            (doseq [n ["Team A" "Team B"]]
-              (app (-> (mock/request :post "/api/teams")
-                       (mock/json-body {:pelada_id pelada-id :name n})
-                       auth)))
+        (doseq [n ["Team A" "Team B"]]
+          (app (-> (mock/request :post "/api/teams")
+                   (mock/json-body {:pelada_id pelada-id :name n})
+                   auth)))
 
             ;; Close attendance
-            (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth)))))
+        (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth)))))
 
             ;; Begin pelada to generate matches
-            (let [begin-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin")) auth))]
-              (is (= 200 (:status begin-resp))))
+        (let [begin-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin")) auth))]
+          (is (= 200 (:status begin-resp))))
 
             ;; List matches (user is member, can view)
-            (let [matches-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/matches")) auth))
-                  matches (decode-body matches-resp)]
-              (is (= 200 (:status matches-resp)))
-              (is (seq matches))
+        (let [matches-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/matches")) auth))
+              matches (decode-body matches-resp)]
+          (is (= 200 (:status matches-resp)))
+          (is (seq matches))
 
               ;; Update score of first match (user is admin, can update)
-              (when (seq matches)
-                (let [match-id (:id (first matches))
-                      update-resp (app (-> (mock/request :put (str "/api/matches/" match-id "/score"))
-                                           (mock/json-body {:home_score 2 :away_score 1})
-                                           auth))]
-                  (is (= 200 (:status update-resp))))))))))
+          (when (seq matches)
+            (let [match-id (:id (first matches))
+                  update-resp (app (-> (mock/request :put (str "/api/matches/" match-id "/score"))
+                                       (mock/json-body {:home_score 2 :away_score 1})
+                                       auth))]
+              (is (= 200 (:status update-resp))))))))))

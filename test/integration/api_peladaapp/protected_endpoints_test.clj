@@ -105,19 +105,19 @@
     (let [app (-> th/*test-system* :app :handler)
           ;; Missing "Token" prefix
           req1 (-> (mock/request :get "/api/users")
-                    (mock/header "Authorization" "just-a-token"))
+                   (mock/header "Authorization" "just-a-token"))
           resp1 (app req1)
-          
+
           ;; Empty Authorization header
           req2 (-> (mock/request :get "/api/users")
-                    (mock/header "Authorization" ""))
+                   (mock/header "Authorization" ""))
           resp2 (app req2)]
-      
+
       (is (= 401 (:status resp1))
-            "Expected 401 for malformed Authorization header")
-            
+          "Expected 401 for malformed Authorization header")
+
       (is (= 401 (:status resp2))
-            "Expected 401 for empty Authorization header"))))
+          "Expected 401 for empty Authorization header"))))
 
 (deftest expired-token-handling
   (testing "Expired tokens should be rejected"

@@ -52,8 +52,11 @@
          (exception/api-exception-handler e))))
 
 (defn- delete-action [request]
-  (let [user-id (-> request :params :id)
+  (let [user-id (-> request :params :id Integer/parseInt)
+        authenticated-user-id (-> request :identity :id)
         db (-> request :database)]
+    (when (not= user-id authenticated-user-id)
+      (throw (ex-info nil {:type :forbidden :message "You can only delete your own account"})))
     (controller.user/delete-user user-id db)))
 
 (defn delete [request]

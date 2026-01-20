@@ -141,13 +141,13 @@
         org-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)
 
         response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
-                            (mock/query-string {:year 2030}) ;; Future year with no data
-                            ((th/auth-header token))))
+                          (mock/query-string {:year 2030}) ;; Future year with no data
+                          ((th/auth-header token))))
         body (th/decode-body response)]
 
-      (is (= 200 (:status response)))
-      (is (vector? body))
-      (is (empty? body))))
+    (is (= 200 (:status response)))
+    (is (vector? body))
+    (is (empty? body))))
 
 (deftest unauthorized-statistics-test
   (let [app (-> th/*test-system* :app :handler)
@@ -158,4 +158,4 @@
 
         response (app (mock/request :get (str "/api/organizations/" org-id "/statistics")))]
       ;; Should return 401 Unauthorized because no token is provided
-      (is (= 401 (:status response)))))
+    (is (= 401 (:status response)))))
