@@ -25,8 +25,7 @@
 (deftest begin-with-matches-per-team
   (testing "Begin pelada with matches_per_team parameter"
     (let [app (-> th/*test-system* :app :handler)
-          db-file (:db-file th/*test-system*)
-          ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
+          db-file (:db-file th/*test-system*)]
 
       ;; Register and login
       (app (-> (mock/request :post "/auth/register")
@@ -35,19 +34,18 @@
                            (mock/json-body {:email "user@test.com" :password "pass"})))
             token (:token (decode-body login))
             auth (fn [req] (mock/header req "authorization" (str "Token " token)))
-            user-id (th/user-id-by-email ds "user@test.com")]
 
-        ;; Create organization (user becomes admin)
-        (let [org-resp (app (-> (mock/request :post "/api/organizations")
+            ;; Create organization (user becomes admin)
+            org-resp (app (-> (mock/request :post "/api/organizations")
                                 (mock/json-body {:name "Test Org"})
                                 auth))
-              org-id (:id (decode-body org-resp))]
+            org-id (:id (decode-body org-resp))
 
-          ;; Create pelada
-          (let [pelada-resp (app (-> (mock/request :post "/api/peladas")
+            ;; Create pelada
+            pelada-resp (app (-> (mock/request :post "/api/peladas")
                                      (mock/json-body {:organization_id org-id})
                                      auth))
-                pelada-id (:id (decode-body pelada-resp))]
+            pelada-id (:id (decode-body pelada-resp))]
 
             ;; Create 4 teams
             (doseq [n ["A" "B" "C" "D"]]
@@ -70,4 +68,4 @@
               (let [matches-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/matches")) auth))
                     matches (decode-body matches-resp)]
                 (is (= 200 (:status matches-resp)))
-                (is (= (:matches_created begin-body) (count matches)))))))))))
+                (is (= (:matches_created begin-body) (count matches)))))))))

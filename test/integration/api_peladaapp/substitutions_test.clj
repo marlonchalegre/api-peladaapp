@@ -10,10 +10,10 @@
   (testing "Create and list substitutions with authorization"
     (let [app (-> th/*test-system* :app :handler)
           token (th/register-and-login! app {:name "U" :email "u@e.com" :password "p"})
-          auth (th/auth-header token)]
+          auth (th/auth-header token)
 
       ;; Create organization (user becomes admin)
-      (let [org-resp (app (-> (mock/request :post "/api/organizations")
+      org-resp (app (-> (mock/request :post "/api/organizations")
                               (mock/json-body {:name "Test Org"})
                               auth))
             org-body (th/decode-body org-resp)
@@ -52,8 +52,9 @@
             (is (= 200 (:status begin-resp))))
 
           ;; List substitutions (should be empty)
-          (let [list-resp (app (-> (mock/request :get "/api/matches/1/substitutions") auth))
-                subs (th/decode-body list-resp)]
-            (is (= 200 (:status list-resp)))
-            ;; It's ok if there are no substitutions yet
-            (is (vector? subs))))))))
+                    (let [list-resp (app (-> (mock/request :get "/api/matches/1/substitutions") auth))
+                          subs (th/decode-body list-resp)]
+                      (is (= 200 (:status list-resp)))
+                      ;; It's ok if there are no substitutions yet
+                      (is (vector? subs)))))))
+          

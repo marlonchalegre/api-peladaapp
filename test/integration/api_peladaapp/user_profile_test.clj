@@ -35,23 +35,25 @@
       ;; Login
       (let [login (login! app {:email email :password password})
             body (decode-body login)
-            token (:token body)]
-        (is (= 200 (:status login)))
-        (is (string? token))
+            token (:token body)
+        _ (is (= 200 (:status login)))
+        _ (is (string? token))
         ;; Update profile - name only
-        (let [resp (app (-> (mock/request :put "/api/user/1/profile")
+        resp (app (-> (mock/request :put "/api/user/1/profile")
                             (mock/header "authorization" (str "Token " token))
                             (mock/json-body {:name "John Smith"})))
-              body (decode-body resp)]
-          (is (= 200 (:status resp)))
-          (is (= "John Smith" (:name body)))
-          (is (= email (:email body))))
+        body (decode-body resp)
+        
         ;; Verify the update persisted
-        (let [resp (app (-> (mock/request :get "/api/user/1")
+        resp2 (app (-> (mock/request :get "/api/user/1")
                             (mock/header "authorization" (str "Token " token))))
-              body (decode-body resp)]
-          (is (= 200 (:status resp)))
-          (is (= "John Smith" (:name body))))))))
+        body2 (decode-body resp2)]
+        
+        (is (= 200 (:status resp)))
+        (is (= "John Smith" (:name body)))
+        (is (= email (:email body)))
+        (is (= 200 (:status resp2)))
+        (is (= "John Smith" (:name body2)))))))
 
 (deftest user-profile-update-email
   (testing "User can update their email via profile endpoint"
@@ -113,16 +115,16 @@
       ;; Login
       (let [login (login! app {:email email :password password})
             body (decode-body login)
-            token (:token body)]
-        (is (= 200 (:status login)))
-        ;; Update multiple fields
-        (let [resp (app (-> (mock/request :put "/api/user/1/profile")
-                            (mock/header "authorization" (str "Token " token))
-                            (mock/json-body {:name "Alice Wonder" :email "alice.wonder@example.com"})))
-              body (decode-body resp)]
-          (is (= 200 (:status resp)))
-          (is (= "Alice Wonder" (:name body)))
-          (is (= "alice.wonder@example.com" (:email body))))))))
+            token (:token body)
+            _ (is (= 200 (:status login)))
+            ;; Update multiple fields
+            resp (app (-> (mock/request :put "/api/user/1/profile")
+                          (mock/header "authorization" (str "Token " token))
+                          (mock/json-body {:name "Alice Wonder" :email "alice.wonder@example.com"})))
+            body (decode-body resp)]
+        (is (= 200 (:status resp)))
+        (is (= "Alice Wonder" (:name body)))
+        (is (= "alice.wonder@example.com" (:email body)))))))
 
 (deftest user-profile-update-not-found
   (testing "Returns 403 when user tries to update another user (even if non-existent)"
@@ -133,14 +135,14 @@
       (register! app {:name "Test" :email email :password password})
       (let [login (login! app {:email email :password password})
             body (decode-body login)
-            token (:token body)]
-        ;; Try to update non-existent user 999
-        ;; Should return 403 because user 1 cannot update user 999 (authorization fails first)
-        (let [resp (app (-> (mock/request :put "/api/user/999/profile")
-                            (mock/header "authorization" (str "Token " token))
-                            (mock/json-body {:name "New Name"})))]
-          (is (= 403 (:status resp)))
-          (is (= "You can only update your own profile" (:message (decode-body resp)))))))))
+            token (:token body)
+            ;; Try to update non-existent user 999
+            ;; Should return 403 because user 1 cannot update user 999 (authorization fails first)
+            resp (app (-> (mock/request :put "/api/user/999/profile")
+                          (mock/header "authorization" (str "Token " token))
+                          (mock/json-body {:name "New Name"})))]
+        (is (= 403 (:status resp)))
+        (is (= "You can only update your own profile" (:message (decode-body resp))))))))
 
 (deftest user-profile-update-empty-body
   (testing "Handles empty update gracefully"
@@ -153,16 +155,16 @@
       ;; Login
       (let [login (login! app {:email email :password password})
             body (decode-body login)
-            token (:token body)]
-        ;; Update with empty body
-        (let [resp (app (-> (mock/request :put "/api/user/1/profile")
-                            (mock/header "authorization" (str "Token " token))
-                            (mock/json-body {})))
-              body (decode-body resp)]
-          ;; Should succeed but not change anything
-          (is (= 200 (:status resp)))
-          (is (= "Empty" (:name body)))
-          (is (= email (:email body))))))))
+            token (:token body)
+            ;; Update with empty body
+            resp (app (-> (mock/request :put "/api/user/1/profile")
+                          (mock/header "authorization" (str "Token " token))
+                          (mock/json-body {})))
+            body (decode-body resp)]
+        ;; Should succeed but not change anything
+        (is (= 200 (:status resp)))
+        (is (= "Empty" (:name body)))
+        (is (= email (:email body)))))))
 
 (deftest user-profile-update-authorization-own-profile
   (testing "User can update their own profile"
@@ -176,14 +178,14 @@
       (let [login (login! app {:email email :password password})
             body (decode-body login)
             token (:token body)
-            user-id (-> body :user :id)]
-        ;; Update own profile (user ID 1 updating user ID 1)
-        (let [resp (app (-> (mock/request :put (str "/api/user/" user-id "/profile"))
-                            (mock/header "authorization" (str "Token " token))
-                            (mock/json-body {:name "Updated Name"})))
-              body (decode-body resp)]
-          (is (= 200 (:status resp)))
-          (is (= "Updated Name" (:name body))))))))
+            user-id (-> body :user :id)
+            ;; Update own profile (user ID 1 updating user ID 1)
+            resp (app (-> (mock/request :put (str "/api/user/" user-id "/profile"))
+                          (mock/header "authorization" (str "Token " token))
+                          (mock/json-body {:name "Updated Name"})))
+            body (decode-body resp)]
+        (is (= 200 (:status resp)))
+        (is (= "Updated Name" (:name body)))))))
 
 (deftest user-profile-update-authorization-blocks-other-users
   (testing "User cannot update another user's profile"

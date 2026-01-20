@@ -2,7 +2,7 @@
   (:require
    [api-peladaapp.logic.score :as logic.score]
    [api-peladaapp.test-helpers :as th]
-   [clojure.test :refer :all]
+   [clojure.test :refer [deftest is testing use-fixtures]]
    [next.jdbc :as jdbc])
   (:import
    [java.time Duration Instant]))

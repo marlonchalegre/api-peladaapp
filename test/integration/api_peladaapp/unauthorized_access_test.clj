@@ -12,10 +12,10 @@
         admin-token (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass"})
         user-token (th/register-and-login! app {:name "User" :email "user@test.com" :password "pass"})
         admin-auth (th/auth-header admin-token)
-        user-auth (th/auth-header user-token)]
+        user-auth (th/auth-header user-token)
 
     ;; Admin creates an organization
-    (let [org-resp (app (-> (mock/request :post "/api/organizations")
+    org-resp (app (-> (mock/request :post "/api/organizations")
                             (mock/json-body {:name "Restricted Org"})
                             admin-auth))
           org-id (:id (th/decode-body org-resp))]
@@ -33,4 +33,4 @@
 
       (testing "Guest (no token) cannot list organizations"
         (let [resp (app (-> (mock/request :get "/api/organizations")))]
-          (is (= 401 (:status resp))))))))
+          (is (= 401 (:status resp)))))))

@@ -13,13 +13,13 @@
         db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
         token (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass"})
-        auth (th/auth-header token)]
+        auth (th/auth-header token)
 
-    ;; Create organization
-    (let [org-resp (app (-> (mock/request :post "/api/organizations")
+        ;; Create organization
+        org-resp (app (-> (mock/request :post "/api/organizations")
                             (mock/json-body {:name "Test Org"})
                             auth))
-          org-id (:id (th/decode-body org-resp))]
+        org-id (:id (th/decode-body org-resp))]
 
       ;; Create 25 peladas directly in DB to be faster
       (dotimes [i 25]
@@ -43,4 +43,4 @@
             headers (:headers resp)]
         (is (= 200 (:status resp)))
         (is (= 5 (count body)))
-        (is (= "2" (get headers "X-Page")))))))
+        (is (= "2" (get headers "X-Page"))))))

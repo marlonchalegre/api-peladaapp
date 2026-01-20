@@ -4,7 +4,6 @@
    [clojure.data.json :as json]
    [clojure.string :as str]
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [next.jdbc :as jdbc]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
@@ -24,9 +23,7 @@
 
 (deftest matches-flow
   (testing "Complete matches workflow with authorization"
-    (let [app (-> th/*test-system* :app :handler)
-          db-file (:db-file th/*test-system*)
-          ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
+    (let [app (-> th/*test-system* :app :handler)]
 
       ;; Register and login
       (app (-> (mock/request :post "/auth/register")
@@ -35,19 +32,18 @@
                            (mock/json-body {:email "user@test.com" :password "pass"})))
             token (:token (decode-body login))
             auth (fn [req] (mock/header req "authorization" (str "Token " token)))
-            user-id (th/user-id-by-email ds "user@test.com")]
 
-        ;; Create organization (user becomes admin)
-        (let [org-resp (app (-> (mock/request :post "/api/organizations")
+            ;; Create organization (user becomes admin)
+            org-resp (app (-> (mock/request :post "/api/organizations")
                                 (mock/json-body {:name "Test Org"})
                                 auth))
-              org-id (:id (decode-body org-resp))]
+            org-id (:id (decode-body org-resp))
 
-          ;; Create pelada
-          (let [pelada-resp (app (-> (mock/request :post "/api/peladas")
+            ;; Create pelada
+            pelada-resp (app (-> (mock/request :post "/api/peladas")
                                      (mock/json-body {:organization_id org-id})
                                      auth))
-                pelada-id (:id (decode-body pelada-resp))]
+            pelada-id (:id (decode-body pelada-resp))]
 
             ;; Create teams
             (doseq [n ["Team A" "Team B"]]
@@ -74,4 +70,4 @@
                       update-resp (app (-> (mock/request :put (str "/api/matches/" match-id "/score"))
                                            (mock/json-body {:home_score 2 :away_score 1})
                                            auth))]
-                  (is (= 200 (:status update-resp))))))))))))
+                  (is (= 200 (:status update-resp))))))))))

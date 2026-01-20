@@ -138,24 +138,24 @@
         ds (if (fn? db-val) (db-val) db-val)
         token (th/register-and-login! app {:name "User" :email "user@test.com" :password "pass123"})
         _ (jdbc/execute! ds ["INSERT INTO Organizations (name) VALUES ('Org')"])
-        org-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)]
+        org-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)
 
-    (let [response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
+        response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
                             (mock/query-string {:year 2030}) ;; Future year with no data
                             ((th/auth-header token))))
-          body (th/decode-body response)]
+        body (th/decode-body response)]
 
       (is (= 200 (:status response)))
       (is (vector? body))
-      (is (empty? body)))))
+      (is (empty? body))))
 
 (deftest unauthorized-statistics-test
   (let [app (-> th/*test-system* :app :handler)
         db-val (-> th/*test-system* :database :database)
         ds (if (fn? db-val) (db-val) db-val)
         _ (jdbc/execute! ds ["INSERT INTO Organizations (name) VALUES ('Org')"])
-        org-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)]
+        org-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)
 
-    (let [response (app (mock/request :get (str "/api/organizations/" org-id "/statistics")))]
+        response (app (mock/request :get (str "/api/organizations/" org-id "/statistics")))]
       ;; Should return 401 Unauthorized because no token is provided
-      (is (= 401 (:status response))))))
+      (is (= 401 (:status response)))))

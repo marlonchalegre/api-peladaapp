@@ -34,8 +34,7 @@
       (let [admin-login (app (-> (mock/request :post "/auth/login")
                                  (mock/json-body {:email "admin@test.com" :password "admin123"})))
             admin-token (:token (decode-body admin-login))
-            admin-auth (fn [req] (mock/header req "authorization" (str "Token " admin-token)))
-            admin-user-id (th/user-id-by-email ds "admin@test.com")]
+            admin-auth (fn [req] (mock/header req "authorization" (str "Token " admin-token)))]
 
         ;; Register player user
         (app (-> (mock/request :post "/auth/register")
@@ -44,46 +43,47 @@
                                     (mock/json-body {:email "player@test.com" :password "player123"})))
               player-token (:token (decode-body player-login))
               player-auth (fn [req] (mock/header req "authorization" (str "Token " player-token)))
-              player-user-id (th/user-id-by-email ds "player@test.com")]
+              player-user-id (th/user-id-by-email ds "player@test.com")
 
-          ;; Admin creates organization
-          (let [org-resp (app (-> (mock/request :post "/api/organizations")
+              ;; Admin creates organization
+              org-resp (app (-> (mock/request :post "/api/organizations")
                                   (mock/json-body {:name "Test Organization"})
                                   admin-auth))
-                org-id (:id (decode-body org-resp))]
-            (is (= 201 (:status org-resp)))
+              org-id (:id (decode-body org-resp))
+            _ (is (= 201 (:status org-resp)))
 
             ;; Admin adds player to organization
-            (let [add-player-resp (app (-> (mock/request :post "/api/players")
+            add-player-resp (app (-> (mock/request :post "/api/players")
                                            (mock/json-body {:organization_id org-id
                                                             :user_id player-user-id
                                                             :grade 7.5
                                                             :position_id 1})
-                                           admin-auth))]
-              (is (= 201 (:status add-player-resp))))
+                                           admin-auth))
 
             ;; Player can view organization details
-            (let [get-org-resp (app (-> (mock/request :get (str "/api/organizations/" org-id))
+            get-org-resp (app (-> (mock/request :get (str "/api/organizations/" org-id))
                                         player-auth))
-                  org-data (decode-body get-org-resp)]
-              (is (= 200 (:status get-org-resp)))
-              (is (= org-id (:id org-data)))
-              (is (= "Test Organization" (:name org-data))))
+            org-data (decode-body get-org-resp)
 
             ;; Player can list organizations
-            (let [list-org-resp (app (-> (mock/request :get "/api/organizations")
+            list-org-resp (app (-> (mock/request :get "/api/organizations")
                                          player-auth))
-                  orgs (decode-body list-org-resp)]
-              (is (= 200 (:status list-org-resp)))
-              (is (seq orgs)))
+            orgs (decode-body list-org-resp)
 
             ;; Player can view players in the organization
-            (let [list-players-resp (app (-> (mock/request :get (str "/api/organizations/" org-id "/players"))
+            list-players-resp (app (-> (mock/request :get (str "/api/organizations/" org-id "/players"))
                                              player-auth))
-                  players (decode-body list-players-resp)]
-              (is (= 200 (:status list-players-resp)))
-              (is (= 1 (count players)))
-              (is (= player-user-id (:user_id (first players)))))))))))
+            players (decode-body list-players-resp)]
+            
+            (is (= 201 (:status add-player-resp)))
+            (is (= 200 (:status get-org-resp)))
+            (is (= org-id (:id org-data)))
+            (is (= "Test Organization" (:name org-data)))
+            (is (= 200 (:status list-org-resp)))
+            (is (seq orgs))
+            (is (= 200 (:status list-players-resp)))
+            (is (= 1 (count players)))
+            (is (= player-user-id (:user_id (first players)))))))))
 
 (deftest player-can-view-peladas
   (testing "A player belonging to an organization can view peladas of that organization"
@@ -97,8 +97,7 @@
       (let [admin-login (app (-> (mock/request :post "/auth/login")
                                  (mock/json-body {:email "admin@test.com" :password "admin123"})))
             admin-token (:token (decode-body admin-login))
-            admin-auth (fn [req] (mock/header req "authorization" (str "Token " admin-token)))
-            admin-user-id (th/user-id-by-email ds "admin@test.com")]
+            admin-auth (fn [req] (mock/header req "authorization" (str "Token " admin-token)))]
 
         ;; Register player user
         (app (-> (mock/request :post "/auth/register")
@@ -145,7 +144,7 @@
                     peladas (decode-body list-peladas-resp)]
                 (is (= 200 (:status list-peladas-resp)))
                 (is (= 1 (count peladas)))
-                (is (= pelada-id (:id (first peladas))))))))))))
+                (is (= pelada-id (:id (first peladas)))))))))))
 
 (deftest player-can-view-matches
   (testing "A player belonging to an organization can view matches of peladas"
@@ -159,8 +158,7 @@
       (let [admin-login (app (-> (mock/request :post "/auth/login")
                                  (mock/json-body {:email "admin@test.com" :password "admin123"})))
             admin-token (:token (decode-body admin-login))
-            admin-auth (fn [req] (mock/header req "authorization" (str "Token " admin-token)))
-            admin-user-id (th/user-id-by-email ds "admin@test.com")]
+            admin-auth (fn [req] (mock/header req "authorization" (str "Token " admin-token)))]
 
         ;; Register player user
         (app (-> (mock/request :post "/auth/register")
@@ -249,8 +247,7 @@
       (let [admin-login (app (-> (mock/request :post "/auth/login")
                                  (mock/json-body {:email "admin@test.com" :password "admin123"})))
             admin-token (:token (decode-body admin-login))
-            admin-auth (fn [req] (mock/header req "authorization" (str "Token " admin-token)))
-            admin-user-id (th/user-id-by-email ds "admin@test.com")]
+            admin-auth (fn [req] (mock/header req "authorization" (str "Token " admin-token)))]
 
         ;; Register player user
         (app (-> (mock/request :post "/auth/register")
@@ -342,7 +339,7 @@
   (testing "A user who is not a member of an organization cannot view its data"
     (let [app (-> th/*test-system* :app :handler)
           db-file (:db-file th/*test-system*)
-          ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
+          _ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
 
       ;; Register admin user
       (app (-> (mock/request :post "/auth/register")
@@ -358,13 +355,13 @@
         (let [outsider-login (app (-> (mock/request :post "/auth/login")
                                       (mock/json-body {:email "outsider@test.com" :password "outsider123"})))
               outsider-token (:token (decode-body outsider-login))
-              outsider-auth (fn [req] (mock/header req "authorization" (str "Token " outsider-token)))]
+              outsider-auth (fn [req] (mock/header req "authorization" (str "Token " outsider-token)))
 
-          ;; Admin creates organization
-          (let [org-resp (app (-> (mock/request :post "/api/organizations")
+              ;; Admin creates organization
+              org-resp (app (-> (mock/request :post "/api/organizations")
                                   (mock/json-body {:name "Test Organization"})
                                   admin-auth))
-                org-id (:id (decode-body org-resp))]
+              org-id (:id (decode-body org-resp))]
 
             ;; Admin creates pelada
             (let [pelada-resp (app (-> (mock/request :post "/api/peladas")

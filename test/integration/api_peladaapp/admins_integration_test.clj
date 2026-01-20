@@ -95,13 +95,10 @@
 (deftest test-pelada-authorization
   (testing "Only admins can create peladas"
     (let [app (-> th/*test-system* :app :handler)
-          db-file (:db-file th/*test-system*)
-          ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
 
           ;; Register admin user
           token-admin (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass"})
           auth-admin (th/auth-header token-admin)
-          admin-id (th/user-id-by-email ds "admin@test.com")
 
           ;; Register regular user
           token-user (th/register-and-login! app {:name "User" :email "user@test.com" :password "pass"})

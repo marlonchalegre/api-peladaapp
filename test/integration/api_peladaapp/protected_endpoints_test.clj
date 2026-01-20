@@ -102,28 +102,30 @@
 
 (deftest missing-authorization-header-format
   (testing "Requests with malformed Authorization header return 401"
-    (let [app (-> th/*test-system* :app :handler)]
-      ;; Missing "Token" prefix
-      (let [req (-> (mock/request :get "/api/users")
+    (let [app (-> th/*test-system* :app :handler)
+          ;; Missing "Token" prefix
+          req1 (-> (mock/request :get "/api/users")
                     (mock/header "Authorization" "just-a-token"))
-            resp (app req)]
-        (is (= 401 (:status resp))
-            "Expected 401 for malformed Authorization header"))
-
-      ;; Empty Authorization header
-      (let [req (-> (mock/request :get "/api/users")
+          resp1 (app req1)
+          
+          ;; Empty Authorization header
+          req2 (-> (mock/request :get "/api/users")
                     (mock/header "Authorization" ""))
-            resp (app req)]
-        (is (= 401 (:status resp))
-            "Expected 401 for empty Authorization header")))))
+          resp2 (app req2)]
+      
+      (is (= 401 (:status resp1))
+            "Expected 401 for malformed Authorization header")
+            
+      (is (= 401 (:status resp2))
+            "Expected 401 for empty Authorization header"))))
 
 (deftest expired-token-handling
   (testing "Expired tokens should be rejected"
-    (let [app (-> th/*test-system* :app :handler)]
-      ;; This is a token that has a past expiration date
-      ;; In a real scenario, you would generate a token with exp in the past
-      (let [req (-> (mock/request :get "/api/users")
-                    (mock/header "Authorization" "Token eyJhbGciOiJIUzUxMiJ9.expiredtoken"))
-            resp (app req)]
-        (is (= 401 (:status resp))
-            "Expected 401 for expired token")))))
+    (let [app (-> th/*test-system* :app :handler)
+          ;; This is a token that has a past expiration date
+          ;; In a real scenario, you would generate a token with exp in the past
+          req (-> (mock/request :get "/api/users")
+                  (mock/header "Authorization" "Token eyJhbGciOiJIUzUxMiJ9.expiredtoken"))
+          resp (app req)]
+      (is (= 401 (:status resp))
+          "Expected 401 for expired token"))))

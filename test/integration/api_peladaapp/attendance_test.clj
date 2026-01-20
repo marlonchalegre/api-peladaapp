@@ -31,13 +31,13 @@
     (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "p1@ex.com" :password "p"})))
           token (:token (decode-body login))
           auth (fn [req] (mock/header req "authorization" (str "Token " token)))
-          user-id (th/user-id-by-email ds "p1@ex.com")]
+          user-id (th/user-id-by-email ds "p1@ex.com")
 
-      ;; Create organization (user becomes admin automatically)
-      (let [org-resp (app (-> (mock/request :post "/api/organizations")
+          ;; Create organization (user becomes admin automatically)
+          org-resp (app (-> (mock/request :post "/api/organizations")
                               (mock/json-body {:name "Attendance Club"})
                               auth))
-            org-id (:id (decode-body org-resp))]
+          org-id (:id (decode-body org-resp))]
         (is (= 201 (:status org-resp)))
 
         ;; Create player for user
@@ -84,4 +84,4 @@
           ;; Close attendance
           (let [close-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance"))
                                     auth))]
-            (is (= 200 (:status close-resp)))))))))
+            (is (= 200 (:status close-resp))))))))
