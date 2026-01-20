@@ -15,11 +15,22 @@
 
 (s/defn remove-organization-admin :- s/Int
   [id :- s/Int db]
-  (db.admin/delete-organization-admin id db))
+  (let [admin (db.admin/get-organization-admin id db)]
+    (if admin
+      (let [admins (db.admin/list-admins-by-organization (:organization-id admin) db)]
+        (if (<= (count admins) 1)
+          (throw (ex-info "Cannot remove the last administrator from the organization."
+                          {:type :bad-request}))
+          (db.admin/delete-organization-admin id db)))
+      0)))
 
 (s/defn remove-organization-admin-by-org-and-user :- s/Int
   [organization_id :- s/Int user_id :- s/Int db]
-  (db.admin/delete-organization-admin-by-org-and-user organization_id user_id db))
+  (let [admins (db.admin/list-admins-by-organization organization_id db)]
+    (if (<= (count admins) 1)
+      (throw (ex-info "Cannot remove the last administrator from the organization."
+                      {:type :bad-request}))
+      (db.admin/delete-organization-admin-by-org-and-user organization_id user_id db))))
 
 (s/defn list-organization-admins :- [models.admin/OrganizationAdmin]
   [organization_id :- s/Int db]
