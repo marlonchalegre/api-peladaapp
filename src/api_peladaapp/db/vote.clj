@@ -48,3 +48,16 @@
   [pelada-id voter-id db]
   (-> (sql/delete! db :votes {:pelada_id pelada-id :voter_id voter-id})
       affected-rows-count))
+
+(s/defn insert-votes-batch :- s/Int
+  "Insert multiple votes at once."
+  [votes-data db]
+  (if (empty? votes-data)
+    0
+    (let [rows (map (fn [v]
+                      {:pelada_id (:pelada-id v)
+                       :voter_id (:voter-id v)
+                       :target_id (:target-id v)
+                       :stars (:stars v)})
+                    votes-data)]
+      (count (sql/insert-multi! db :votes rows)))))

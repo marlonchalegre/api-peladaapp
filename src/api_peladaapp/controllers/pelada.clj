@@ -84,6 +84,15 @@
         total-count (db.pelada/count-peladas organization-id db)]
     (pagination/with-pagination-headers peladas total-count page per-page)))
 
+(s/defn list-peladas-by-user
+  [user-id :- s/Int db pagination]
+  (let [page (or (:page pagination) 1)
+        per-page (or (:per-page pagination) 20)
+        offset (* (- page 1) per-page)
+        peladas (db.pelada/list-peladas-by-user user-id per-page offset db)
+        total-count (db.pelada/count-peladas-by-user user-id db)]
+    (pagination/with-pagination-headers peladas total-count page per-page)))
+
 (s/defn begin-pelada :- responses.pelada/PeladaBeginResponse
   "Generate matches for a pelada, transition it to running, and seed lineups."
   [pelada-id :- s/Int db & [opts]]

@@ -8,7 +8,9 @@
    [api-peladaapp.db.user :as db.user]
    [medley.core :as medley.core]
    [next.jdbc.sql :as sql]
-   [schema.core :as s]))
+   [schema.core :as s])
+  (:import [java.time LocalDateTime ZoneId]
+           [java.time.format DateTimeFormatter]))
 
 (defn- affected-rows-count
   [result]
@@ -34,11 +36,11 @@
   [id :- s/Int
    pelada
    db]
-  (let [db-row (medley.core/assoc-some {}
+  (let [db-row (medley.core/assoc-some {} 
                                        :organization_id (:organization-id pelada)
                                        :scheduled_at (:scheduled-at pelada)
                                        :num_teams (:num-teams pelada)
-                                       :players_per_team (:players-per-team pelada)
+                                       :players_per-team (:players-per-team pelada)
                                        :status (:status pelada)
                                        :closed_at (:closed-at pelada))]
     (-> (sql/update! db :peladas db-row {:id id})
@@ -62,6 +64,38 @@
   [organization-id :- s/Int
    db]
   (-> (sql/query db ["select count(*) as count from peladas where organization_id = ?" organization-id])
+      first
+      :count))
+
+(s/defn list-peladas-by-user :- [s/Any]
+  [user-id :- s/Int
+   limit :- s/Int
+   offset :- s/Int
+   db]
+  (let [cutoff-time (.format (.minusHours (LocalDateTime/now (ZoneId/of "UTC")) 24)
+                             DateTimeFormatter/ISO_LOCAL_DATE_TIME)]
+    (->> (sql/query db ["SELECT p.*, o.name as organization_name
+                         FROM Peladas p
+                         JOIN OrganizationPlayers op ON op.organization_id = p.organization_id
+                         JOIN Organizations o ON o.id = p.organization_id
+                         WHERE op.user_id = ?
+                         ORDER BY
+                           CASE
+                             WHEN p.status = 'closed' AND p.closed_at > ? THEN 1
+                             WHEN p.status != 'closed' THEN 2
+                             ELSE 3
+                           END ASC,
+                           p.scheduled_at DESC, p.id DESC
+                         LIMIT ? OFFSET ?" user-id cutoff-time limit offset])
+         (map adapter.pelada/db->model))))
+
+(s/defn count-peladas-by-user :- s/Int
+  [user-id :- s/Int
+   db]
+  (-> (sql/query db ["SELECT count(*) as count
+                       FROM Peladas p
+                       JOIN OrganizationPlayers op ON op.organization_id = p.organization_id
+                       WHERE op.user_id = ?" user-id])
       first
       :count))
 

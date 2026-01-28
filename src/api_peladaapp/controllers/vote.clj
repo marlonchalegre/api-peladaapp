@@ -26,14 +26,16 @@
     (vote.logic/validate-voting-eligibility pelada))
   ;; Delete existing votes by this voter
   (db.vote/delete-votes-by-voter pelada-id voter-id db)
-  ;; Insert new votes
-  (doseq [vote votes]
-    (let [full-vote {:pelada-id pelada-id
-                     :voter-id voter-id
-                     :target-id (:target-id vote)
-                     :stars (:stars vote)}]
-      (vote.logic/validate-vote full-vote)
-      (db.vote/insert-vote full-vote db)))
+  ;; Insert new votes in batch
+  (let [full-votes (map (fn [vote]
+                          {:pelada-id pelada-id
+                           :voter-id voter-id
+                           :target-id (:target-id vote)
+                           :stars (:stars vote)})
+                        votes)]
+    (doseq [fv full-votes]
+      (vote.logic/validate-vote fv))
+    (db.vote/insert-votes-batch full-votes db))
   {:votes_cast (count votes)})
 
 (s/defn list-votes :- [models.vote/Vote]

@@ -5,6 +5,7 @@
 (s/defschema Pelada
   {:id s/Int
    :organization-id s/Int
+   (s/optional-key :organization-name) s/Str
    :scheduled-at s/Any
    :num-teams (s/maybe s/Int)
    :players-per-team (s/maybe s/Int)

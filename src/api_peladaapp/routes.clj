@@ -35,6 +35,7 @@
     (PUT "/peladas/:id" [] handler.pelada/update-by-id)
     (DELETE "/peladas/:id" [] handler.pelada/delete)
     (GET "/organizations/:organization_id/peladas" [] handler.pelada/list-by-org)
+    (GET "/users/:user_id/peladas" [] handler.pelada/list-by-user)
     (POST "/peladas/:id/begin" [] handler.pelada/begin)
     (POST "/peladas/:id/close" [] handler.pelada/close)
     (POST "/peladas/:id/attendance" [] handler.attendance/update-attendance)

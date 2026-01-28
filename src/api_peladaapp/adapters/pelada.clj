@@ -29,10 +29,11 @@
 
 (s/defn model->response :- responses.pelada/PeladaResponse
   [model :- models.pelada/Pelada]
-  (let [{:keys [id organization-id scheduled-at num-teams players-per-team status closed-at]} model]
+  (let [{:keys [id organization-id organization-name scheduled-at num-teams players-per-team status closed-at]} model]
     (medley.core/assoc-some {}
                             :id id
                             :organization_id organization-id
+                            :organization_name organization-name
                             :scheduled_at scheduled-at
                             :num_teams num-teams
                             :players_per_team players-per-team
@@ -45,6 +46,7 @@
     (medley.core/assoc-some {}
                             :id (:id p)
                             :organization-id (:organization_id p)
+                            :organization-name (:organization_name p)
                             :scheduled-at (:scheduled_at p)
                             :num-teams (:num_teams p)
                             :players-per-team (:players_per_team p)

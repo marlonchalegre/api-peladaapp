@@ -85,6 +85,22 @@
            (ok peladas-responses (:headers peladas-data))))
        (catch Exception e (exception/api-exception-handler e))))
 
+(defn list-by-user [request]
+  (try (let [db (:database request)
+             user-id-param (Integer/parseInt (str (get-in request [:params :user_id])))
+             auth-user-id (auth/get-user-id-from-request request)
+             query-params (:query-params request)
+             pagination (pagination/parse-pagination-params query-params)]
+         ;; Users can list their own peladas
+         (when (not= user-id-param auth-user-id)
+            (throw (ex-info "Unauthorized" {:type :forbidden :message "You can only list your own peladas"})))
+
+         (let [peladas-data (controller.pelada/list-peladas-by-user user-id-param db pagination)
+               peladas-models (:data peladas-data)
+               peladas-responses (map adapter.pelada/model->response peladas-models)]
+           (ok peladas-responses (:headers peladas-data))))
+       (catch Exception e (exception/api-exception-handler e))))
+
 (defn begin [request]
   (try (let [db (:database request)
              id (Integer/parseInt (str (get-in request [:params :id])))

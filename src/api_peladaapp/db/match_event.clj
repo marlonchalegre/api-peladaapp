@@ -53,17 +53,12 @@
 (s/defn list-player-stats-by-pelada :- [models.match/PlayerStats]
   [pelada-id :- s/Int db]
   (->> (jdbc/execute! db
-                      ["select e.player_id, p.user_id, u.name,
-                                 sum(case when e.event_type='goal' then 1 else 0 end)      as goals,
-                                 sum(case when e.event_type='assist' then 1 else 0 end)    as assists,
-                                 sum(case when e.event_type='own_goal' then 1 else 0 end) as own_goals
-                           from MatchEvents e
-                           join Matches m on m.id = e.match_id
-                           join OrganizationPlayers p on p.id = e.player_id
+                      ["select s.player_id, p.user_id, u.name, s.goals, s.assists, s.own_goals
+                           from PeladaPlayerStats s
+                           join OrganizationPlayers p on p.id = s.player_id
                            join Users u on u.id = p.user_id
-                          where m.pelada_id = ?
-                          group by e.player_id, p.user_id, u.name
-                          order by goals desc, assists desc" pelada-id])
+                          where s.pelada_id = ?
+                          order by s.goals desc, s.assists desc" pelada-id])
        (map unqualify-row)
        (map (fn [row]
               {:player-id (:player_id row)

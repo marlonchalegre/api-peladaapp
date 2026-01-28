@@ -1,6 +1,7 @@
 (ns api-peladaapp.db.organization
   (:require
    [api-peladaapp.adapters.organization :as adapter.organization]
+   [api-peladaapp.helpers.misc :as misc]
    [next.jdbc.result-set :as rs]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
@@ -30,11 +31,18 @@
        (map adapter.organization/db->model)))
 
 (s/defn list-by-user [user-id db]
-  (->> (sql/query db ["SELECT DISTINCT o.* FROM Organizations o
-                      LEFT JOIN OrganizationAdmins oa ON o.id = oa.organization_id
-                      LEFT JOIN OrganizationPlayers op ON o.id = op.organization_id
-                      WHERE oa.user_id = ? OR op.user_id = ?" user-id user-id])
-       (map adapter.organization/db->model)))
+  (->> (sql/query db ["SELECT o.id, o.name, 'admin' as role
+                       FROM Organizations o
+                       JOIN OrganizationAdmins oa ON o.id = oa.organization_id
+                       WHERE oa.user_id = ?
+                       UNION
+                       SELECT o.id, o.name, 'player' as role
+                       FROM Organizations o
+                       JOIN OrganizationPlayers op ON o.id = op.organization_id
+                       WHERE op.user_id = ?
+                       AND NOT EXISTS (SELECT 1 FROM OrganizationAdmins oa WHERE oa.organization_id = o.id AND oa.user_id = ?)"
+                      user-id user-id user-id])
+       (map misc/unamespace)))
 
 (s/defn count-organizations :- s/Int
   [db]

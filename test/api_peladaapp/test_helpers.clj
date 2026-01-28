@@ -22,16 +22,23 @@
    "resources/migrations/20251029200000-organization_admins.up.sql"
    "resources/migrations/20251029210000-add_closed_at_to_peladas.up.sql"
    "resources/migrations/20251029220000-create_player_scores_view.up.sql"
-   "resources/migrations/20260115000000-attendance.up.sql"])
+   "resources/migrations/20260115000000-attendance.up.sql"
+   "resources/migrations/20260130000000-performance_indexes.up.sql"
+   "resources/migrations/20260130010000-create_pelada_player_stats.up.sql"
+   "resources/migrations/20260130020000-optimize_votes_index.up.sql"])
 
 (defn migrate! [db-file]
   (let [ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
     (with-open [conn (jdbc/get-connection ds)]
       (doseq [sql-file migration-files
               :let [content (slurp sql-file)
-                    statements (->> (str/split content #";[\r\n]+")
-                                    (map str/trim)
-                                    (remove str/blank?))]
+                    statements (if (str/includes? content "--;;")
+                                 (->> (str/split content #"\-\-;;")
+                                      (map str/trim)
+                                      (remove str/blank?))
+                                 (->> (str/split content #";[\r\n]+")
+                                      (map str/trim)
+                                      (remove str/blank?)))]
               stmt statements]
         (jdbc/execute! conn [stmt])))))
 

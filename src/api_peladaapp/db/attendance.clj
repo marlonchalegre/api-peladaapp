@@ -1,24 +1,27 @@
 (ns api-peladaapp.db.attendance
   (:require
    [api-peladaapp.helpers.misc :refer [unamespace]]
+   [next.jdbc :as jdbc]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
 (defn- affected-rows-count
   [result]
-  (-> result vals first))
+  (let [res (if (vector? result) (first result) result)]
+    (-> res vals first)))
 
 (s/defn upsert-attendance :- s/Int
   [pelada-id :- s/Int
    player-id :- s/Int
    status :- s/Str
    db]
-  (let [existing (sql/query db ["select id from peladaattendance where pelada_id = ? and player_id = ?" pelada-id player-id])]
-    (if (seq existing)
-      (-> (sql/update! db :peladaattendance {:status status :updated_at (str (java.time.Instant/now))} {:id (:id (unamespace (first existing)))})
-          affected-rows-count)
-      (-> (sql/insert! db :peladaattendance {:pelada_id pelada-id :player_id player-id :status status})
-          affected-rows-count))))
+  (-> (jdbc/execute! db ["INSERT INTO peladaattendance (pelada_id, player_id, status, updated_at)
+                          VALUES (?, ?, ?, ?)
+                          ON CONFLICT(pelada_id, player_id) DO UPDATE SET
+                          status = excluded.status,
+                          updated_at = excluded.updated_at"
+                         pelada-id player-id status (str (java.time.Instant/now))])
+      affected-rows-count))
 
 (s/defn list-attendance-by-pelada :- [s/Any]
   [pelada-id :- s/Int

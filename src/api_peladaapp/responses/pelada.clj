@@ -6,6 +6,7 @@
 (s/defschema PeladaResponse
   {:id s/Int
    :organization_id s/Int
+   (s/optional-key :organization_name) s/Str
    (s/optional-key :scheduled_at) s/Any
    (s/optional-key :num_teams) (s/maybe s/Int)
    (s/optional-key :players_per_team) (s/maybe s/Int)

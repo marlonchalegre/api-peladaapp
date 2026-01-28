@@ -54,11 +54,7 @@
 
 (s/defn list-user-organizations
   [user-id :- s/Int db]
-  (let [orgs (db.organization/list-by-user user-id db)]
-    (map (fn [org]
-           (let [is-admin (db.admin/is-user-admin-of-organization? user-id (:id org) db)]
-             (assoc org :role (if is-admin "admin" "player"))))
-         orgs)))
+  (db.organization/list-by-user user-id db))
 
 (s/defn get-statistics
   [id :- s/Int
