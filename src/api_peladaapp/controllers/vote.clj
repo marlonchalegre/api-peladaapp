@@ -2,7 +2,6 @@
   (:require
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.player :as db.player]
-   [api-peladaapp.db.team :as db.team]
    [api-peladaapp.db.vote :as db.vote]
    [api-peladaapp.logic.vote :as vote.logic]
    [api-peladaapp.models.vote :as models.vote]

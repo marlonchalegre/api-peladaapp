@@ -84,7 +84,8 @@
                                        idx (.indexOf remaining-matches match)
                                        next-remaining (vec (concat (subvec remaining-matches 0 idx)
                                                                    (subvec remaining-matches (inc idx))))]
-                                   (find-schedule (conj schedule {:home h :away a}) next-team-stats all-teams total-matches matches-per-team next-remaining))))
+                                   (find-schedule (conj schedule {:home h :away a}) next-team-stats all-teams total-matches matches-per-team next-remaining))
+                                 nil))
                              orientations)]
             (if (seq result)
               result
