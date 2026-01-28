@@ -1,6 +1,7 @@
 (ns api-peladaapp.adapters.pelada
   (:require
    [api-peladaapp.helpers.misc :as misc]
+   [api-peladaapp.logic.vote :as logic.vote]
    [api-peladaapp.models.pelada :as models.pelada]
    [api-peladaapp.requests.pelada :as requests.pelada]
    [api-peladaapp.responses.pelada :as responses.pelada]
@@ -29,15 +30,18 @@
 
 (s/defn model->response :- responses.pelada/PeladaResponse
   [model :- models.pelada/Pelada]
-  (let [{:keys [id organization-id organization-name scheduled-at num-teams players-per-team status closed-at]} model]
+  (let [{:keys [id organization-id organization-name scheduled-at num-teams players-per-team status closed-at]} model
+        display-status (if (logic.vote/voting-open? model)
+                         "voting"
+                         status)]
     (medley.core/assoc-some {}
                             :id id
                             :organization_id organization-id
                             :organization_name organization-name
-                            :scheduled_at scheduled-at
-                            :num_teams num-teams
-                            :players_per_team players-per-team
-                            :status status
+                            :scheduled-at scheduled-at
+                            :num-teams num-teams
+                            :players-per-team players-per-team
+                            :status display-status
                             :closed_at closed-at)))
 
 (s/defn db->model :- models.pelada/Pelada

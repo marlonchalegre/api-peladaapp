@@ -97,6 +97,22 @@
       (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Voting window closed"
                             (vote.logic/validate-voting-eligibility pelada))))))
 
+(deftest test-voting-open?
+  (testing "Open pelada should return false"
+    (is (false? (vote.logic/voting-open? {:status "open"}))))
+
+  (testing "Closed pelada within window should return true"
+    (let [now (Instant/now)
+          two-hours-ago (.minus now (Duration/ofHours 2))
+          pelada {:status "closed" :closed-at two-hours-ago}]
+      (is (true? (vote.logic/voting-open? pelada)))))
+
+  (testing "Closed pelada after window should return false"
+    (let [now (Instant/now)
+          twenty-five-hours-ago (.minus now (Duration/ofHours 25))
+          pelada {:status "closed" :closed-at twenty-five-hours-ago}]
+      (is (false? (vote.logic/voting-open? pelada))))))
+
 (deftest test-normalized-score
   (testing "Empty votes should return 0.0"
     (let [result (vote.logic/normalized-score 1 [])]

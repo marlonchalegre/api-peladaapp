@@ -61,6 +61,15 @@
   (ensure-voting-window-open pelada)
   pelada)
 
+(defn voting-open?
+  "Check if voting is currently open for this pelada."
+  [pelada]
+  (try
+    (validate-voting-eligibility pelada)
+    true
+    (catch Exception _
+      false)))
+
 (defn normalized-score
   "Normalize player's average stars (1..5) into 1..10 scale."
   [player-id votes]

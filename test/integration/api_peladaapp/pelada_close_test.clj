@@ -63,9 +63,9 @@
                                 auth))
             body (decode-body close-resp)]
         (is (= 200 (:status close-resp)))
-        (is (= "closed" (:status body)))
+        (is (= "voting" (:status body))) ;; Display status is voting if recently closed
         (is (not (nil? (:closed_at body))))
 
         (let [pelada (pelada.controller/get-pelada pelada-id ds)]
-          (is (= "closed" (:status pelada)))
+          (is (= "closed" (:status pelada))) ;; Database status is still closed
           (is (not (nil? (:closed-at pelada)))))))))
