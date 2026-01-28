@@ -38,8 +38,8 @@
       (let [m (db.match/get-match match-id db)
             home (:home-team-id m)
             away (:away-team-id m)
-            home-players (map :player_id (db.team/list-team-players home db))
-            away-players (map :player_id (db.team/list-team-players away db))
+            home-players (map :player-id (db.team/list-team-players home db))
+            away-players (map :player-id (db.team/list-team-players away db))
             to-insert (concat (map (fn [pid] {:match_id match-id :team_id home :player_id pid}) home-players)
                               (map (fn [pid] {:match_id match-id :team_id away :player_id pid}) away-players))]
         (if (empty? to-insert)
