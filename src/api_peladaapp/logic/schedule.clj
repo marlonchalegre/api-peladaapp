@@ -18,7 +18,7 @@
       (assoc-in [team-id :consecutive-plays] 0)
       (update-in [team-id :consecutive-rests] (fnil inc 0))))
 
-(defn valid-match? [team-stats matches-per-team teams-in-match]
+(defn valid-match? [team-stats matches-per-team teams-in-match all-teams-count]
   (let [team1 (first teams-in-match)
         team2 (second teams-in-match)
         stats1 (get team-stats team1)
@@ -35,10 +35,10 @@
     (and
      ;; Check for team1
      (< (:played stats1 0) matches-per-team)
-     (< (:consecutive-plays stats1 0) 2)
+     (or (= all-teams-count 2) (< (:consecutive-plays stats1 0) 2)) ;; Relax consecutive plays for 2 teams
      ;; Check for team2
      (< (:played stats2 0) matches-per-team)
-     (< (:consecutive-plays stats2 0) 2)
+     (or (= all-teams-count 2) (< (:consecutive-plays stats2 0) 2)) ;; Relax consecutive plays for 2 teams
      ;; Check other teams for consecutive rests
      (every? (fn [[team-id stats]]
                (if (or (= team-id team1) (= team-id team2))
@@ -51,13 +51,13 @@
 
 (defn- find-schedule
   [schedule team-stats all-teams total-matches matches-per-team remaining-matches]
-  (if (empty? remaining-matches)
+  (if (>= (count schedule) total-matches)
     schedule
     (let [distinct-matches (distinct remaining-matches)]
       (loop [candidates distinct-matches]
-        (when-let [match (first candidates)]
+        (if-let [match (first candidates)]
           (let [teams-in-match [(:home match) (:away match)]]
-            (if (valid-match? team-stats matches-per-team teams-in-match)
+            (if (valid-match? team-stats matches-per-team teams-in-match (count all-teams))
               (let [playing-teams (set teams-in-match)
                     resting-teams (set/difference all-teams playing-teams)
                     next-team-stats (reduce update-stats-for-play team-stats playing-teams)
@@ -71,7 +71,8 @@
                 (if (seq result)
                   result
                   (recur (rest candidates))))
-              (recur (rest candidates)))))))))
+              (recur (rest candidates))))
+          nil)))))
 
 (defn- pair-round [teams]
   (let [n (count teams)
@@ -110,11 +111,10 @@
 (defn schedule-matches-with-limit
   "Backtracking scheduler to find a valid sequence of matches."
   [team-ids matches-per-team]
-  (when (and matches-per-team (odd? (* (count team-ids) matches-per-team)))
-    (throw (ex-info "Total number of plays must be even."
-                    {:type :bad-request})))
   (let [teams (vec team-ids)
         n (count teams)
+        ;; We calculate total-matches as the maximum possible given matches-per-team.
+        ;; Each match uses 2 slots. Total slots available = n * matches-per-team.
         total-matches (if (and n (pos? n) matches-per-team) (quot (* n matches-per-team) 2) 0)
         all-teams-set (set teams)
         initial-stats (zipmap teams (repeat {:played 0 :consecutive-plays 0 :consecutive-rests 0 :doubles-count 0}))
@@ -123,8 +123,20 @@
                               (mapv (fn [[h a]] {:home h :away a}) (mapcat identity (circle-method-rounds teams)))
                               (generate-all-possible-matches teams))
 
-        all-possible-matches (vec (take total-matches (cycle round-robin-matches)))]
-    (find-schedule [] initial-stats all-teams-set total-matches matches-per-team all-possible-matches)))
+        ;; Cycle round robin matches to have enough candidates for backtracking
+        all-possible-matches (vec (take (* 2 total-matches) (cycle round-robin-matches)))
+        
+        result (find-schedule [] initial-stats all-teams-set total-matches matches-per-team all-possible-matches)]
+    
+    (if (and (seq result) (= (count result) total-matches))
+      result
+      ;; If perfect schedule not found, try to find ANY schedule (best effort)
+      ;; For now we just throw if it failed to find the requested amount, 
+      ;; but we removed the strict odd plays check.
+      (if (seq result) 
+        result
+        (throw (ex-info "Could not find a valid schedule with the given constraints."
+                        {:type :bad-request}))))))
 
 (defn schedule-matches
   [team-ids]
