@@ -30,19 +30,18 @@
 
 (s/defn model->response :- responses.pelada/PeladaResponse
   [model :- models.pelada/Pelada]
-  (let [{:keys [id organization-id organization-name scheduled-at num-teams players-per-team status closed-at]} model
-        display-status (if (logic.vote/voting-open? model)
+  (let [display-status (if (logic.vote/voting-open? model)
                          "voting"
-                         status)]
+                         (:status model))]
     (medley.core/assoc-some {}
-                            :id id
-                            :organization_id organization-id
-                            :organization_name organization-name
-                            :scheduled-at scheduled-at
-                            :num-teams num-teams
-                            :players-per-team players-per-team
+                            :id (:id model)
+                            :organization_id (:organization-id model)
+                            :organization_name (:organization-name model)
+                            :scheduled_at (:scheduled-at model)
+                            :num_teams (:num-teams model)
+                            :players_per_team (:players-per-team model)
                             :status display-status
-                            :closed_at closed-at)))
+                            :closed_at (:closed-at model))))
 
 (s/defn db->model :- models.pelada/Pelada
   [pelada]
