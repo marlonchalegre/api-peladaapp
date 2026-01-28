@@ -122,13 +122,13 @@
           ;; Group team players by team ID
           team-players-grouped (group-by :team_id team-players-raw)
 
-          ;; Add players to teams
+          ;; Add players to teams - Use all-players-in-org to avoid nulls if some team player is not 'confirmed'
           teams-with-players (map (fn [team]
-                                    (assoc team :players (map (fn [team-player]
-                                                                (let [player (first (filter #(= (:player_id team-player) (:id %)) all-org-players))
-                                                                      user (get users-map (:user-id player))]
-                                                                  (assoc player :user user)))
-                                                              (get team-players-grouped (:id team) []))))
+                                    (assoc team :players (keep (fn [team-player]
+                                                                 (when-let [player (first (filter #(= (:player_id team-player) (:id %)) all-players-in-org))]
+                                                                   (let [user (get users-map (:user-id player))]
+                                                                     (assoc player :user user))))
+                                                               (get team-players-grouped (:id team) []))))
                                   teams)
 
           ;; Identify players already assigned to teams
@@ -145,7 +145,7 @@
                                             available-players)]
 
       {:pelada pelada
-       :teams (filter #(seq (:players %)) teams-with-players) ;; Only return teams that actually have confirmed players
+       :teams (filter #(seq (:players %)) teams-with-players)
        :available_players available-players-with-users
        :attendance (filter (fn [a] (some #(= (:player_id a) (:id %)) all-org-players))
                            (map (fn [a] (assoc a :player (let [p (first (filter #(= (:player_id a) (:id %)) all-players-in-org))]
