@@ -12,7 +12,8 @@
         (assoc-in [team-id :consecutive-rests] 0)
         (update-in [team-id :consecutive-plays] (fnil inc 0))
         (update-in [team-id :doubles-count] (if is-double inc identity))
-        (assoc-in [team-id :last-role] role))))
+        (assoc-in [team-id :last-role] role)
+        (update-in [team-id role] (fnil inc 0)))))
 
 (defn update-stats-for-rest [stats team-id]
   (-> stats
@@ -33,19 +34,25 @@
         away-new-doubles (if away-double? (inc (:doubles-count away-stats 0)) (:doubles-count away-stats 0))
 
         all-doubles (map :doubles-count (vals team-stats))
-        min-doubles (if (seq all-doubles) (apply min all-doubles) 0)]
+        min-doubles (if (seq all-doubles) (apply min all-doubles) 0)
+        
+        ;; Home/Away Balance Check
+        new-home-count (inc (get home-stats :home 0))
+        new-away-count (inc (get away-stats :away 0))
+        home-balance (- new-home-count (get home-stats :away 0))
+        away-balance (- new-away-count (get away-stats :home 0))]
     (and
      ;; Check for home-team
      (< (:played home-stats 0) matches-per-team)
      (or (= all-teams-count 2) (< (:consecutive-plays home-stats 0) 2))
-     ;; New constraint: If playing consecutively, must switch role
      (or (not home-double?) (not= (:last-role home-stats) :home))
+     (<= home-balance 2) ;; Threshold for home/away imbalance
 
      ;; Check for away-team
      (< (:played away-stats 0) matches-per-team)
      (or (= all-teams-count 2) (< (:consecutive-plays away-stats 0) 2))
-     ;; New constraint: If playing consecutively, must switch role
      (or (not away-double?) (not= (:last-role away-stats) :away))
+     (<= away-balance 2) ;; Threshold for home/away imbalance
 
      ;; Check other teams for consecutive rests
      (every? (fn [[team-id stats]]
@@ -53,6 +60,7 @@
                  true
                  (< (:consecutive-rests stats 0) 2)))
              (apply dissoc team-stats [home-team away-team]))
+     
      ;; Fairness check for doubles
      (<= (- home-new-doubles min-doubles) 1)
      (<= (- away-new-doubles min-doubles) 1))))
@@ -124,7 +132,7 @@
         n (count teams)
         total-matches (if (and n (pos? n) matches-per-team) (quot (* n matches-per-team) 2) 0)
         all-teams-set (set teams)
-        initial-stats (zipmap teams (repeat {:played 0 :consecutive-plays 0 :consecutive-rests 0 :doubles-count 0 :last-role nil}))
+        initial-stats (zipmap teams (repeat {:played 0 :consecutive-plays 0 :consecutive-rests 0 :doubles-count 0 :last-role nil :home 0 :away 0}))
 
         round-robin-matches (if (even? n)
                               (mapv (fn [[h a]] {:home h :away a}) (mapcat identity (circle-method-rounds teams)))
