@@ -3,7 +3,7 @@
    [clojure.math.combinatorics :as combo]
    [clojure.set :as set]))
 
-(defn update-stats-for-play [stats team-id]
+(defn update-stats-for-play [stats team-id role]
   (let [current-stats (get stats team-id)
         consecutive-plays (:consecutive-plays current-stats 0)
         is-double (pos? consecutive-plays)]
@@ -11,43 +11,51 @@
         (update-in [team-id :played] (fnil inc 0))
         (assoc-in [team-id :consecutive-rests] 0)
         (update-in [team-id :consecutive-plays] (fnil inc 0))
-        (update-in [team-id :doubles-count] (if is-double inc identity)))))
+        (update-in [team-id :doubles-count] (if is-double inc identity))
+        (assoc-in [team-id :last-role] role))))
 
 (defn update-stats-for-rest [stats team-id]
   (-> stats
       (assoc-in [team-id :consecutive-plays] 0)
-      (update-in [team-id :consecutive-rests] (fnil inc 0))))
+      (update-in [team-id :consecutive-rests] (fnil inc 0))
+      (assoc-in [team-id :last-role] nil)))
 
 (defn valid-match? [team-stats matches-per-team teams-in-match all-teams-count]
-  (let [team1 (first teams-in-match)
-        team2 (second teams-in-match)
-        stats1 (get team-stats team1)
-        stats2 (get team-stats team2)
+  (let [home-team (first teams-in-match)
+        away-team (second teams-in-match)
+        home-stats (get team-stats home-team)
+        away-stats (get team-stats away-team)
 
         ;; Calculate potential new doubles count
-        t1-double? (pos? (:consecutive-plays stats1 0))
-        t2-double? (pos? (:consecutive-plays stats2 0))
-        t1-new-doubles (if t1-double? (inc (:doubles-count stats1 0)) (:doubles-count stats1 0))
-        t2-new-doubles (if t2-double? (inc (:doubles-count stats2 0)) (:doubles-count stats2 0))
+        home-double? (pos? (:consecutive-plays home-stats 0))
+        away-double? (pos? (:consecutive-plays away-stats 0))
+        home-new-doubles (if home-double? (inc (:doubles-count home-stats 0)) (:doubles-count home-stats 0))
+        away-new-doubles (if away-double? (inc (:doubles-count away-stats 0)) (:doubles-count away-stats 0))
 
         all-doubles (map :doubles-count (vals team-stats))
         min-doubles (if (seq all-doubles) (apply min all-doubles) 0)]
     (and
-     ;; Check for team1
-     (< (:played stats1 0) matches-per-team)
-     (or (= all-teams-count 2) (< (:consecutive-plays stats1 0) 2)) ;; Relax consecutive plays for 2 teams
-     ;; Check for team2
-     (< (:played stats2 0) matches-per-team)
-     (or (= all-teams-count 2) (< (:consecutive-plays stats2 0) 2)) ;; Relax consecutive plays for 2 teams
+     ;; Check for home-team
+     (< (:played home-stats 0) matches-per-team)
+     (or (= all-teams-count 2) (< (:consecutive-plays home-stats 0) 2))
+     ;; New constraint: If playing consecutively, must switch role
+     (or (not home-double?) (not= (:last-role home-stats) :home))
+
+     ;; Check for away-team
+     (< (:played away-stats 0) matches-per-team)
+     (or (= all-teams-count 2) (< (:consecutive-plays away-stats 0) 2))
+     ;; New constraint: If playing consecutively, must switch role
+     (or (not away-double?) (not= (:last-role away-stats) :away))
+
      ;; Check other teams for consecutive rests
      (every? (fn [[team-id stats]]
-               (if (or (= team-id team1) (= team-id team2))
+               (if (or (= team-id home-team) (= team-id away-team))
                  true
                  (< (:consecutive-rests stats 0) 2)))
-             (apply dissoc team-stats teams-in-match))
+             (apply dissoc team-stats [home-team away-team]))
      ;; Fairness check for doubles
-     (<= (- t1-new-doubles min-doubles) 1)
-     (<= (- t2-new-doubles min-doubles) 1))))
+     (<= (- home-new-doubles min-doubles) 1)
+     (<= (- away-new-doubles min-doubles) 1))))
 
 (defn- find-schedule
   [schedule team-stats all-teams total-matches matches-per-team remaining-matches]
@@ -56,21 +64,22 @@
     (let [distinct-matches (distinct remaining-matches)]
       (loop [candidates distinct-matches]
         (if-let [match (first candidates)]
-          (let [teams-in-match [(:home match) (:away match)]]
-            (if (valid-match? team-stats matches-per-team teams-in-match (count all-teams))
-              (let [playing-teams (set teams-in-match)
-                    resting-teams (set/difference all-teams playing-teams)
-                    next-team-stats (reduce update-stats-for-play team-stats playing-teams)
-                    next-team-stats (reduce update-stats-for-rest next-team-stats resting-teams)
+          ;; Try both orientations for each match
+          (let [orientations [[(:home match) (:away match)] [(:away match) (:home match)]]
+                result (some (fn [[h a]]
+                               (if (valid-match? team-stats matches-per-team [h a] (count all-teams))
+                                 (let [playing-teams {h :home a :away}
+                                       resting-teams (set/difference all-teams (set [h a]))
+                                       next-team-stats (reduce-kv update-stats-for-play team-stats playing-teams)
+                                       next-team-stats (reduce update-stats-for-rest next-team-stats resting-teams)
 
-                    idx (.indexOf remaining-matches match)
-                    next-remaining (vec (concat (subvec remaining-matches 0 idx)
-                                                (subvec remaining-matches (inc idx))))
-
-                    result (find-schedule (conj schedule match) next-team-stats all-teams total-matches matches-per-team next-remaining)]
-                (if (seq result)
-                  result
-                  (recur (rest candidates))))
+                                       idx (.indexOf remaining-matches match)
+                                       next-remaining (vec (concat (subvec remaining-matches 0 idx)
+                                                                   (subvec remaining-matches (inc idx))))]
+                                   (find-schedule (conj schedule {:home h :away a}) next-team-stats all-teams total-matches matches-per-team next-remaining))))
+                             orientations)]
+            (if (seq result)
+              result
               (recur (rest candidates))))
           nil)))))
 
@@ -113,26 +122,20 @@
   [team-ids matches-per-team]
   (let [teams (vec team-ids)
         n (count teams)
-        ;; We calculate total-matches as the maximum possible given matches-per-team.
-        ;; Each match uses 2 slots. Total slots available = n * matches-per-team.
         total-matches (if (and n (pos? n) matches-per-team) (quot (* n matches-per-team) 2) 0)
         all-teams-set (set teams)
-        initial-stats (zipmap teams (repeat {:played 0 :consecutive-plays 0 :consecutive-rests 0 :doubles-count 0}))
+        initial-stats (zipmap teams (repeat {:played 0 :consecutive-plays 0 :consecutive-rests 0 :doubles-count 0 :last-role nil}))
 
         round-robin-matches (if (even? n)
                               (mapv (fn [[h a]] {:home h :away a}) (mapcat identity (circle-method-rounds teams)))
                               (generate-all-possible-matches teams))
 
-        ;; Cycle round robin matches to have enough candidates for backtracking
         all-possible-matches (vec (take (* 2 total-matches) (cycle round-robin-matches)))
         
         result (find-schedule [] initial-stats all-teams-set total-matches matches-per-team all-possible-matches)]
     
     (if (and (seq result) (= (count result) total-matches))
       result
-      ;; If perfect schedule not found, try to find ANY schedule (best effort)
-      ;; For now we just throw if it failed to find the requested amount, 
-      ;; but we removed the strict odd plays check.
       (if (seq result) 
         result
         (throw (ex-info "Could not find a valid schedule with the given constraints."
