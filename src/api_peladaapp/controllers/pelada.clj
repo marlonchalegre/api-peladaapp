@@ -96,21 +96,23 @@
 (s/defn begin-pelada :- responses.pelada/PeladaBeginResponse
   "Generate matches for a pelada, transition it to running, and seed lineups."
   [pelada-id :- s/Int db & [opts]]
-  (let [matches-per-team (:matches_per_team (or opts {}))
-        pelada (db.pelada/get-pelada pelada-id db)
-        team-ids (->> (fetch-team-ids pelada-id db)
-                      (pelada.logic/ensure-startable pelada))
-        match-plan (pelada.logic/schedule-matches-for-start team-ids matches-per-team)]
-    (persist-match-plan! pelada-id match-plan db)
-    (db.pelada/update-pelada pelada-id {:status "running"} db)
-    (seed-lineups-from-teams! pelada-id db)
-    {:matches_created (count match-plan)}))
+  (jdbc/with-transaction [tx db]
+    (let [matches-per-team (:matches_per_team (or opts {}))
+          pelada (db.pelada/get-pelada pelada-id tx)
+          team-ids (->> (fetch-team-ids pelada-id tx)
+                        (pelada.logic/ensure-startable pelada))
+          match-plan (pelada.logic/schedule-matches-for-start team-ids matches-per-team)]
+      (persist-match-plan! pelada-id match-plan tx)
+      (db.pelada/update-pelada pelada-id {:status "running"} tx)
+      (seed-lineups-from-teams! pelada-id tx)
+      {:matches_created (count match-plan)})))
 
 (s/defn close-pelada :- models.pelada/Pelada
   [pelada-id :- s/Int db]
-  (db.match/finish-all-by-pelada pelada-id db)
-  (db.pelada/update-pelada pelada-id {:status "closed" :closed-at (str (java.time.Instant/now))} db)
-  (db.pelada/get-pelada pelada-id db))
+  (jdbc/with-transaction [tx db]
+    (db.match/finish-all-by-pelada pelada-id tx)
+    (db.pelada/update-pelada pelada-id {:status "closed" :closed-at (str (java.time.Instant/now))} tx)
+    (db.pelada/get-pelada pelada-id tx)))
 
 (s/defn get-pelada-dashboard-data :- responses.pelada/PeladaDashboardResponse
   [pelada-id :- s/Int db]
