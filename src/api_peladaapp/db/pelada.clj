@@ -147,22 +147,14 @@
 
           assigned-player-ids (set (map :player_id team-players-raw))
 
-; Filter available players (not in any team for this pelada)
-
+          ; Filter available players (not in any team for this pelada)
           ; If status is 'attendance', we show all org players as available for attendance (the frontend will handle grouping)
-
-          ; If status is NOT 'attendance', we only show 'confirmed' players that are not assigned to teams (unless attendance is empty).
-
-          available-players (if (or (= "attendance" (:status pelada)) (empty? attendance))
-
+          ; If status is NOT 'attendance', we only show 'confirmed' players that are not assigned to teams.
+          available-players (if (= "attendance" (:status pelada))
                               all-org-players
-
                               (filter (fn [p]
-
                                         (and (not (assigned-player-ids (:id p)))
-
                                              (= "confirmed" (get attendance-map (:id p)))))
-
                                       all-org-players))
 
 ; Add user info to available players
