@@ -19,8 +19,11 @@
   (select-keys request [:name :email :password]))
 
 (s/defn model->response :- responses.user/UserResponse
-  [user :- models.user/User]
-  (select-keys user [:id :name :email]))
+  ([user :- models.user/User]
+   (model->response user false))
+  ([user :- models.user/User exclude-email? :- s/Bool]
+   (let [fields (if exclude-email? [:id :name] [:id :name :email])]
+     (select-keys user fields))))
 
 (s/defn db->model :- models.user/User
   [user]

@@ -40,7 +40,7 @@
                                        :organization_id (:organization-id pelada)
                                        :scheduled_at (:scheduled-at pelada)
                                        :num_teams (:num-teams pelada)
-                                       :players_per-team (:players-per-team pelada)
+                                       :players-per-team (:players-per-team pelada)
                                        :status (:status pelada)
                                        :closed_at (:closed-at pelada))]
     (-> (sql/update! db :peladas db-row {:id id})
@@ -100,87 +100,57 @@
       :count))
 
 (s/defn get-pelada-full-details :- s/Any
-
   [pelada-id :- s/Int
-
    db]
-
   (if-let [pelada (get-pelada pelada-id db)]
-
     (let [organization-id (:organization-id pelada)
-
-          all-org-players (db.player/list-players-by-organization organization-id db)
-
-          all-users (map adapter.user/model->response (db.user/list-users db 0 100000)) ;; Fetch a large number of users for now, can optimize later if needed
-
-          users-map (into {} (map (juxt :id identity)) all-users)
-
-          teams (db.team/list-pelada-teams pelada-id db)
-
-          team-players-raw (db.team/list-team-players-by-pelada pelada-id db)
-
           attendance (db.attendance/list-attendance-by-pelada pelada-id db)
-
           attendance-map (into {} (map (juxt :player_id :status)) attendance)
+          
+          ;; If not in attendance mode, we only care about confirmed players
+          all-players-in-org (db.player/list-players-by-organization organization-id db)
+          all-org-players (if (= "attendance" (:status pelada))
+                            all-players-in-org
+                            (filter (fn [p] (= "confirmed" (get attendance-map (:id p))))
+                                    all-players-in-org))
 
-; Group team players by team ID
-
+          all-users (map #(adapter.user/model->response % true) (db.user/list-users db 0 100000)) ;; Exclude email for privacy
+          users-map (into {} (map (juxt :id identity)) all-users)
+          teams (db.team/list-pelada-teams pelada-id db)
+          team-players-raw (db.team/list-team-players-by-pelada pelada-id db)
+          
+          ;; Group team players by team ID
           team-players-grouped (group-by :team_id team-players-raw)
 
-; Add players to teams
-
+          ;; Add players to teams
           teams-with-players (map (fn [team]
-
                                     (assoc team :players (map (fn [team-player]
-
                                                                 (let [player (first (filter #(= (:player_id team-player) (:id %)) all-org-players))
-
                                                                       user (get users-map (:user-id player))]
-
                                                                   (assoc player :user user)))
-
                                                               (get team-players-grouped (:id team) []))))
-
                                   teams)
 
-; Identify players already assigned to teams
-
+          ;; Identify players already assigned to teams
           assigned-player-ids (set (map :player_id team-players-raw))
 
-          ; Filter available players (not in any team for this pelada)
-          ; If status is 'attendance', we show all org players as available for attendance (the frontend will handle grouping)
-          ; If status is NOT 'attendance', we only show 'confirmed' players that are not assigned to teams.
-          available-players (if (= "attendance" (:status pelada))
-                              all-org-players
-                              (filter (fn [p]
-                                        (and (not (assigned-player-ids (:id p)))
-                                             (= "confirmed" (get attendance-map (:id p)))))
-                                      all-org-players))
+          ;; Filter available players (not in any team for this pelada)
+          available-players (filter (fn [p] (not (assigned-player-ids (:id p))))
+                                    all-org-players)
 
-; Add user info to available players
-
+          ;; Add user info to available players
           available-players-with-users (map (fn [player]
-
                                               (assoc player :user (get users-map (:user-id player))
-
                                                      :attendance_status (get attendance-map (:id player) "pending")))
-
                                             available-players)]
 
       {:pelada pelada
-
-       :teams teams-with-players
-
+       :teams (filter #(seq (:players %)) teams-with-players) ;; Only return teams that actually have confirmed players
        :available_players available-players-with-users
-
-       :attendance (map (fn [a] (assoc a :player (let [p (first (filter #(= (:player_id a) (:id %)) all-org-players))]
-
-                                                   (assoc p :user (get users-map (:user-id p))))))
-
-                        attendance)
-
-       :users_map users-map ;; This might be useful for the frontend to build its own userIdToName map
-
-       :org_players_map (into {} (map (juxt :id identity)) all-org-players)})
-
+       :attendance (filter (fn [a] (some #(= (:player_id a) (:id %)) all-org-players))
+                           (map (fn [a] (assoc a :player (let [p (first (filter #(= (:player_id a) (:id %)) all-players-in-org))]
+                                                           (assoc p :user (get users-map (:user-id p))))))
+                                attendance))
+       :users_map users-map
+       :org_players_map (into {} (map (juxt :id identity)) all-players-in-org)})
     (throw (ex-info "Pelada not found" {:type :not-found :message "Pelada not found"}))))
