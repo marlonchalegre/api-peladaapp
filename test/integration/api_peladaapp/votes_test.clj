@@ -20,29 +20,48 @@
       (instance? java.io.InputStream b) (let [s (slurp b)] (when (not (str/blank? s)) (json/read-str s :key-fn keyword)))
       :else nil)))
 
+(defn- register-and-login [app email name]
+  (app (-> (mock/request :post "/auth/register")
+           (mock/json-body {:name name :email email :password "p"})))
+  (let [login-resp (app (-> (mock/request :post "/auth/login")
+                            (mock/json-body {:email email :password "p"})))
+        body (decode-body login-resp)]
+    {:token (:token body)
+     :user-id (:id (:user body))}))
+
 (deftest votes-and-normalization
   (let [app (-> th/*test-system* :app :handler)
         db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
-    ;; seed org and players
+    ;; seed org
     (sql/insert! ds :Organizations {:name "Org"})
-    (doseq [[i name email] [[1 "Ana" "ana@example.com"] [2 "Bob" "bob@example.com"] [3 "Cid" "cid@example.com"]]]
-      (sql/insert! ds :Users {:name name :email email :password "p"})
-      (sql/insert! ds :OrganizationPlayers {:id i :organization_id 1 :user_id i}))
-    ;; Create closed pelada with closed_at timestamp
-    (let [closed-at (str (.minus (Instant/now) (Duration/ofHours 2)))]
-      (sql/insert! ds :Peladas {:id 1 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at closed-at}))
+    
+    ;; Register users via API to ensure proper auth state
+    (let [{ana-token :token ana-user-id :user-id} (register-and-login app "ana@example.com" "Ana")
+          {bob-user-id :user-id} (register-and-login app "bob@example.com" "Bob")
+          {cid-user-id :user-id} (register-and-login app "cid@example.com" "Cid")
+          auth (fn [req] (mock/header req "authorization" (str "Token " ana-token)))]
+      
+      ;; Map them to organization players
+      (sql/insert! ds :OrganizationPlayers {:id 1 :organization_id 1 :user_id ana-user-id})
+      (sql/insert! ds :OrganizationPlayers {:id 2 :organization_id 1 :user_id bob-user-id})
+      (sql/insert! ds :OrganizationPlayers {:id 3 :organization_id 1 :user_id cid-user-id})
 
-    ;; auth-protected endpoints: login to get token
-    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Admin" :email "admin@example.com" :password "p"})))
-    (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "admin@example.com" :password "p"})))
-          token (:token (decode-body login))
-          auth (fn [req] (mock/header req "authorization" (str "Token " token)))]
+      ;; Create closed pelada with closed_at timestamp
+      (let [closed-at (str (.minus (Instant/now) (Duration/ofHours 2)))]
+        (sql/insert! ds :Peladas {:id 1 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at closed-at}))
+
       ;; cast votes: 2 and 3 vote for 1 (no self-vote)
-      (is (= 201 (:status (app (-> (mock/request :post "/api/votes") auth (mock/json-body {:pelada_id 1 :voter_id 2 :target_id 1 :stars 5}))))))
-      (is (= 201 (:status (app (-> (mock/request :post "/api/votes") auth (mock/json-body {:pelada_id 1 :voter_id 3 :target_id 1 :stars 3}))))))
+      ;; We need Bob and Cid tokens to vote for Ana
+      (let [{bob-token :token} (register-and-login app "bob@example.com" "Bob")
+            {cid-token :token} (register-and-login app "cid@example.com" "Cid")
+            bob-auth (fn [req] (mock/header req "authorization" (str "Token " bob-token)))
+            cid-auth (fn [req] (mock/header req "authorization" (str "Token " cid-token)))]
+        
+        (is (= 201 (:status (app (-> (mock/request :post "/api/votes") bob-auth (mock/json-body {:pelada_id 1 :voter_id 2 :target_id 1 :stars 5}))))))
+        (is (= 201 (:status (app (-> (mock/request :post "/api/votes") cid-auth (mock/json-body {:pelada_id 1 :voter_id 3 :target_id 1 :stars 3})))))))
 
-      ;; list votes
+      ;; list votes (Ana viewing)
       (let [resp (app (-> (mock/request :get "/api/peladas/1/votes") auth))
             body (decode-body resp)]
         (is (= 200 (:status resp)))
@@ -62,38 +81,43 @@
   (let [app (-> th/*test-system* :app :handler)
         db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
-    ;; seed org, players, and teams
+    ;; seed org
     (sql/insert! ds :Organizations {:name "Org"})
-    (doseq [[i name email] [[1 "Ana" "ana@example.com"] [2 "Bob" "bob@example.com"] [3 "Cid" "cid@example.com"] [4 "Dan" "dan@example.com"]]]
-      (sql/insert! ds :Users {:name name :email email :password "p"})
-      (sql/insert! ds :OrganizationPlayers {:id i :organization_id 1 :user_id i}))
+    
+    ;; Register users
+    (let [{ana-token :token ana-user-id :user-id} (register-and-login app "ana@example.com" "Ana")
+          {bob-user-id :user-id} (register-and-login app "bob@example.com" "Bob")
+          {cid-user-id :user-id} (register-and-login app "cid@example.com" "Cid")
+          {dan-user-id :user-id} (register-and-login app "dan@example.com" "Dan")
+          auth (fn [req] (mock/header req "authorization" (str "Token " ana-token)))]
+      
+      (sql/insert! ds :OrganizationPlayers {:id 1 :organization_id 1 :user_id ana-user-id})
+      (sql/insert! ds :OrganizationPlayers {:id 2 :organization_id 1 :user_id bob-user-id})
+      (sql/insert! ds :OrganizationPlayers {:id 3 :organization_id 1 :user_id cid-user-id})
+      (sql/insert! ds :OrganizationPlayers {:id 4 :organization_id 1 :user_id dan-user-id})
 
-    ;; Create closed pelada with closed_at timestamp
-    (let [closed-at (str (.minus (Instant/now) (Duration/ofHours 1)))]
-      (sql/insert! ds :Peladas {:id 1 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at closed-at}))
+      ;; Create closed pelada with closed_at timestamp
+      (let [closed-at (str (.minus (Instant/now) (Duration/ofHours 1)))]
+        (sql/insert! ds :Peladas {:id 1 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at closed-at}))
 
-    ;; Create teams and add players
-    (sql/insert! ds :Teams {:id 1 :pelada_id 1 :name "Team A"})
-    (sql/insert! ds :Teams {:id 2 :pelada_id 1 :name "Team B"})
-    (sql/insert! ds :TeamPlayers {:team_id 1 :player_id 1})
-    (sql/insert! ds :TeamPlayers {:team_id 1 :player_id 2})
-    (sql/insert! ds :TeamPlayers {:team_id 2 :player_id 3})
-    (sql/insert! ds :TeamPlayers {:team_id 2 :player_id 4})
-
-    ;; auth-protected endpoints: login to get token
-    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Admin" :email "admin@example.com" :password "p"})))
-    (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "admin@example.com" :password "p"})))
-          token (:token (decode-body login))
-          auth (fn [req] (mock/header req "authorization" (str "Token " token)))]
+      ;; Create teams and add players
+      (sql/insert! ds :Teams {:id 1 :pelada_id 1 :name "Team A"})
+      (sql/insert! ds :Teams {:id 2 :pelada_id 1 :name "Team B"})
+      (sql/insert! ds :TeamPlayers {:team_id 1 :player_id 1})
+      (sql/insert! ds :TeamPlayers {:team_id 1 :player_id 2})
+      (sql/insert! ds :TeamPlayers {:team_id 2 :player_id 3})
+      (sql/insert! ds :TeamPlayers {:team_id 2 :player_id 4})
 
       (testing "Voting info before voting"
-        (let [resp (app (-> (mock/request :get "/api/peladas/1/voters/1/voting-info") auth))
+        (let [resp (app (-> (mock/request :get "/api/peladas/1/voting-info") auth))
               body (decode-body resp)]
           (is (= 200 (:status resp)))
           (is (true? (:can_vote body)))
           (is (false? (:has_voted body)))
+          (is (= 1 (:voter_player_id body)))
           ;; Player 1 should see players 2, 3, 4 (not themselves)
-          (is (= 3 (count (:eligible_players body))))))
+          (is (= 3 (count (:eligible_players body))))
+          (is (= "Bob" (:name (first (filter #(= 2 (:player_id %)) (:eligible_players body))))))))
 
       (testing "Batch cast votes"
         (let [votes [{:target_id 2 :stars 5}
@@ -107,7 +131,7 @@
           (is (= 3 (:votes_cast body)))))
 
       (testing "Voting info after voting"
-        (let [resp (app (-> (mock/request :get "/api/peladas/1/voters/1/voting-info") auth))
+        (let [resp (app (-> (mock/request :get "/api/peladas/1/voting-info") auth))
               body (decode-body resp)]
           (is (= 200 (:status resp)))
           (is (true? (:can_vote body)))
@@ -131,31 +155,29 @@
   (let [app (-> th/*test-system* :app :handler)
         db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
-    ;; seed org and players
+    ;; seed org
     (sql/insert! ds :Organizations {:name "Org"})
-    (doseq [[i name email] [[1 "Ana" "ana@example.com"] [2 "Bob" "bob@example.com"]]]
-      (sql/insert! ds :Users {:name name :email email :password "p"})
-      (sql/insert! ds :OrganizationPlayers {:id i :organization_id 1 :user_id i}))
-
-    ;; auth-protected endpoints: login to get token
-    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Admin" :email "admin@example.com" :password "p"})))
-    (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "admin@example.com" :password "p"})))
-          token (:token (decode-body login))
-          auth (fn [req] (mock/header req "authorization" (str "Token " token)))]
+    
+    (let [{ana-token :token ana-user-id :user-id} (register-and-login app "ana@example.com" "Ana")
+          {bob-user-id :user-id} (register-and-login app "bob@example.com" "Bob")
+          auth (fn [req] (mock/header req "authorization" (str "Token " ana-token)))]
+      
+      (sql/insert! ds :OrganizationPlayers {:id 1 :organization_id 1 :user_id ana-user-id})
+      (sql/insert! ds :OrganizationPlayers {:id 2 :organization_id 1 :user_id bob-user-id})
 
       (testing "Cannot vote on open pelada"
         (sql/insert! ds :Peladas {:id 2 :organization_id 1 :scheduled_at "2025-10-28" :status "open"})
-        (let [resp (app (-> (mock/request :post "/api/votes") auth (mock/json-body {:pelada_id 2 :voter_id 2 :target_id 1 :stars 5})))]
+        (let [resp (app (-> (mock/request :post "/api/votes") auth (mock/json-body {:pelada_id 2 :voter_id 1 :target_id 2 :stars 5})))]
           (is (= 400 (:status resp)))))
 
       (testing "Cannot vote after 24 hours"
         (let [twenty-five-hours-ago (str (.minus (Instant/now) (Duration/ofHours 25)))]
           (sql/insert! ds :Peladas {:id 3 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at twenty-five-hours-ago})
-          (let [resp (app (-> (mock/request :post "/api/votes") auth (mock/json-body {:pelada_id 3 :voter_id 2 :target_id 1 :stars 5})))]
+          (let [resp (app (-> (mock/request :post "/api/votes") auth (mock/json-body {:pelada_id 3 :voter_id 1 :target_id 2 :stars 5})))]
             (is (= 400 (:status resp))))))
 
       (testing "Can vote within 24 hours"
         (let [two-hours-ago (str (.minus (Instant/now) (Duration/ofHours 2)))]
           (sql/insert! ds :Peladas {:id 4 :organization_id 1 :scheduled_at "2025-10-28" :status "closed" :closed_at two-hours-ago})
-          (let [resp (app (-> (mock/request :post "/api/votes") auth (mock/json-body {:pelada_id 4 :voter_id 2 :target_id 1 :stars 5})))]
+          (let [resp (app (-> (mock/request :post "/api/votes") auth (mock/json-body {:pelada_id 4 :voter_id 1 :target_id 2 :stars 5})))]
             (is (= 201 (:status resp)))))))))

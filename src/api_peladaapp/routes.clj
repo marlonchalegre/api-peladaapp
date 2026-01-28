@@ -105,7 +105,7 @@
     (POST "/votes" [] handler.vote/cast)
     (POST "/peladas/:pelada_id/votes/batch" [] handler.vote/batch-cast)
     (GET "/peladas/:pelada_id/votes" [] handler.vote/list-by-pelada)
-    (GET "/peladas/:pelada_id/voters/:voter_id/voting-info" [] handler.vote/voting-info)
+    (GET "/peladas/:pelada_id/voting-info" [] handler.vote/voting-info)
     (GET "/peladas/:pelada_id/players/:player_id/normalized-score" [] handler.vote/normalize-score)))
 
 (defroutes api-auth

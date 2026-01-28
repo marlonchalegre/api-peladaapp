@@ -13,10 +13,15 @@
 (s/defschema BatchVoteResponse
   {:votes_cast s/Int})
 
+(s/defschema EligiblePlayer
+  {:player_id s/Int
+   :name s/Str})
+
 (s/defschema VotingInfoResponse
   {:can_vote s/Bool
    :has_voted s/Bool
-   :eligible_players [s/Int]
+   :eligible_players [EligiblePlayer]
+   (s/optional-key :voter_player_id) (s/maybe s/Int)
    (s/optional-key :message) s/Str})
 
 (s/defschema NormalizedScoreResponse
