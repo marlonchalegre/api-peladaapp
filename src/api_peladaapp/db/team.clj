@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.adapters.team :as adapter.team]
    [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
@@ -59,6 +60,22 @@
         result (jdbc/execute-one! db query)]
     (nil? result)))
 
+(s/defn validate-team-not-full :- (s/maybe s/Bool)
+  "Validates if the team has not reached the player limit"
+  [team-id db]
+  (let [query ["SELECT p.players_per_team as max_players, count(tp.player_id) as current_count
+                FROM Teams t
+                JOIN Peladas p ON p.id = t.pelada_id
+                LEFT JOIN TeamPlayers tp ON tp.team_id = t.id
+                WHERE t.id = ?
+                GROUP BY p.players_per_team"
+               team-id]
+        result (jdbc/execute-one! db query {:builder-fn next.jdbc.result-set/as-unqualified-lower-maps})]
+    (if (and (:max_players result) 
+             (>= (:current_count result) (:max_players result)))
+      false
+      true)))
+
 (s/defn add-player-to-team :- s/Int
   [team-id player-id db]
   (when-not (validate-player-belongs-to-pelada-org team-id player-id db)
@@ -73,6 +90,11 @@
                      :message "Player is already in a team for this pelada"
                      :team-id team-id
                      :player-id player-id})))
+  (when-not (validate-team-not-full team-id db)
+    (throw (ex-info "Team is full"
+                    {:type :validation-error
+                     :message "Team is full"
+                     :team-id team-id})))
   (-> (sql/insert! db :teamplayers {:team_id team-id :player_id player-id})
       affected-rows-count))
 
