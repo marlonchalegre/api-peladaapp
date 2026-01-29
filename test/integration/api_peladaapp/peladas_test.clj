@@ -39,26 +39,33 @@
         ;; Create pelada (user is admin, so can create)
       (let [resp (app (-> (mock/request :post "/api/peladas")
                           (mock/json-body {:organization_id org-id})
-                          auth))]
-        (is (= 201 (:status resp))))
+                          auth))
+            pelada-id (:id (decode-body resp))]
+        (is (= 201 (:status resp)))
 
         ;; Create teams (user is admin)
       (doseq [n ["A" "B" "C" "D"]]
         (is (= 201 (:status (app (-> (mock/request :post "/api/teams")
-                                     (mock/json-body {:pelada_id 1 :name n})
+                                     (mock/json-body {:pelada_id pelada-id :name n})
                                      auth))))))
 
+        ;; Verify empty teams are visible via full-details endpoint
+      (let [resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) auth))
+            body (decode-body resp)]
+        (is (= 200 (:status resp)))
+        (is (= 4 (count (:teams body)))))
+
         ;; Close attendance
-      (is (= 200 (:status (app (-> (mock/request :post "/api/peladas/1/close-attendance") auth)))))
+      (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth)))))
 
         ;; Begin pelada (user is admin, can begin)
-      (let [resp (app (-> (mock/request :post "/api/peladas/1/begin") auth))
+      (let [resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin")) auth))
             body (decode-body resp)]
         (is (= 200 (:status resp)))
         (is (pos? (:matches_created body))))
 
         ;; List matches (user is member, can view)
-      (let [resp (app (-> (mock/request :get "/api/peladas/1/matches") auth))
+      (let [resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/matches")) auth))
             body (decode-body resp)]
         (is (= 200 (:status resp)))
-        (is (seq body))))))
+        (is (seq body)))))))

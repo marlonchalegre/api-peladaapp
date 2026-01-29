@@ -145,7 +145,7 @@
                                             available-players)]
 
       {:pelada pelada
-       :teams (filter #(seq (:players %)) teams-with-players)
+       :teams teams-with-players
        :available_players available-players-with-users
        :attendance (filter (fn [a] (some #(= (:player_id a) (:id %)) all-org-players))
                            (map (fn [a] (assoc a :player (let [p (first (filter #(= (:player_id a) (:id %)) all-players-in-org))]
