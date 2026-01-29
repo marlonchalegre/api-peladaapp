@@ -18,11 +18,17 @@
                              WHERE op.id IN (" placeholders ")
                              GROUP BY op.id")]
                       player-ids)
-          db-results (jdbc/execute! db query {:builder-fn rs/as-unqualified-lower-maps})]
-      (reduce (fn [acc {:keys [id grade avg_stars]}]
-                (let [final-score (if avg_stars
-                                    (double (* 2.0 avg_stars))
-                                    (double (or grade 5.0)))]
-                  (assoc acc id final-score)))
-              {}
-              db-results))))
+          db-results (jdbc/execute! db query {:builder-fn rs/as-unqualified-lower-maps})
+          scores-map (reduce (fn [acc {:keys [id grade avg_stars]}]
+                               (let [final-score (if avg_stars
+                                                   (double (* 2.0 avg_stars))
+                                                   (double (or grade 5.0)))]
+                                 (assoc acc id final-score)))
+                             {}
+                             db-results)]
+      (reduce (fn [acc id]
+                (if (contains? acc id)
+                  acc
+                  (assoc acc id 5.0)))
+              scores-map
+              player-ids))))

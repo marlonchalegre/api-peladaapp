@@ -138,7 +138,7 @@
           ;; Total 4 players. T1 had 1 but it was cleared and re-randomized.
           ;; Both teams should be full now.
           (is (= 2 t1-count))
-          (is (= 2 t2-count))))
+          (is (= 2 t2-count)))))
 
     (testing "Spreads positions across teams (no clumping)"
       (jdbc/execute! ds ["DELETE FROM TeamPlayers"])
@@ -173,4 +173,28 @@
           ;; Verify T1 has exactly one of the GKs
           (is (= 1 (count (clojure.set/intersection t1-players #{1 2}))))
           ;; Verify T2 has exactly one of the GKs
-          (is (= 1 (count (clojure.set/intersection t2-players #{1 2}))))))))))
+          (is (= 1 (count (clojure.set/intersection t2-players #{1 2})))))))
+
+    (testing "Handles empty player list gracefully"
+      (let [player-ids []
+            pelada-id 1
+            players-per-team 6]
+        ;; Should not throw and do nothing
+        (is (nil? (logic.randomize/randomize-teams! pelada-id player-ids players-per-team ds)))))
+
+    (testing "Handles players with no position"
+      (jdbc/execute! ds ["DELETE FROM TeamPlayers"])
+      (jdbc/execute! ds ["DELETE FROM OrganizationPlayers"])
+      (jdbc/execute! ds ["DELETE FROM Users"])
+      (jdbc/execute! ds ["DELETE FROM Teams"])
+      (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (1, 1, 'T1')"])
+      
+      (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (1, 'NoPos', 'np@e.com', 'p', NULL)"])
+      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (1, 1, 1, 5.0)"])
+      
+      (let [player-ids [1]
+            pelada-id 1
+            players-per-team 2]
+        (logic.randomize/randomize-teams! pelada-id player-ids players-per-team ds)
+        (let [t1-players (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 1"])]
+          (is (= 1 (count t1-players))))))))

@@ -14,14 +14,19 @@
         (is (= 5.0 (get scores 1))))))
 
   (testing "Returns normalized score (x2) for player with votes"
-    ;; Mock DB returning average score 4.5
-    (with-redefs [jdbc/execute! (fn [_ _ _] [{:target_id 1 :score 4.5}])]
+    ;; Mock DB returning average stars 4.5
+    (with-redefs [jdbc/execute! (fn [_ _ _] [{:id 1 :avg_stars 4.5}])]
       (let [scores (score.logic/get-normalized-scores [1] {})]
         (is (= 9.0 (get scores 1))))))
 
   (testing "Returns mixed results: existing scores normalized, missing ones defaulted"
     ;; Mock DB returning score for player 1 only
-    (with-redefs [jdbc/execute! (fn [_ _ _] [{:target_id 1 :score 3.5}])]
+    (with-redefs [jdbc/execute! (fn [_ _ _] [{:id 1 :avg_stars 3.5}])]
       (let [scores (score.logic/get-normalized-scores [1 2] {})]
         (is (= 7.0 (get scores 1)))   ;; 3.5 * 2
-        (is (= 5.0 (get scores 2))))))) ;; Default
+        (is (= 5.0 (get scores 2))))))
+
+  (testing "Falls back to grade if no votes exist"
+    (with-redefs [jdbc/execute! (fn [_ _ _] [{:id 1 :grade 8.5 :avg_stars nil}])]
+      (let [scores (score.logic/get-normalized-scores [1] {})]
+        (is (= 8.5 (get scores 1))))))) ;; Default
