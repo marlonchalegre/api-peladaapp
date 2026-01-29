@@ -16,15 +16,16 @@
    "" 4})
 
 (defn- get-player-details
-  "Fetches grade and position for the given player-ids."
-  [player-ids db]
+  "Fetches grade and position for the given player-ids within the organization."
+  [player-ids org-id db]
   (if (empty? player-ids)
     []
     (jdbc/execute! db
                    (into [(str "SELECT op.id as id, op.grade as grade, u.position as position
                                 FROM OrganizationPlayers op
                                 JOIN Users u ON op.user_id = u.id
-                                WHERE op.id IN (" (str/join "," (repeat (count player-ids) "?")) ")")]
+                                WHERE op.organization_id = ? AND op.id IN (" (str/join "," (repeat (count player-ids) "?")) ")")
+                          org-id]
                          player-ids)
                    {:builder-fn rs/as-unqualified-lower-maps})))
 
@@ -36,12 +37,12 @@
 
 (defn- get-team-states
   "Calculates current score and player count for each team."
-  [teams players-per-team tx]
+  [teams players-per-team org-id tx]
   (mapv (fn [team]
           (let [current-players (db.team/list-team-players-by-pelada (:id team) tx)
                 ;; We need grades for current players to calculate score
                 current-grades (if (seq current-players)
-                                 (->> (get-player-details (map :player_id current-players) tx)
+                                 (->> (get-player-details (map :player_id current-players) org-id tx)
                                       (map :grade)
                                       (remove nil?)
                                       (reduce + 0))
@@ -71,14 +72,10 @@
     (jdbc/with-transaction [tx db]
       (let [pelada (db.pelada/get-pelada pelada-id tx)
             org-id (:organization-id pelada)
-            ;; Validate players belong to org
-            valid-player-ids (->> player-ids
-                                  (map #(db.player/get-org-player-by-user-id % org-id tx))
-                                  (map :id)
-                                  (remove nil?))
             
-            ;; Fetch details for sorting
-            players-details (get-player-details valid-player-ids tx)
+            ;; Fetch details for players (verifies they belong to org)
+            ;; We assume player-ids are OrganizationPlayer IDs (not User IDs)
+            players-details (get-player-details player-ids org-id tx)
             
             ;; Sort players: Position first, then Grade
             sorted-players (sort-players-for-balance players-details)
@@ -86,7 +83,7 @@
             teams (db.team/list-pelada-teams pelada-id tx)
             
             ;; Initial team states
-            initial-team-states (get-team-states teams players-per-team tx)]
+            initial-team-states (get-team-states teams players-per-team org-id tx)]
 
         ;; Distribute players
         (loop [players sorted-players
