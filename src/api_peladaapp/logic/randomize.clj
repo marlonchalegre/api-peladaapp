@@ -57,7 +57,8 @@
   (let [eligible-teams (filter #(< (:current-count %) (:max-players %)) team-states)]
     (if (empty? eligible-teams)
       [nil team-states] ;; No slots left
-      (let [best-team (apply min-key :current-score eligible-teams)
+      ;; Shuffle teams to randomise selection among teams with equal scores
+      (let [best-team (apply min-key :current-score (shuffle eligible-teams))
             updated-team (-> best-team
                              (update :current-score + (or (:grade player) 0))
                              (update :current-count inc))
@@ -77,7 +78,8 @@
             players-details (get-player-details player-ids org-id tx)
             
             ;; Sort players: Position first, then Grade
-            sorted-players (sort-players-for-balance players-details)
+            ;; Shuffle first to ensure random order for players with same position/score
+            sorted-players (sort-players-for-balance (shuffle players-details))
             
             teams (db.team/list-pelada-teams pelada-id tx)
             
