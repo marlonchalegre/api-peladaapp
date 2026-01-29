@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.logic.randomize :as logic.randomize]
    [api-peladaapp.test-helpers :as th]
+   [clojure.set]
    [clojure.test :refer [deftest is testing use-fixtures]]
    [next.jdbc :as jdbc]
    [next.jdbc.sql :as sql]))
@@ -137,4 +138,39 @@
           ;; Total 4 players. T1 had 1 but it was cleared and re-randomized.
           ;; Both teams should be full now.
           (is (= 2 t1-count))
-          (is (= 2 t2-count)))))))
+          (is (= 2 t2-count))))
+
+    (testing "Spreads positions across teams (no clumping)"
+      (jdbc/execute! ds ["DELETE FROM TeamPlayers"])
+      (jdbc/execute! ds ["DELETE FROM OrganizationPlayers"])
+      (jdbc/execute! ds ["DELETE FROM Users"])
+      (jdbc/execute! ds ["DELETE FROM Teams"])
+      
+      (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (1, 1, 'T1')"])
+      (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (2, 1, 'T2')"])
+      
+      ;; 2 Goalkeepers, 2 Defenders
+      (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (1, 'GK1', 'gk1@e.com', 'p', 'Goalkeeper')"])
+      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (1, 1, 1, 10.0)"])
+      (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (2, 'GK2', 'gk2@e.com', 'p', 'Goalkeeper')"])
+      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (2, 2, 1, 10.0)"])
+      
+      (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (3, 'DF1', 'df1@e.com', 'p', 'Defender')"])
+      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (3, 3, 1, 5.0)"])
+      (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (4, 'DF2', 'df2@e.com', 'p', 'Defender')"])
+      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (4, 4, 1, 5.0)"])
+
+      (let [player-ids [1 2 3 4]
+            pelada-id 1
+            players-per-team 2]
+        (logic.randomize/randomize-teams! pelada-id player-ids players-per-team ds)
+
+        ;; Each team MUST have 1 GK and 1 DF.
+        ;; If they clumped, one team would have 2 GKs.
+        (let [t1-players (set (map :TeamPlayers/player_id (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 1"])))
+              t2-players (set (map :TeamPlayers/player_id (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 2"])))]
+          
+          ;; Verify T1 has exactly one of the GKs
+          (is (= 1 (count (clojure.set/intersection t1-players #{1 2}))))
+          ;; Verify T2 has exactly one of the GKs
+          (is (= 1 (count (clojure.set/intersection t2-players #{1 2}))))))))))

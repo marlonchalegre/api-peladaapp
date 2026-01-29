@@ -35,33 +35,41 @@
            players))
 
 (defn- get-team-states
-  "Calculates current score and player count for each team."
+  "Calculates current score, player count and position distribution for each team."
   [teams players-per-team org-id tx]
   (mapv (fn [team]
           (let [current-players (db.team/list-team-players (:id team) tx)
-                ;; We need grades for current players to calculate score
-                current-grades (if (seq current-players)
-                                 (->> (get-player-details (map :player-id current-players) org-id tx)
-                                      (map :grade)
-                                      (remove nil?)
-                                      (reduce + 0))
-                                 0)]
+                ;; We need grades and positions for current players
+                details (if (seq current-players)
+                          (get-player-details (map :player-id current-players) org-id tx)
+                          [])
+                current-grades (->> details (map :grade) (remove nil?) (reduce + 0))
+                pos-counts (frequencies (map :position details))]
             {:id (:id team)
              :current-score current-grades
              :current-count (count current-players)
-             :max-players players-per-team}))
+             :max-players players-per-team
+             :positions pos-counts}))
         teams))
 
 (defn- assign-player-to-best-team
   [player team-states]
-  (let [eligible-teams (filter #(< (:current-count %) (:max-players %)) team-states)]
+  (let [pos (:position player)
+        eligible-teams (filter #(< (:current-count %) (:max-players %)) team-states)]
     (if (empty? eligible-teams)
       [nil team-states] ;; No slots left
-      ;; Shuffle teams to randomise selection among teams with equal scores
-      (let [best-team (apply min-key :current-score (shuffle eligible-teams))
+      ;; Priority: 
+      ;; 1. Team with fewest players of this position
+      ;; 2. Team with lowest total score
+      ;; Shuffle first to randomize among equals
+      (let [best-team (->> (shuffle eligible-teams)
+                           (sort-by (juxt #(get (:positions %) pos 0)
+                                          :current-score))
+                           first)
             updated-team (-> best-team
                              (update :current-score + (or (:grade player) 0))
-                             (update :current-count inc))
+                             (update :current-count inc)
+                             (update-in [:positions pos] (fnil inc 0)))
             updated-states (mapv #(if (= (:id %) (:id best-team)) updated-team %) team-states)]
         [(:id best-team) updated-states]))))
 
