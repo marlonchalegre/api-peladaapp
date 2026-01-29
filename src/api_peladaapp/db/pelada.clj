@@ -6,6 +6,7 @@
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.team :as db.team]
    [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.logic.score :as logic.score]
    [medley.core :as medley.core]
    [next.jdbc.sql :as sql]
    [schema.core :as s])
@@ -142,11 +143,18 @@
           available-players-with-users (map (fn [player]
                                               (assoc player :user (get users-map (:user-id player))
                                                      :attendance_status (get attendance-map (:id player) "pending")))
-                                            available-players)]
+                                            available-players)
+          
+          ;; Calculate normalized scores for all players in org
+          player-ids (map :id all-players-in-org)
+          scores-map (if (seq player-ids)
+                       (logic.score/get-normalized-scores player-ids db)
+                       {})]
 
       {:pelada pelada
        :teams teams-with-players
        :available_players available-players-with-users
+       :scores scores-map
        :attendance (filter (fn [a] (some #(= (:player_id a) (:id %)) all-org-players))
                            (map (fn [a] (assoc a :player (let [p (first (filter #(= (:player_id a) (:id %)) all-players-in-org))]
                                                            (assoc p :user (get users-map (:user-id p))))))
