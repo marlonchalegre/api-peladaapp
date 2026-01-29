@@ -29,4 +29,10 @@
             scores (logic.score/get-normalized-scores player-ids ds)]
         (is (= 8.0 (get scores 1)))
         (is (= 8.0 (get scores 2)))
-        (is (= 5.0 (get scores 3)))))))
+        (is (= 5.0 (get scores 3)))))
+
+    (testing "Falls back to player grade if no votes exist"
+      (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password) VALUES (4, 'Dani', 'dani@e.com', 'p')"])
+      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, organization_id, user_id, grade) VALUES (4, 1, 4, 7.5)"])
+      (let [scores (logic.score/get-normalized-scores [4] ds)]
+        (is (= 7.5 (get scores 4)))))))
