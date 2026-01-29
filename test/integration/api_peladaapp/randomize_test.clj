@@ -82,4 +82,28 @@
           ;; GK Team should have {1, 2}
           ;; Other Team should have {4, 3}
           (is (= #{1 2} gk-team))
-          (is (= #{3 4} other-team)))))))
+          (is (= #{3 4} other-team)))))
+
+    (testing "Respects player limit with many players"
+      (jdbc/execute! ds ["DELETE FROM TeamPlayers"])
+      (jdbc/execute! ds ["DELETE FROM OrganizationPlayers"])
+      (jdbc/execute! ds ["DELETE FROM Users"])
+      (jdbc/execute! ds ["DELETE FROM Teams"])
+      ;; Create 4 teams
+      (dotimes [i 4]
+        (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (?, 1, ?)" (inc i) (str "T" i)]))
+
+      ;; Create 20 players
+      (dotimes [i 20]
+        (let [id (inc i)]
+          (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (?, ?, ?, 'p', 'Midfielder')" id (str "P" i) (str "p" i "@e.com")])
+          (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (?, ?, 1, 5.0)" id id])))
+
+      (let [player-ids (range 1 21)
+            pelada-id 1
+            players-per-team 6]
+        (logic.randomize/randomize-teams! pelada-id player-ids players-per-team ds)
+
+        (let [team-counts (map :c (sql/query ds ["SELECT count(*) as c FROM TeamPlayers GROUP BY team_id"]))]
+          (is (every? #(<= % 6) team-counts))
+          (is (= 20 (reduce + team-counts))))))))

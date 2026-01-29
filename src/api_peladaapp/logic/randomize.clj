@@ -1,7 +1,6 @@
 (ns api-peladaapp.logic.randomize
   (:require
    [api-peladaapp.db.pelada :as db.pelada]
-   [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.team :as db.team]
    [clojure.string :as str]
    [next.jdbc :as jdbc]
