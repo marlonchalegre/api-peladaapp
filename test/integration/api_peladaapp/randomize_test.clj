@@ -106,4 +106,36 @@
 
         (let [team-counts (map :c (sql/query ds ["SELECT count(*) as c FROM TeamPlayers GROUP BY team_id"]))]
           (is (every? #(<= % 6) team-counts))
-          (is (= 20 (reduce + team-counts))))))))
+          (is (= 20 (reduce + team-counts))))))
+
+    (testing "Respects existing players in teams"
+      (jdbc/execute! ds ["DELETE FROM TeamPlayers"])
+      (jdbc/execute! ds ["DELETE FROM OrganizationPlayers"])
+      (jdbc/execute! ds ["DELETE FROM Users"])
+      (jdbc/execute! ds ["DELETE FROM Teams"])
+      
+      (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (1, 1, 'T1')"])
+      (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (2, 1, 'T2')"])
+      
+      ;; Create 4 players
+      (dotimes [i 4]
+        (let [id (inc i)]
+          (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (?, ?, ?, 'p', 'Midfielder')" id (str "P" i) (str "p" i "@e.com")])
+          (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (?, ?, 1, 5.0)" id id])))
+
+      ;; Pre-fill Team 1 with Player 1
+      (jdbc/execute! ds ["INSERT INTO TeamPlayers (team_id, player_id) VALUES (1, 1)"])
+
+      ;; Randomize remaining players [2, 3, 4]
+      (let [player-ids [2 3 4]
+            pelada-id 1
+            players-per-team 2]
+        (logic.randomize/randomize-teams! pelada-id player-ids players-per-team ds)
+
+        (let [t1-count (:c (first (sql/query ds ["SELECT count(*) as c FROM TeamPlayers WHERE team_id = 1"])))
+              t2-count (:c (first (sql/query ds ["SELECT count(*) as c FROM TeamPlayers WHERE team_id = 2"])))]
+          ;; Total 4 players. T1 had 1. 3 new.
+          ;; T1 should have 2 (max).
+          ;; T2 should have 2.
+          (is (= 2 t1-count))
+          (is (= 2 t2-count)))))))

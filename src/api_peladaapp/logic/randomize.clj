@@ -38,10 +38,10 @@
   "Calculates current score and player count for each team."
   [teams players-per-team org-id tx]
   (mapv (fn [team]
-          (let [current-players (db.team/list-team-players-by-pelada (:id team) tx)
+          (let [current-players (db.team/list-team-players (:id team) tx)
                 ;; We need grades for current players to calculate score
                 current-grades (if (seq current-players)
-                                 (->> (get-player-details (map :player_id current-players) org-id tx)
+                                 (->> (get-player-details (map :player-id current-players) org-id tx)
                                       (map :grade)
                                       (remove nil?)
                                       (reduce + 0))
