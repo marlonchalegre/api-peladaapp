@@ -70,6 +70,9 @@
   [pelada-id player-ids players-per-team db]
   (when (and players-per-team (pos? players-per-team) (seq player-ids))
     (jdbc/with-transaction [tx db]
+      ;; Clear existing assignments to allow full reshuffle
+      (db.team/clear-teams-players pelada-id tx)
+      
       (let [pelada (db.pelada/get-pelada pelada-id tx)
             org-id (:organization-id pelada)
             

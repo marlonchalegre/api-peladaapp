@@ -103,6 +103,13 @@
   (-> (sql/delete! db :teamplayers {:team_id team-id :player_id player-id})
       affected-rows-count))
 
+(s/defn clear-teams-players :- s/Int
+  "Removes all players from all teams of a specific pelada"
+  [pelada-id db]
+  (let [query "DELETE FROM TeamPlayers WHERE team_id IN (SELECT id FROM Teams WHERE pelada_id = ?)"
+        result (jdbc/execute! db [query pelada-id])]
+    (affected-rows-count (first result))))
+
 (s/defn list-team-players [team-id db]
   (->> (sql/find-by-keys db :teamplayers {:team_id team-id})
        (map unqualify-row)

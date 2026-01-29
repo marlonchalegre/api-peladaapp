@@ -126,16 +126,15 @@
       ;; Pre-fill Team 1 with Player 1
       (jdbc/execute! ds ["INSERT INTO TeamPlayers (team_id, player_id) VALUES (1, 1)"])
 
-      ;; Randomize remaining players [2, 3, 4]
-      (let [player-ids [2 3 4]
+      ;; Randomize ALL players [1, 2, 3, 4] to reshuffle
+      (let [player-ids [1 2 3 4]
             pelada-id 1
             players-per-team 2]
         (logic.randomize/randomize-teams! pelada-id player-ids players-per-team ds)
 
         (let [t1-count (:c (first (sql/query ds ["SELECT count(*) as c FROM TeamPlayers WHERE team_id = 1"])))
               t2-count (:c (first (sql/query ds ["SELECT count(*) as c FROM TeamPlayers WHERE team_id = 2"])))]
-          ;; Total 4 players. T1 had 1. 3 new.
-          ;; T1 should have 2 (max).
-          ;; T2 should have 2.
+          ;; Total 4 players. T1 had 1 but it was cleared and re-randomized.
+          ;; Both teams should be full now.
           (is (= 2 t1-count))
           (is (= 2 t2-count)))))))
