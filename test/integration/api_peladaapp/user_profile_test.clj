@@ -215,3 +215,32 @@
                                 (mock/header "authorization" (str "Token " token1))))
               get-body (decode-body get-resp)]
           (is (= "User 1" (:name get-body))))))))
+
+(deftest user-profile-update-position
+  (testing "User can update their position via profile endpoint"
+    (let [app (-> th/*test-system* :app :handler)
+          email "striker@example.com"
+          password "password123"]
+      ;; Register user
+      (let [reg (register! app {:name "Striker" :email email :password password})]
+        (is (= 201 (:status reg))))
+      ;; Login
+      (let [login (login! app {:email email :password password})
+            body (decode-body login)
+            token (:token body)
+            _ (is (= 200 (:status login)))
+            ;; Update position
+            resp (app (-> (mock/request :put "/api/user/1/profile")
+                          (mock/header "authorization" (str "Token " token))
+                          (mock/json-body {:position "Striker"})))
+            body (decode-body resp)
+
+            ;; Verify the update persisted
+            resp2 (app (-> (mock/request :get "/api/user/1")
+                           (mock/header "authorization" (str "Token " token))))
+            body2 (decode-body resp2)]
+
+        (is (= 200 (:status resp)))
+        (is (= "Striker" (:position body)))
+        (is (= 200 (:status resp2)))
+        (is (= "Striker" (:position body2)))))))

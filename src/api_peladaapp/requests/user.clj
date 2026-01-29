@@ -5,14 +5,17 @@
 (s/defschema CreateUserRequest
   {:name s/Str
    :email s/Str
-   :password s/Str})
+   :password s/Str
+   (s/optional-key :position) s/Str})
 
 (s/defschema UpdateUserRequest
   {(s/optional-key :name) s/Str
    (s/optional-key :email) s/Str
-   (s/optional-key :password) s/Str})
+   (s/optional-key :password) s/Str
+   (s/optional-key :position) s/Str})
 
 (s/defschema UpdateProfileRequest
   {(s/optional-key :name) s/Str
    (s/optional-key :email) s/Str
-   (s/optional-key :password) s/Str})
+   (s/optional-key :password) s/Str
+   (s/optional-key :position) s/Str})

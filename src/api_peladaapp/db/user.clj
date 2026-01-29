@@ -27,9 +27,9 @@
 
 (s/defn insert-user :- s/Int
   "Insert a user and return its generated id"
-  [{:keys [name email password]} :- models.user/NewUser
+  [{:keys [name email password position]} :- models.user/NewUser
    db]
-  (sql/insert! db :users {:name name :email email :password password})
+  (sql/insert! db :users {:name name :email email :password password :position position})
   (-> (find-user-by-email email db) :id int))
 
 (s/defn update-user :- s/Int
@@ -41,7 +41,8 @@
                    :users
                    (medley.core/assoc-some {} :name (:name user)
                                            :email (:email user)
-                                           :password (:password user))
+                                           :password (:password user)
+                                           :position (:position user))
                    {:id id})
       affected-rows-count))
 
@@ -65,17 +66,18 @@
       :count))
 
 (s/defn update-user-profile :- s/Int
-  "Update user profile (name, email, password only) in the database"
+  "Update user profile (name, email, password, position only) in the database"
   [id :- s/Int
    user :- models.user/User
    db]
-  ;; Only update allowed fields: name, email, password
+  ;; Only update allowed fields: name, email, password, position
   (-> (sql/update! db
                    :users
                    (medley.core/assoc-some {}
                                            :name (:name user)
                                            :email (:email user)
-                                           :password (:password user))
+                                           :password (:password user)
+                                           :position (:position user))
                    {:id id})
       affected-rows-count))
 

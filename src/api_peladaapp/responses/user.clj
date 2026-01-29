@@ -5,8 +5,10 @@
 (s/defschema UserResponse
   {:id s/Int
    :name s/Str
-   (s/optional-key :email) s/Str})
+   (s/optional-key :email) s/Str
+   (s/optional-key :position) s/Str})
 
 (s/defschema PublicUserResponse
   {:id s/Int
-   :name s/Str})
+   :name s/Str
+   (s/optional-key :position) s/Str})

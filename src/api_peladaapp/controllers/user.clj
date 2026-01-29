@@ -58,7 +58,7 @@
     (pagination/with-pagination-headers users total-count page per-page)))
 
 (s/defn update-user-profile :- models.user/User
-  "Update user profile - only allows updating name, email, and password. Score is protected."
+  "Update user profile - only allows updating name, email, password and position. Score is protected."
   [profile-data :- models.user/UserProfileUpdate
    user-id :- s/Int
    db]
@@ -71,7 +71,8 @@
             updated-user (cond-> base-user
                            (:name profile-data) (assoc :name (:name profile-data))
                            (:email profile-data) (assoc :email (:email profile-data))
-                           (:password profile-data) (assoc :password (:password profile-data)))
+                           (:password profile-data) (assoc :password (:password profile-data))
+                           (:position profile-data) (assoc :position (:position profile-data)))
             ;; Encrypt password if it was updated
             final-user (if (:password profile-data)
                          (logic.user/encrypt-password updated-user)
