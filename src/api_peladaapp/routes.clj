@@ -19,7 +19,10 @@
 
 (defroutes api-users
   (context "/api" []
-    (GET "/users" [] handler.user/list-all)))
+    (GET "/users" [] handler.user/list-all)
+    (GET "/user/:id" [id] handler.user/get-by-id)
+    (PUT "/user/:id/profile" [id] handler.user/update-profile)
+    (DELETE "/user/:id" [id] handler.user/delete)))
 
 (defroutes api-peladas
   (context "/api" []
@@ -85,7 +88,7 @@
   (GET "/api/health" [] handler.health/check))
 
 (defroutes gen-routes
-  (not-found "404"))
+  (not-found {:status 404 :body {:error "Backend route not found"}}))
 
 (defn any-access [_]
   true)

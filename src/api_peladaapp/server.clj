@@ -21,6 +21,7 @@
         status (case error-type
                  :authentication 401
                  :unauthorized 401
+                 :invalid-credentials 401
                  :forbidden 403
                  403)
         message (or (:message value)

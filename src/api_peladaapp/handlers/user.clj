@@ -35,3 +35,34 @@
       (responses/ok users-responses (:headers users-data)))
     (catch Exception e
       (exception/api-exception-handler e))))
+
+(defn get-by-id [request]
+  (try
+    (let [id (-> request :params :id parse-long)
+          db (-> request :database)]
+      (-> (controller.user/get-user id db)
+          adapter.user/model->response
+          responses/ok))
+    (catch Exception e
+      (exception/api-exception-handler e))))
+
+(defn update-profile [request]
+  (try
+    (let [id (-> request :params :id parse-long)
+          body (-> request :body)
+          db (-> request :database)]
+      (-> (adapter.user/update-profile-request->model body)
+          (controller.user/update-user-profile id db)
+          adapter.user/model->response
+          responses/ok))
+    (catch Exception e
+      (exception/api-exception-handler e))))
+
+(defn delete [request]
+  (try
+    (let [id (-> request :params :id parse-long)
+          db (-> request :database)]
+      (controller.user/delete-user id db)
+      (responses/no-content))
+    (catch Exception e
+      (exception/api-exception-handler e))))

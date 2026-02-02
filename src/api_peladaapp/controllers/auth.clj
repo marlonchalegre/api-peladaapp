@@ -17,7 +17,7 @@
         secret (config/get-key :jwt-secret)
         db-pass (:password user-db)]
     (when (nil? user-db)
-      (throw (ex-info nil {:type :not-found :message "User not found"})))
+      (throw (ex-info nil {:type :invalid-credentials :message "Invalid credentials"})))
     (when (or (nil? password) (nil? db-pass) (not (hashers/check password db-pass)))
       (throw (ex-info nil {:type :invalid-credentials :message "Invalid credentials"})))
     (let [admin-orgs (map :organization-id (db.admin/list-organizations-by-admin (:id user-db) db))
