@@ -85,10 +85,13 @@
       (let [login-req (-> (mock/request :post "/auth/login")
                           (mock/json-body {:email "nonexistent@example.com"
                                            :password "somepass"}))
-            login-resp (app login-req)]
-        ;; Should not be 401 (might be 400 or 404 for bad credentials)
-        (is (not= 401 (:status login-resp))
-            "Login endpoint should be public"))
+            login-resp (app login-req)
+            body (th/decode-body login-resp)]
+        ;; Should be 401 now (invalid credentials), but with our specific message
+        (is (= 401 (:status login-resp))
+            "Login endpoint should return 401 for bad credentials")
+        (is (= "Invalid credentials" (:message body))
+            "Login should return 'Invalid credentials' message, not 'Authentication required'"))
 
       ;; Register endpoint should be accessible
       (let [register-req (-> (mock/request :post "/auth/register")
@@ -96,9 +99,9 @@
                                               :email "new@example.com"
                                               :password "newpass123"}))
             register-resp (app register-req)]
-        ;; Should not be 401
-        (is (not= 401 (:status register-resp))
-            "Register endpoint should be public")))))
+        ;; Should be 201 Created
+        (is (= 201 (:status register-resp))
+            "Register endpoint should be public and return 201")))))
 
 (deftest missing-authorization-header-format
   (testing "Requests with malformed Authorization header return 401"

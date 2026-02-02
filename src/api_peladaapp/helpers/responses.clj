@@ -10,7 +10,12 @@
            (nil? d) {:error "bad-request"}
            (string? d) {:message d}
            :else d)})
-(defn unauthorized [d] {:status 401 :body (or d {:error "unauthorized"})})
+(defn unauthorized [d]
+  {:status 401
+   :body (cond
+           (nil? d) {:error "unauthorized"}
+           (string? d) {:message d}
+           :else d)})
 (defn forbidden [d]
   {:status 403
    :body (cond
@@ -24,6 +29,8 @@
            (nil? d) {:error "not-found"}
            (string? d) {:message d}
            :else d)})
+(defn no-content [] {:status 204 :body nil})
+
 (defn deleted [_] {:status 200 :body {}})
 (defn updated [d]
   {:status 200

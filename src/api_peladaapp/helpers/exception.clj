@@ -1,7 +1,7 @@
 (ns api-peladaapp.helpers.exception
   (:require
    [api-peladaapp.helpers.responses :refer [bad-request forbidden not-found
-                                            server-error]]))
+                                            server-error unauthorized]]))
 
 (defn- exception->map [^Throwable e]
   (let [sw (java.io.StringWriter.)
@@ -17,7 +17,7 @@
     (case (:type data)
       :already-exist       (bad-request (:message data))
       :not-found           (not-found (:message data))
-      :invalid-credentials (bad-request (:message data))
+      :invalid-credentials (unauthorized (:message data))
       :bad-request         (bad-request (:message data))
       :validation-error    (bad-request (:message data))
       :forbidden           (forbidden (:message data))

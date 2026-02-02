@@ -41,4 +41,10 @@
                             :password (hashers/encrypt "s3cret")})
     (let [resp (app (-> (mock/request :post "/auth/login")
                         (mock/json-body {:email "john@example.com" :password "bad"})))]
-      (is (= 400 (:status resp))))))
+      (is (= 401 (:status resp))))))
+
+(deftest login-fails-with-non-existent-user
+  (let [app (-> th/*test-system* :app :handler)]
+    (let [resp (app (-> (mock/request :post "/auth/login")
+                        (mock/json-body {:email "ghost@example.com" :password "any"})))]
+      (is (= 401 (:status resp))))))
