@@ -15,20 +15,6 @@
              created))
        (catch Exception e (exception/api-exception-handler e))))
 
-(defn get-by-id [request]
-  (try (let [db (:database request)
-             id (get-in request [:params :id])]
-         (-> (controller.admin/get-organization-admin id db)
-             adapter.admin/model->response
-             ok))
-       (catch Exception e (exception/api-exception-handler e))))
-
-(defn remove-admin [request]
-  (try (let [db (:database request)
-             id (get-in request [:params :id])]
-         (deleted (controller.admin/remove-organization-admin id db)))
-       (catch Exception e (exception/api-exception-handler e))))
-
 (defn remove-admin-by-org-and-user [request]
   (try (let [db (:database request)
              org-id (Integer/parseInt (str (get-in request [:params :organization_id])))
@@ -40,17 +26,4 @@
   (try (let [db (:database request)
              org-id (Integer/parseInt (str (get-in request [:params :organization_id])))]
          (ok (map adapter.admin/model->response (controller.admin/list-organization-admins org-id db))))
-       (catch Exception e (exception/api-exception-handler e))))
-
-(defn list-by-user [request]
-  (try (let [db (:database request)
-             user-id (Integer/parseInt (str (get-in request [:params :user_id])))]
-         (ok (map adapter.admin/model->response (controller.admin/list-user-admin-organizations user-id db))))
-       (catch Exception e (exception/api-exception-handler e))))
-
-(defn check-is-admin [request]
-  (try (let [db (:database request)
-             org-id (Integer/parseInt (str (get-in request [:params :organization_id])))
-             user-id (Integer/parseInt (str (get-in request [:params :user_id])))]
-         (ok {:is_admin (controller.admin/is-user-admin-of-organization? user-id org-id db)}))
        (catch Exception e (exception/api-exception-handler e))))

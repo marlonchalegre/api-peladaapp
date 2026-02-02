@@ -54,8 +54,7 @@
         ;; 3. User 2 creates their own organization
         (let [resp (app (-> (mock/request :post "/api/organizations")
                             (mock/json-body {:name "Org 2"})
-                            auth2))
-              org2-id (:id (th/decode-body resp))]
+                            auth2))]
           (is (= 201 (:status resp)))
 
           ;; Verify User 2 sees both organizations

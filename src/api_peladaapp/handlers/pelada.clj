@@ -4,7 +4,7 @@
    [api-peladaapp.controllers.pelada :as controller.pelada]
    [api-peladaapp.helpers.exception :as exception]
    [api-peladaapp.helpers.pagination :as pagination]
-   [api-peladaapp.helpers.responses :refer [created deleted ok updated]]
+   [api-peladaapp.helpers.responses :refer [created deleted ok]]
    [api-peladaapp.logic.authorization :as auth]))
 
 (defn create [request]
@@ -20,19 +20,6 @@
              created))
        (catch Exception e (exception/api-exception-handler e))))
 
-(defn get-by-id [request]
-  (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
-             user-id (auth/get-user-id-from-request request)
-             pelada (controller.pelada/get-pelada id db)
-             org-id (:organization-id pelada)]
-         ;; Members can view peladas
-         (auth/require-organization-member! user-id org-id db)
-         (-> pelada
-             adapter.pelada/model->response
-             ok))
-       (catch Exception e (exception/api-exception-handler e))))
-
 (defn get-full-details [request]
   (try (let [db (:database request)
              id (Integer/parseInt (str (get-in request [:params :id])))
@@ -44,20 +31,6 @@
          (auth/require-organization-member! user-id org-id db)
          ;; Returning as is (map) since it's a complex response defined in controller return type
          (ok pelada-data))
-       (catch Exception e (exception/api-exception-handler e))))
-
-(defn update-by-id [request]
-  (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
-             body (:body request)
-             user-id (auth/get-user-id-from-request request)
-             pelada (controller.pelada/get-pelada id db)
-             org-id (:organization-id pelada)]
-         ;; Only admins can update peladas
-         (auth/require-organization-admin! user-id org-id db)
-         (-> (controller.pelada/update-pelada id (adapter.pelada/update-request->model body) db)
-             adapter.pelada/model->response
-             updated))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn delete [request]

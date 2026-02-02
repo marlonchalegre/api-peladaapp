@@ -3,7 +3,7 @@
    [api-peladaapp.adapters.player :as adapter.player]
    [api-peladaapp.controllers.player :as controller.player]
    [api-peladaapp.helpers.exception :as exception]
-   [api-peladaapp.helpers.responses :refer [created deleted ok updated]]))
+   [api-peladaapp.helpers.responses :refer [created deleted ok]]))
 
 (defn create [request]
   (try (let [db (:database request)
@@ -12,23 +12,6 @@
          (-> (controller.player/create-player player db)
              adapter.player/model->response
              created))
-       (catch Exception e (exception/api-exception-handler e))))
-
-(defn get-by-id [request]
-  (try (let [db (:database request)
-             id (get-in request [:params :id])]
-         (-> (controller.player/get-player id db)
-             adapter.player/model->response
-             ok))
-       (catch Exception e (exception/api-exception-handler e))))
-
-(defn update-by-id [request]
-  (try (let [db (:database request)
-             id (get-in request [:params :id])
-             body (:body request)]
-         (-> (controller.player/update-player id (adapter.player/update-request->model body) db)
-             adapter.player/model->response
-             updated))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn delete [request]
