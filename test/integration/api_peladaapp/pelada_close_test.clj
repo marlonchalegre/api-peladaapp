@@ -68,4 +68,11 @@
 
         (let [pelada (pelada.controller/get-pelada pelada-id ds)]
           (is (= "closed" (:status pelada))) ;; Database status is still closed
-          (is (not (nil? (:closed-at pelada)))))))))
+          (is (not (nil? (:closed-at pelada)))))
+
+        (let [matches (jdbc/execute! ds ["SELECT * FROM matches WHERE pelada_id = ?" pelada-id])]
+          (is (seq matches))
+          (doseq [m matches]
+            (is (= "finished" (:Matches/status m)))
+            (is (= 0 (:Matches/home_score m)))
+            (is (= 0 (:Matches/away_score m)))))))))

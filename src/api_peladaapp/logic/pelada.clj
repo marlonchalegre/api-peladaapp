@@ -16,6 +16,15 @@
     (throw (ex-info nil {:type :bad-request
                          :message "Pelada already started or closed"}))))
 
+(defn ensure-running
+  "Ensure pelada is currently running. Returns pelada or throws with :bad-request."
+  [pelada]
+  (if (= "running" (:status pelada))
+    pelada
+    (throw (ex-info "Pelada is not running"
+                    {:type :bad-request
+                     :message "Action only allowed while pelada is running"}))))
+
 (defn ensure-schedulable-team-count
   "Ensure there are enough teams and team count is even. Returns team ids."
   [team-ids]

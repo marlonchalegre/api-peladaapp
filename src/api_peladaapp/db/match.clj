@@ -1,6 +1,7 @@
 (ns api-peladaapp.db.match
   (:require
    [api-peladaapp.adapters.match :as adapter.match]
+   [next.jdbc :as jdbc]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
@@ -43,7 +44,7 @@
   (-> (sql/update! db :matches {:sequence sequence} {:id id})
       affected-rows-count))
 
-(s/defn finish-all-by-pelada :- s/Int
+(s/defn finish-all-by-pelada
+  "Finish all matches for a pelada. Matches not yet finished are closed as 0x0 draws."
   [pelada-id :- s/Int db]
-  (-> (sql/update! db :matches {:status "finished"} {:pelada_id pelada-id})
-      affected-rows-count))
+  (jdbc/execute! db ["UPDATE matches SET status = 'finished', home_score = 0, away_score = 0 WHERE pelada_id = ? AND status != 'finished'" pelada-id]))
