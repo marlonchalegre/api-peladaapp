@@ -25,6 +25,16 @@
          (catch Exception e
            (exception/api-exception-handler e)))))
 
+(defn first-access-handler
+  [request]
+  (let [body (-> request :body)
+        db (-> request :database)]
+    (try (let [{:keys [token user]} (controllers.auth/first-access body db)]
+           (-> (adapters.credential/model->response token user)
+               ok))
+         (catch Exception e
+           (exception/api-exception-handler e)))))
+
 ;; Access Level Handlers
 
 (defn authenticated-access

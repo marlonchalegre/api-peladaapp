@@ -24,3 +24,28 @@
           user-with-orgs (assoc user-db :admin-orgs admin-orgs)]
       {:token (logic.user/build-token user-with-orgs secret)
        :user user-db})))
+
+(s/defn first-access :- {:token s/Str :user models.user/User}
+  "Complete registration for an invited user (who has no password set)."
+  [{:keys [email name password position]} :- models.user/NewUser
+   db]
+  (let [user-db (db.user/find-user-by-email email db)]
+    (cond
+      (nil? user-db)
+      (throw (ex-info "User not found. Please ask for an invitation first."
+                      {:type :not-found :message "User not found"}))
+
+      (some? (:password user-db))
+      (throw (ex-info "User already has a password. Please use login."
+                      {:type :already-exist :message "User already registered"}))
+
+      :else
+      (let [updated-user (as-> {:email email :name name :password password :position position} $
+                           (logic.user/encrypt-password $)
+                           (do (db.user/update-user (:id user-db) $ db)
+                               (db.user/find-user-by-id (:id user-db) db)))
+            secret (config/get-key :jwt-secret)
+            admin-orgs (map :organization-id (db.admin/list-organizations-by-admin (:id user-db) db))
+            user-with-orgs (assoc updated-user :admin-orgs admin-orgs)]
+        {:token (logic.user/build-token user-with-orgs secret)
+         :user updated-user}))))

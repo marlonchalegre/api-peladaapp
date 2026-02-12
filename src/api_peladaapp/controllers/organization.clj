@@ -2,10 +2,98 @@
   (:require
    [api-peladaapp.db.admin :as db.admin]
    [api-peladaapp.db.organization :as db.organization]
+   [api-peladaapp.db.organization-invitation :as db.invitation]
    [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.models.organization :as models.organization]
+   [next.jdbc :as jdbc]
    [schema.core :as s]))
+
+(defn- generate-token []
+  (str (java.util.UUID/randomUUID)))
+
+(s/defn get-or-create-organization-link :- s/Str
+  "Returns the existing public link token or creates a new one"
+  [organization-id :- s/Int
+   user-id :- s/Int
+   db]
+  (if-let [existing (db.invitation/find-link-invitation-by-org organization-id db)]
+    (:token existing)
+    (let [token (generate-token)]
+      (db.invitation/insert-invitation {:organization-id organization-id
+                                        :token token
+                                        :invited-by user-id}
+                                       db)
+      token)))
+
+(s/defn invite-player
+  "Invites a player to an organization. 
+   If user doesn't exist, creates a partial user.
+   If user is not in org, adds them."
+  [organization-id :- s/Int
+   email :- s/Str
+   invited-by :- (s/maybe s/Int)
+   db]
+  (let [user (db.user/find-user-by-email email db)
+        user-id (if user
+                  (:id user)
+                  (db.user/insert-partial-user email db))
+        is-in-org? (boolean (db.player/get-org-player-by-user-id user-id organization-id db))]
+    (when-not is-in-org?
+      (db.player/insert-player {:user-id user-id :organization-id organization-id :grade 5.0} db))
+    ;; Record personal invitation
+    (db.invitation/insert-invitation {:organization-id organization-id
+                                      :email email
+                                      :token (generate-token)
+                                      :invited-by invited-by}
+                                     db)
+    {:user-id user-id
+     :email email
+     :is-new-user (nil? user)
+     :organization-id organization-id}))
+
+(s/defn list-pending-invitations
+  [email :- s/Str db]
+  (db.invitation/list-pending-invitations-by-email email db))
+
+(s/defn get-invitation-by-token
+  [token :- s/Str db]
+  (if-let [inv (db.invitation/get-invitation-by-token token db)]
+    inv
+    (throw (ex-info "Invitation not found" {:type :not-found :message "Invitation not found"}))))
+
+(s/defn accept-invitation
+  [token :- s/Str user-id :- s/Int db]
+  (let [inv (db.invitation/get-invitation-by-token token db)]
+    (if (nil? inv)
+      (throw (ex-info "Invitation not found" {:type :not-found}))
+      (let [org-id (:organization_id inv)
+            is-in-org? (boolean (db.player/get-org-player-by-user-id user-id org-id db))
+            user (db.user/find-user-by-id user-id db)]
+        
+        ;; Security check: if invitation has email, user email must match
+        (when (and (:email inv) (not= (:email inv) (:email user)))
+          (throw (ex-info "Invitation does not belong to this user" 
+                          {:type :forbidden :message "This invitation was sent to another email address."})))
+
+        (jdbc/with-transaction [tx db]
+          (when-not is-in-org?
+            (jdbc/execute! tx ["INSERT INTO OrganizationPlayers (user_id, organization_id, grade) VALUES (?, ?, 5.0)"
+                               user-id org-id]))
+          (when (:email inv) ;; Only personal invitations change status
+            (db.invitation/update-invitation-status (:id inv) "accepted" tx)))
+        {:organization-id org-id}))))
+
+(s/defn list-organization-invitations
+  [organization-id :- s/Int db]
+  (db.invitation/list-invitations-by-organization organization-id db))
+
+(s/defn revoke-invitation
+  [invitation-id :- s/Int organization-id :- s/Int db]
+  (let [inv (db.invitation/get-invitation-by-id invitation-id db)]
+    (when (and inv (= (:organization_id inv) organization-id))
+      (db.invitation/delete-invitation invitation-id db))))
 
 (s/defn create-organization :- models.organization/Organization
   [org :- models.organization/Organization

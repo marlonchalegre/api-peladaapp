@@ -20,9 +20,9 @@
 (defroutes api-users
   (context "/api" []
     (GET "/users" [] handler.user/list-all)
-    (GET "/user/:id" [id] handler.user/get-by-id)
-    (PUT "/user/:id/profile" [id] handler.user/update-profile)
-    (DELETE "/user/:id" [id] handler.user/delete)))
+    (GET "/user/:id" [] handler.user/get-by-id)
+    (PUT "/user/:id/profile" [] handler.user/update-profile)
+    (DELETE "/user/:id" [] handler.user/delete)))
 
 (defroutes api-peladas
   (context "/api" []
@@ -66,7 +66,13 @@
     (GET "/organizations/:id" [] handler.organization/get-by-id)
     (DELETE "/organizations/:id" [] handler.organization/delete)
     (GET "/organizations/:id/statistics" [] handler.organization/get-statistics)
-    (GET "/users/:user_id/organizations" [] handler.organization/list-by-user)))
+    (POST "/organizations/:id/invite" [] handler.organization/invite)
+    (GET "/organizations/:id/invite-link" [] handler.organization/get-invite-link)
+    (GET "/organizations/:id/invitations" [] handler.organization/list-invitations)
+    (DELETE "/organizations/:id/invitations/:invitation_id" [] handler.organization/revoke-invitation)
+    (GET "/users/:user_id/organizations" [] handler.organization/list-by-user)
+    (GET "/invitations/pending" [] handler.organization/list-pending-invitations)
+    (POST "/invitations/:token/accept" [token] handler.organization/accept-invitation)))
 
 (defroutes api-admins
   (context "/api" []
@@ -82,7 +88,9 @@
 (defroutes api-auth
   (context "/auth" []
     (POST "/login" [] auth/auth-handler)
-    (POST "/register" [] handler.user/create)))
+    (POST "/first-access" [] auth/first-access-handler)
+    (POST "/register" [] handler.user/create)
+    (GET "/invitations/:token" [token] handler.organization/get-invitation-info)))
 
 (defroutes api-health
   (GET "/api/health" [] handler.health/check))

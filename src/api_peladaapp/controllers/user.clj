@@ -9,10 +9,21 @@
 (s/defn create-user :- models.user/User
   [user :- models.user/NewUser
    db]
-  (let [user? (-> (db.user/find-user-by-email (:email user) db)
-                  some?)]
-    (if user?
+  (let [existing-user (db.user/find-user-by-email (:email user) db)]
+    (cond
+      ;; User exists and has a password -> Error
+      (and existing-user (:password existing-user))
       (throw (ex-info nil {:type :already-exist :message "User already exists"}))
+
+      ;; User exists but has no password (partial) -> Update/Claim
+      existing-user
+      (as-> user $
+        (logic.user/encrypt-password $)
+        (do (db.user/update-user (:id existing-user) $ db)
+            (assoc user :id (:id existing-user))))
+
+      ;; User does not exist -> Insert
+      :else
       (as-> user $
         (logic.user/encrypt-password $)
         (db.user/insert-user $ db)

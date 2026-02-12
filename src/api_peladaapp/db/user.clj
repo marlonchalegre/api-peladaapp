@@ -32,6 +32,13 @@
   (sql/insert! db :users {:name name :email email :password password :position position})
   (-> (find-user-by-email email db) :id int))
 
+(s/defn insert-partial-user :- s/Int
+  "Insert a user with only email and return its generated id"
+  [email :- s/Str
+   db]
+  (sql/insert! db :users {:email email})
+  (-> (find-user-by-email email db) :id int))
+
 (s/defn update-user :- s/Int
   "Update a user in the database"
   [id :- s/Int

@@ -26,7 +26,8 @@
    "resources/migrations/20260130000000-performance_indexes.up.sql"
    "resources/migrations/20260130010000-create_pelada_player_stats.up.sql"
    "resources/migrations/20260130020000-optimize_votes_index.up.sql"
-   "resources/migrations/20260130030000-add_position_to_users.up.sql"])
+   "resources/migrations/20260130030000-add_position_to_users.up.sql"
+   "resources/migrations/20260211000000-organization_invitations.up.sql"])
 
 (defn migrate! [db-file]
   (let [ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
