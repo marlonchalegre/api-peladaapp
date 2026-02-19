@@ -36,6 +36,19 @@
     (catch Exception e
       (exception/api-exception-handler e))))
 
+(defn search [request]
+  (try
+    (let [db (-> request :database)
+          query-params (:query-params request)
+          query (get query-params "q" "")
+          pagination (pagination/parse-pagination-params query-params)
+          users-data (controller.user/search-users db query pagination)
+          users-models (:data users-data)
+          users-responses (map adapter.user/model->response users-models)]
+      (responses/ok users-responses (:headers users-data)))
+    (catch Exception e
+      (exception/api-exception-handler e))))
+
 (defn get-by-id [request]
   (try
     (let [id (-> request :params :id parse-long)

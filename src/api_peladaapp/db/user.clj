@@ -72,6 +72,21 @@
       first
       :count))
 
+(s/defn search-users :- [models.user/User]
+  "Search users by name or email with pagination"
+  [db query offset limit]
+  (let [q (str "%" query "%")]
+    (->> (sql/query db ["SELECT * FROM users WHERE name ILIKE ? OR email ILIKE ? ORDER BY name LIMIT ? OFFSET ?" q q limit offset])
+         (map adapter.user/db->model))))
+
+(s/defn count-searched-users :- s/Int
+  "Count users matching the search query"
+  [db query]
+  (let [q (str "%" query "%")]
+    (-> (sql/query db ["SELECT count(*) as count FROM users WHERE name ILIKE ? OR email ILIKE ?" q q])
+        first
+        :count)))
+
 (s/defn update-user-profile :- s/Int
   "Update user profile (name, email, password, position only) in the database"
   [id :- s/Int

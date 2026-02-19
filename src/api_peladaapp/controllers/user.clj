@@ -68,6 +68,15 @@
         total-count (db.user/count-users db)]
     (pagination/with-pagination-headers users total-count page per-page)))
 
+(s/defn search-users
+  [db query pagination]
+  (let [page (or (:page pagination) 1)
+        per-page (or (:per-page pagination) 20)
+        offset (* (- page 1) per-page)
+        users (db.user/search-users db query offset per-page)
+        total-count (db.user/count-searched-users db query)]
+    (pagination/with-pagination-headers users total-count page per-page)))
+
 (s/defn update-user-profile :- models.user/User
   "Update user profile - only allows updating name, email, password and position. Score is protected."
   [profile-data :- models.user/UserProfileUpdate

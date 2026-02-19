@@ -20,6 +20,7 @@
 (defroutes api-users
   (context "/api" []
     (GET "/users" [] handler.user/list-all)
+    (GET "/users/search" [] handler.user/search)
     (GET "/user/:id" [] handler.user/get-by-id)
     (PUT "/user/:id/profile" [] handler.user/update-profile)
     (DELETE "/user/:id" [] handler.user/delete)))
