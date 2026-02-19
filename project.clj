@@ -19,6 +19,7 @@
                  [prismatic/schema "1.4.1"]
                  [com.stuartsierra/component "1.1.0"]
                  [com.zaxxer/HikariCP  "6.2.1"]
+                 [org.slf4j/slf4j-simple "2.0.16"]
                  [org.clojure/math.combinatorics "0.3.0"]]
   :plugins [[lein-ancient "1.0.0-RC3"]
             [lein-ring "0.12.6"]

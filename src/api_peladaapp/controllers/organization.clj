@@ -99,12 +99,13 @@
   [org :- models.organization/Organization
    user-id :- (s/maybe s/Int)
    db]
-  (let [id (db.organization/insert-organization org db)]
-    ;; Add creator as admin and player (if user-id is provided)
-    (when user-id
-      (db.admin/insert-organization-admin {:organization-id id :user-id user-id} db)
-      (db.player/insert-player {:user-id user-id :organization-id id :grade 5.0} db))
-    (db.organization/get-organization id db)))
+  (jdbc/with-transaction [tx db]
+    (let [id (db.organization/insert-organization org tx)]
+      ;; Add creator as admin and player (if user-id is provided)
+      (when user-id
+        (db.admin/insert-organization-admin {:organization-id id :user-id user-id} tx)
+        (db.player/insert-player {:user-id user-id :organization-id id :grade 5.0} tx))
+      (db.organization/get-organization id tx))))
 
 (s/defn get-organization :- models.organization/Organization
   [id :- s/Int

@@ -73,7 +73,7 @@
     (DELETE "/organizations/:id/invitations/:invitation_id" [] handler.organization/revoke-invitation)
     (GET "/users/:user_id/organizations" [] handler.organization/list-by-user)
     (GET "/invitations/pending" [] handler.organization/list-pending-invitations)
-    (POST "/invitations/:token/accept" [token] handler.organization/accept-invitation)))
+    (POST "/invitations/:token/accept" [_] handler.organization/accept-invitation)))
 
 (defroutes api-admins
   (context "/api" []
@@ -91,7 +91,7 @@
     (POST "/login" [] auth/auth-handler)
     (POST "/first-access" [] auth/first-access-handler)
     (POST "/register" [] handler.user/create)
-    (GET "/invitations/:token" [token] handler.organization/get-invitation-info)))
+    (GET "/invitations/:token" [_] handler.organization/get-invitation-info)))
 
 (defroutes api-health
   (GET "/api/health" [] handler.health/check))

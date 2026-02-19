@@ -57,7 +57,9 @@
          (auth/require-organization-admin! user-id organization-id db)
          (if (str/blank? email)
            (bad-request "Email is required")
-           (ok (controller.organization/invite-player organization-id email user-id db))))
+           (-> (controller.organization/invite-player organization-id email user-id db)
+               adapter.organization/invite-player-response->frontend
+               ok)))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn get-invite-link [request]
@@ -85,7 +87,9 @@
   (try (let [db (:database request)
              user-id (auth/get-user-id-from-request request)
              token (get-in request [:params :token])]
-         (ok (controller.organization/accept-invitation token user-id db)))
+         (-> (controller.organization/accept-invitation token user-id db)
+             adapter.organization/accept-invitation-response->frontend
+             ok))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn list-invitations [request]

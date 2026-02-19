@@ -15,5 +15,6 @@ COPY . .
 # Expose backend port
 EXPOSE 8000
 
-# Run Ring server with auto-reload
-CMD ["lein", "ring", "server-headless"]
+# Run the main function
+ENV JVM_OPTS="-Dorg.slf4j.simpleLogger.defaultLogLevel=debug"
+CMD ["lein", "run"]

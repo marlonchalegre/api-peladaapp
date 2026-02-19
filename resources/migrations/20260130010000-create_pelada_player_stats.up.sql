@@ -38,7 +38,7 @@ BEGIN
     "assists" = "assists" - CASE WHEN OLD.event_type = 'assist' THEN 1 ELSE 0 END,
     "own_goals" = "own_goals" - CASE WHEN OLD.event_type = 'own_goal' THEN 1 ELSE 0 END
   WHERE "player_id" = OLD.player_id
-    AND "pelada_id" = (SELECT pelada_id FROM "Matches" WHERE id = OLD.match_id);
+    AND "pelada_id" = (SELECT "pelada_id" FROM "Matches" WHERE id = OLD.match_id);
 END;
 --;;
 -- Initial Population (Backfill)

@@ -7,6 +7,6 @@ CREATE TABLE IF NOT EXISTS matchlineups (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   UNIQUE(match_id, player_id),
   UNIQUE(match_id, team_id, player_id),
-  FOREIGN KEY(match_id) REFERENCES Matches(id) ON DELETE CASCADE,
-  FOREIGN KEY(team_id) REFERENCES Teams(id) ON DELETE CASCADE
+  FOREIGN KEY(match_id) REFERENCES "Matches"(id) ON DELETE CASCADE,
+  FOREIGN KEY(team_id) REFERENCES "Teams"(id) ON DELETE CASCADE
 );

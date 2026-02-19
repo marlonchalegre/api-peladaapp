@@ -4,9 +4,6 @@
    [api-peladaapp.routes     :as routes]
    [buddy.auth.accessrules   :refer [wrap-access-rules]]
    [buddy.auth.middleware    :refer [wrap-authentication wrap-authorization]]
-   [clojure.java.io          :as io]
-   [clojure.string           :as str]
-   [migratus.core            :as migratus]
    [next.jdbc                :as jdbc]
    [ring.middleware.json     :refer [wrap-json-body wrap-json-response]]
    [ring.middleware.params   :refer [wrap-params]])
@@ -40,52 +37,8 @@
 (def ^:private db-spec {:dbtype "sqlite"
                         :dbname (or (System/getenv "DB_NAME") "peladaapp.db")})
 
-(defn- run-sql-file! [ds path]
-  (let [res    (or (io/resource path) (io/file path))
-        content (slurp res)
-        statements (->> (str/split content #";[\r\n]+")
-                        (map str/trim)
-                        (remove str/blank?))]
-    (with-open [conn (jdbc/get-connection ds)]
-      (doseq [stmt statements]
-        (jdbc/execute! conn [stmt])))))
-
 (defonce ^:private datasource
-  (let [ds (jdbc/get-datasource db-spec)]
-    (if (or (= "true" (System/getProperty "SKIP_DB_INIT"))
-            (= "true" (System/getenv "SKIP_MIGRATIONS")))
-      (println "Skipping database initialization")
-      (do
-        ;; Try migratus, then ensure schema by applying the SQL file idempotently
-        (try
-          (migratus/migrate {:store :database
-                             :migration-dir "migrations"
-                             :db db-spec})
-          (catch Exception e
-            (.printStackTrace e)
-            ;; ignore, fall through to manual ensure
-            ))
-        (try
-          ;; Check if Peladas table exists before running init script
-          (let [table-exists? (try
-                                (jdbc/execute-one! ds ["SELECT 1 FROM Peladas LIMIT 1"])
-                                true
-                                (catch Exception _ false))]
-            (when-not table-exists?
-              ;; Prefer classpath resource path
-              (try
-                (run-sql-file! ds "migrations/20251028150000-init_all.up.sql")
-                (catch Exception _
-                  (try
-                    ;; Fallback to relative file path
-                    (run-sql-file! ds "resources/migrations/20251028150000-init_all.up.sql")
-                    (catch Exception _
-                      ;; ignore if file not found; best-effort
-                      ))))))
-          (catch Exception _
-            ;; ignore
-            ))))
-    ds))
+  (jdbc/get-datasource db-spec))
 
 (defn wrap-assoc [handler key value]
   (fn [request]

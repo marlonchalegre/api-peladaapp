@@ -1,4 +1,4 @@
--- Add closed_at timestamp to Peladas table
+-- Add closed_at timestamp to "Peladas" table
 ALTER TABLE "Peladas" ADD COLUMN "closed_at" TIMESTAMP;
 
 -- Update existing closed peladas with a default closed_at timestamp
