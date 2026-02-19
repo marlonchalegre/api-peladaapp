@@ -25,7 +25,7 @@
           (println "[MIGRATION] ERROR during migration:")
           (.printStackTrace e)
           (System/exit 1))))
-    
+
     (println "[SYSTEM] Initializing components...")
     (try
       (let [system (core.components/system options)]
