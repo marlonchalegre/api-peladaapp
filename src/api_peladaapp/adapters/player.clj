@@ -24,13 +24,15 @@
                           :position-id (:position_id request)))
 
 (s/defn model->response :- responses.player/PlayerResponse
-  [{:keys [id user-id organization-id grade position-id]}]
+  [{:keys [id user-id organization-id grade position-id user-name user-email]}]
   (medley.core/assoc-some {}
                           :id id
                           :user_id user-id
                           :organization_id organization-id
                           :grade grade
-                          :position_id position-id))
+                          :position_id position-id
+                          :user_name user-name
+                          :user_email user-email))
 
 (s/defn db->model :- models.player/Player
   [p]
@@ -40,4 +42,6 @@
                             :user-id (:user_id row)
                             :organization-id (:organization_id row)
                             :grade (:grade row)
-                            :position-id (:position_id row))))
+                            :position-id (:position_id row)
+                            :user-name (:user_name row)
+                            :user-email (:user_email row))))

@@ -74,12 +74,12 @@
                               [t2-players t1-players])
               gk-team (first team-pairings)
               other-team (second team-pairings)]
-          
+
           ;; Expected: GK (1) goes first to a team.
           ;; Def (4) goes to the other team (lowest score).
           ;; Str1 (3, score 8) goes to Def's team (score 7 < 10).
           ;; Str2 (2, score 5) goes to GK's team.
-          
+
           ;; GK Team should have {1, 2}
           ;; Other Team should have {4, 3}
           (is (= #{1 2} gk-team))
@@ -114,10 +114,10 @@
       (jdbc/execute! ds ["DELETE FROM OrganizationPlayers"])
       (jdbc/execute! ds ["DELETE FROM Users"])
       (jdbc/execute! ds ["DELETE FROM Teams"])
-      
+
       (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (1, 1, 'T1')"])
       (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (2, 1, 'T2')"])
-      
+
       ;; Create 4 players
       (dotimes [i 4]
         (let [id (inc i)]
@@ -145,16 +145,16 @@
       (jdbc/execute! ds ["DELETE FROM OrganizationPlayers"])
       (jdbc/execute! ds ["DELETE FROM Users"])
       (jdbc/execute! ds ["DELETE FROM Teams"])
-      
+
       (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (1, 1, 'T1')"])
       (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (2, 1, 'T2')"])
-      
+
       ;; 2 Goalkeepers, 2 Defenders
       (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (1, 'GK1', 'gk1@e.com', 'p', 'Goalkeeper')"])
       (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (1, 1, 1, 10.0)"])
       (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (2, 'GK2', 'gk2@e.com', 'p', 'Goalkeeper')"])
       (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (2, 2, 1, 10.0)"])
-      
+
       (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (3, 'DF1', 'df1@e.com', 'p', 'Defender')"])
       (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (3, 3, 1, 5.0)"])
       (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (4, 'DF2', 'df2@e.com', 'p', 'Defender')"])
@@ -169,7 +169,7 @@
         ;; If they clumped, one team would have 2 GKs.
         (let [t1-players (set (map :TeamPlayers/player_id (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 1"])))
               t2-players (set (map :TeamPlayers/player_id (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 2"])))]
-          
+
           ;; Verify T1 has exactly one of the GKs
           (is (= 1 (count (clojure.set/intersection t1-players #{1 2}))))
           ;; Verify T2 has exactly one of the GKs
@@ -188,10 +188,10 @@
       (jdbc/execute! ds ["DELETE FROM Users"])
       (jdbc/execute! ds ["DELETE FROM Teams"])
       (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (1, 1, 'T1')"])
-      
+
       (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (1, 'NoPos', 'np@e.com', 'p', NULL)"])
       (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (1, 1, 1, 5.0)"])
-      
+
       (let [player-ids [1]
             pelada-id 1
             players-per-team 2]

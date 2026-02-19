@@ -66,7 +66,7 @@
              pagination (pagination/parse-pagination-params query-params)]
          ;; Users can list their own peladas
          (when (not= user-id-param auth-user-id)
-            (throw (ex-info "Unauthorized" {:type :forbidden :message "You can only list your own peladas"})))
+           (throw (ex-info "Unauthorized" {:type :forbidden :message "You can only list your own peladas"})))
 
          (let [peladas-data (controller.pelada/list-peladas-by-user user-id-param db pagination)
                peladas-models (:data peladas-data)

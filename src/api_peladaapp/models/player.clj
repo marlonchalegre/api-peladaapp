@@ -7,4 +7,6 @@
    :user-id s/Int
    :organization-id s/Int
    :grade (s/maybe s/Num)
-   :position-id (s/maybe s/Int)})
+   :position-id (s/maybe s/Int)
+   (s/optional-key :user-name) s/Str
+   (s/optional-key :user-email) s/Str})

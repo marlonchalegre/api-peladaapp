@@ -35,7 +35,7 @@
 
         all-doubles (map :doubles-count (vals team-stats))
         min-doubles (if (seq all-doubles) (apply min all-doubles) 0)
-        
+
         ;; Home/Away Balance Check
         new-home-count (inc (get home-stats :home 0))
         new-away-count (inc (get away-stats :away 0))
@@ -60,7 +60,7 @@
                  true
                  (< (:consecutive-rests stats 0) 2)))
              (apply dissoc team-stats [home-team away-team]))
-     
+
      ;; Fairness check for doubles
      (<= (- home-new-doubles min-doubles) 1)
      (<= (- away-new-doubles min-doubles) 1))))
@@ -140,12 +140,12 @@
                               (generate-all-possible-matches teams))
 
         all-possible-matches (vec (take (* 2 total-matches) (cycle round-robin-matches)))
-        
+
         result (find-schedule [] initial-stats all-teams-set total-matches matches-per-team all-possible-matches)]
-    
+
     (if (and (seq result) (= (count result) total-matches))
       result
-      (if (seq result) 
+      (if (seq result)
         result
         (throw (ex-info "Could not find a valid schedule with the given constraints."
                         {:type :bad-request}))))))

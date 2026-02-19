@@ -71,7 +71,7 @@
                 GROUP BY p.players_per_team"
                team-id]
         result (jdbc/execute-one! db query {:builder-fn next.jdbc.result-set/as-unqualified-lower-maps})]
-    (if (and (:max_players result) 
+    (if (and (:max_players result)
              (>= (:current_count result) (:max_players result)))
       false
       true)))

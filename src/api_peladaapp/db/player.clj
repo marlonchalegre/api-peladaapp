@@ -1,6 +1,7 @@
 (ns api-peladaapp.db.player
   (:require
    [api-peladaapp.adapters.player :as adapter.player]
+   [next.jdbc]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
@@ -41,6 +42,9 @@
             unqualify)))
 
 (s/defn list-players-by-organization [organization-id db]
-  (->> (sql/find-by-keys db :organizationplayers {:organization_id organization-id})
+  (->> (next.jdbc/execute! db ["SELECT op.*, u.name as user_name, u.email as user_email 
+                                FROM organizationplayers op 
+                                JOIN users u ON op.user_id = u.id 
+                                WHERE op.organization_id = ?" organization-id])
        (map adapter.player/db->model)
        vec))

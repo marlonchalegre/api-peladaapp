@@ -1,11 +1,11 @@
 (ns api-peladaapp.logic-edge-cases-test
   (:require
+   [api-peladaapp.adapters.user :as adapter.user]
    [api-peladaapp.logic.schedule :as sch]
    [api-peladaapp.logic.vote :as vote.logic]
-   [api-peladaapp.adapters.user :as adapter.user]
    [clojure.test :refer [deftest is testing]])
   (:import
-   [java.time Instant Duration]))
+   [java.time Duration Instant]))
 
 (deftest scheduler-edge-cases
   (testing "2 teams, 1 match per team"
@@ -26,7 +26,7 @@
 (deftest vote-logic-edge-cases
   (testing "voting-open? with nil status"
     (is (false? (vote.logic/voting-open? {:status nil}))))
-  
+
   (testing "voting-open? with nil closed-at"
     (is (false? (vote.logic/voting-open? {:status "closed" :closed-at nil}))))
 
@@ -38,7 +38,7 @@
   (testing "model->response with missing email"
     (let [user {:id 1 :name "No Email"}]
       (is (= {:id 1 :name "No Email"} (adapter.user/model->response user)))))
-  
+
   (testing "model->response with explicit false for exclude-email?"
     (let [user {:id 1 :name "Test" :email "t@t.com"}]
       (is (= {:id 1 :name "Test" :email "t@t.com"} (adapter.user/model->response user false))))))

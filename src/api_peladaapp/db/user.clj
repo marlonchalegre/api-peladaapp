@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.adapters.user :as adapter.user]
    [api-peladaapp.models.user :as models.user]
+   [clojure.string :as str]
    [medley.core :as medley.core]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
@@ -75,15 +76,15 @@
 (s/defn search-users :- [models.user/User]
   "Search users by name or email with pagination"
   [db query offset limit]
-  (let [q (str "%" query "%")]
-    (->> (sql/query db ["SELECT * FROM users WHERE name ILIKE ? OR email ILIKE ? ORDER BY name LIMIT ? OFFSET ?" q q limit offset])
+  (let [q (str "%" (str/lower-case query) "%")]
+    (->> (sql/query db ["SELECT * FROM users WHERE LOWER(name) LIKE ? OR LOWER(email) LIKE ? ORDER BY name LIMIT ? OFFSET ?" q q limit offset])
          (map adapter.user/db->model))))
 
 (s/defn count-searched-users :- s/Int
   "Count users matching the search query"
   [db query]
-  (let [q (str "%" query "%")]
-    (-> (sql/query db ["SELECT count(*) as count FROM users WHERE name ILIKE ? OR email ILIKE ?" q q])
+  (let [q (str "%" (str/lower-case query) "%")]
+    (-> (sql/query db ["SELECT count(*) as count FROM users WHERE LOWER(name) LIKE ? OR LOWER(email) LIKE ?" q q])
         first
         :count)))
 

@@ -71,10 +71,10 @@
       (let [org-id (:organization_id inv)
             is-in-org? (boolean (db.player/get-org-player-by-user-id user-id org-id db))
             user (db.user/find-user-by-id user-id db)]
-        
+
         ;; Security check: if invitation has email, user email must match
         (when (and (:email inv) (not= (:email inv) (:email user)))
-          (throw (ex-info "Invitation does not belong to this user" 
+          (throw (ex-info "Invitation does not belong to this user"
                           {:type :forbidden :message "This invitation was sent to another email address."})))
 
         (jdbc/with-transaction [tx db]

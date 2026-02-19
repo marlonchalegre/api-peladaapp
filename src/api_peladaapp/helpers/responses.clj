@@ -31,7 +31,10 @@
            :else d)})
 (defn no-content [] {:status 204 :body nil})
 
-(defn deleted [_] {:status 200 :body {}})
+(defn deleted
+  ([] (deleted nil))
+  ([_] {:status 200 :body {}}))
+
 (defn updated [d]
   {:status 200
    :body (cond

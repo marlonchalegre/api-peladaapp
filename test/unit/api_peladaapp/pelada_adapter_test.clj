@@ -3,7 +3,7 @@
    [api-peladaapp.adapters.pelada :as adapter.pelada]
    [clojure.test :refer [deftest is testing]])
   (:import
-   [java.time Instant Duration]))
+   [java.time Duration Instant]))
 
 (deftest test-model->response-voting-status
   (testing "Should return voting status and preserve scheduled_at when voting is open"

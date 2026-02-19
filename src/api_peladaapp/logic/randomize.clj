@@ -80,20 +80,20 @@
     (jdbc/with-transaction [tx db]
       ;; Clear existing assignments to allow full reshuffle
       (db.team/clear-teams-players pelada-id tx)
-      
+
       (let [pelada (db.pelada/get-pelada pelada-id tx)
             org-id (:organization-id pelada)
-            
+
             ;; Fetch details for players (verifies they belong to org)
             ;; We assume player-ids are OrganizationPlayer IDs (not User IDs)
             players-details (get-player-details player-ids org-id tx)
-            
+
             ;; Sort players: Position first, then Grade
             ;; Shuffle first to ensure random order for players with same position/score
             sorted-players (sort-players-for-balance (shuffle players-details))
-            
+
             teams (db.team/list-pelada-teams pelada-id tx)
-            
+
             ;; Initial team states
             initial-team-states (get-team-states teams players-per-team org-id tx)]
 

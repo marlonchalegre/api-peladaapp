@@ -10,8 +10,9 @@
    [medley.core :as medley.core]
    [next.jdbc.sql :as sql]
    [schema.core :as s])
-  (:import [java.time LocalDateTime ZoneId]
-           [java.time.format DateTimeFormatter]))
+  (:import
+   [java.time LocalDateTime ZoneId]
+   [java.time.format DateTimeFormatter]))
 
 (defn- affected-rows-count
   [result]
@@ -37,7 +38,7 @@
   [id :- s/Int
    pelada
    db]
-  (let [db-row (medley.core/assoc-some {} 
+  (let [db-row (medley.core/assoc-some {}
                                        :organization_id (:organization-id pelada)
                                        :scheduled_at (:scheduled-at pelada)
                                        :num_teams (:num-teams pelada)
@@ -107,7 +108,7 @@
     (let [organization-id (:organization-id pelada)
           attendance (db.attendance/list-attendance-by-pelada pelada-id db)
           attendance-map (into {} (map (juxt :player_id :status)) attendance)
-          
+
           ;; If not in attendance mode, we only care about confirmed players
           all-players-in-org (db.player/list-players-by-organization organization-id db)
           all-org-players (if (= "attendance" (:status pelada))
@@ -119,7 +120,7 @@
           users-map (into {} (map (juxt :id identity)) all-users)
           teams (db.team/list-pelada-teams pelada-id db)
           team-players-raw (db.team/list-team-players-by-pelada pelada-id db)
-          
+
           ;; Group team players by team ID
           team-players-grouped (group-by :team_id team-players-raw)
 
@@ -144,7 +145,7 @@
                                               (assoc player :user (get users-map (:user-id player))
                                                      :attendance_status (get attendance-map (:id player) "pending")))
                                             available-players)
-          
+
           ;; Calculate normalized scores for all players in org
           player-ids (map :id all-players-in-org)
           scores-map (if (seq player-ids)
