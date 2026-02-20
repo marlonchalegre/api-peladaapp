@@ -9,6 +9,6 @@
 (defn get-key
   [key]
   (if (= key :jwt-secret)
-    (or (System/getenv "JWT_SECRET")
+    (or (System/getenv "PELADA_API_SECURITY_SIGNING_KEY")
         (get data key nil))
     (get data key)))
