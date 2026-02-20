@@ -10,6 +10,8 @@ jobs:
   test:
     name: Test and Lint
     runs-on: ubuntu-latest
+    env:
+      PELADA_API_SECURITY_SIGNING_KEY: dummy-secret-for-testing-in-ci
 
     steps:
       - uses: actions/checkout@v4
