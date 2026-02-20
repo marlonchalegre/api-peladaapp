@@ -4,7 +4,8 @@
    [api-peladaapp.controllers.user :as controller.user]
    [api-peladaapp.helpers.exception :as exception]
    [api-peladaapp.helpers.pagination :as pagination]
-   [api-peladaapp.helpers.responses :as responses]))
+   [api-peladaapp.helpers.responses :as responses]
+   [api-peladaapp.logic.authorization :as auth]))
 
 (defn- create-action [request]
   (let [body (-> request :body)
@@ -53,6 +54,7 @@
   (try
     (let [id (-> request :params :id parse-long)
           db (-> request :database)]
+      (auth/require-self-or-admin! request id)
       (-> (controller.user/get-user id db)
           adapter.user/model->response
           responses/ok))
@@ -64,6 +66,7 @@
     (let [id (-> request :params :id parse-long)
           body (-> request :body)
           db (-> request :database)]
+      (auth/require-self-or-admin! request id)
       (-> (adapter.user/update-profile-request->model body)
           (controller.user/update-user-profile id db)
           adapter.user/model->response
@@ -75,6 +78,7 @@
   (try
     (let [id (-> request :params :id parse-long)
           db (-> request :database)]
+      (auth/require-self-or-admin! request id)
       (controller.user/delete-user id db)
       (responses/no-content))
     (catch Exception e

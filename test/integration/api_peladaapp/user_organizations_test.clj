@@ -65,14 +65,13 @@
             (is (some #(and (= "Org 2" (:name %)) (= "admin" (:role %))) orgs))))
 
         ;; 4. Edge case: User with no organizations
-        (let [_ (app (-> (mock/request :post "/auth/register")
-                         (mock/json-body {:name "User 3" :email "u3@test.com" :password "pass"})))
+        (let [token3 (th/register-and-login! app {:name "User 3" :email "u3@test.com" :password "pass"})
+              auth3 (th/auth-header token3)
               user3-id (th/user-id-by-email ds "u3@test.com")
-              list-resp (app (-> (mock/request :get (str "/api/users/" user3-id "/organizations")) auth1))]
+              list-resp (app (-> (mock/request :get (str "/api/users/" user3-id "/organizations")) auth3))]
           (is (= 200 (:status list-resp)))
           (is (= 0 (count (th/decode-body list-resp)))))
 
-        ;; 5. Edge case: Non-existent user
+        ;; 5. Edge case: Non-existent user (should return 403 because it's not self and not global admin)
         (let [list-resp (app (-> (mock/request :get "/api/users/9999/organizations") auth1))]
-          (is (= 200 (:status list-resp)))
-          (is (= 0 (count (th/decode-body list-resp)))))))))
+          (is (= 403 (:status list-resp))))))))

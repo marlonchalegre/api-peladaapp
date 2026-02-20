@@ -35,3 +35,14 @@
   "Extract user ID from request identity"
   [request]
   (get-in request [:identity :id]))
+
+(s/defn require-self-or-admin!
+  "Throws exception if user is not the target user and not a global admin"
+  [request target-user-id]
+  (let [identity (:identity request)
+        current-user-id (:id identity)
+        is-admin? (:is-admin? identity)]
+    (when-not (or (= current-user-id target-user-id) is-admin?)
+      (throw (ex-info "Forbidden: You don't have permission to access this resource"
+                      {:type :forbidden
+                       :message "You don't have permission to access this resource"})))))

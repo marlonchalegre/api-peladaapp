@@ -15,10 +15,10 @@
        first))
 
 (s/defn find-user-by-email :- (s/maybe models.user/User)
-  "Find a user by email"
+  "Find a user by email (case-insensitive)"
   [email :- s/Str
    db]
-  (-> (sql/find-by-keys db :users {:email email}) first adapter.user/db->model))
+  (-> (sql/query db ["SELECT * FROM users WHERE LOWER(email) = LOWER(?)" email]) first adapter.user/db->model))
 
 (s/defn find-user-by-id :- (s/maybe models.user/User)
   "Find a user in the database by id"

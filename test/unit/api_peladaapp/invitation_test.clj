@@ -21,7 +21,7 @@
         org-id (:id org)
         email "new-player@example.com"]
 
-    (testing "Inviting a non-existent user creates a partial user and adds to org"
+    (testing "Inviting a non-existent user creates a partial user and DOES NOT add to org yet"
       (let [result (controller.organization/invite-player org-id email nil db)]
         (is (= email (:email result)))
         (is (:is-new-user result))
@@ -32,11 +32,11 @@
           (is (some? user))
           (is (nil? (:password user))))
 
-        ;; Verify player added to org
+        ;; Verify player NOT added to org yet
         (let [player (first (jdbc/execute! db ["SELECT * FROM OrganizationPlayers WHERE user_id = ? AND organization_id = ?" (:user-id result) org-id] opts))]
-          (is (some? player)))))
+          (is (nil? player)))))
 
-    (testing "Inviting an existing user adds them to org if not already there"
+    (testing "Inviting an existing user DOES NOT add them to org automatically"
       (let [existing-email "existing@example.com"
             _ (jdbc/execute! db ["INSERT INTO Users (email, name, password) VALUES (?, ?, ?)" existing-email "Existing" "hashed-pass"] opts)
             user (first (jdbc/execute! db ["SELECT id FROM Users WHERE email = ?" existing-email] opts))
@@ -46,9 +46,9 @@
         (is (not (:is-new-user result)))
         (is (= user-id (:user-id result)))
 
-        ;; Verify player added to org
+        ;; Verify player NOT added to org yet
         (let [player (first (jdbc/execute! db ["SELECT * FROM OrganizationPlayers WHERE user_id = ? AND organization_id = ?" user-id org-id] opts))]
-          (is (some? player)))))))
+          (is (nil? player)))))))
 
 (deftest first-access-test
   (let [db-val (get-in helpers/*test-system* [:database :database])
@@ -100,8 +100,8 @@
         (is (= token (controller.organization/get-or-create-organization-link org-id user-id db)))
 
         (let [inv (controller.organization/get-invitation-by-token token db)]
-          (is (= org-id (:organization_id inv)))
-          (is (= org-name (:organization_name inv)))
+          (is (= org-id (:organization-id inv)))
+          (is (= org-name (:organization-name inv)))
           (is (nil? (:email inv))))))
 
     (testing "Accepting a link invitation"
@@ -123,7 +123,7 @@
             _ (controller.organization/invite-player org-id email user-id db)
             invites (controller.organization/list-pending-invitations email db)]
         (is (= 1 (count invites)))
-        (is (= org-name (:organization_name (first invites))))
+        (is (= org-name (:organization-name (first invites))))
 
         ;; Accept it
         (controller.organization/accept-invitation (:token (first invites)) u-id db)

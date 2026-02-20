@@ -137,8 +137,10 @@
         db-val (-> th/*test-system* :database :database)
         ds (if (fn? db-val) (db-val) db-val)
         token (th/register-and-login! app {:name "User" :email "user@test.com" :password "pass123"})
+        user-id (th/user-id-by-email ds "user@test.com")
         _ (jdbc/execute! ds ["INSERT INTO Organizations (name) VALUES ('Org')"])
         org-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)
+        _ (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, grade) VALUES (?, ?, 5.0)" org-id user-id])
 
         response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
                           (mock/query-string {:year 2030}) ;; Future year with no data

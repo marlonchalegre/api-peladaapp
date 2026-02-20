@@ -13,17 +13,37 @@
                                 :token-name "Token"
                                 :options {:alg :hs512}}))
 
+;; Simple brute-force protection
+(def login-attempts (atom {}))
+
+(defn- too-many-attempts? [email]
+  (let [attempts (get @login-attempts email 0)]
+    (>= attempts 5)))
+
+(defn- record-failure [email]
+  (swap! login-attempts update email (fnil inc 0)))
+
+(defn- clear-attempts [email]
+  (swap! login-attempts dissoc email))
+
 (defn auth-handler
   [request]
   (let [body (-> request :body)
+        email (:email body)
         db (-> request :database)]
-    (try (let [{:keys [token user]} (-> body
-                                        adapters.credential/login-request->model
-                                        (controllers.auth/authenticate db))]
-           (-> (adapters.credential/model->response token user)
-               ok))
-         (catch Exception e
-           (exception/api-exception-handler e)))))
+    (if (too-many-attempts? email)
+      (exception/api-exception-handler (ex-info "Too many login attempts. Please try again later."
+                                                {:type :too-many-requests
+                                                 :message "Too many login attempts. Please try again later."}))
+      (try (let [{:keys [token user]} (-> body
+                                          adapters.credential/login-request->model
+                                          (controllers.auth/authenticate db))]
+             (clear-attempts email)
+             (-> (adapters.credential/model->response token user)
+                 ok))
+           (catch Exception e
+             (record-failure email)
+             (exception/api-exception-handler e))))))
 
 (defn first-access-handler
   [request]

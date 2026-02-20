@@ -30,7 +30,7 @@
 (s/defn invite-player
   "Invites a player to an organization. 
    If user doesn't exist, creates a partial user.
-   If user is not in org, adds them."
+   Record personal invitation but DOES NOT add to org yet."
   [organization-id :- s/Int
    email :- s/Str
    invited-by :- (s/maybe s/Int)
@@ -39,15 +39,14 @@
         user-id (if user
                   (:id user)
                   (db.user/insert-partial-user email db))
-        is-in-org? (boolean (db.player/get-org-player-by-user-id user-id organization-id db))]
-    (when-not is-in-org?
-      (db.player/insert-player {:user-id user-id :organization-id organization-id :grade 5.0} db))
-    ;; Record personal invitation
-    (db.invitation/insert-invitation {:organization-id organization-id
-                                      :email email
-                                      :token (generate-token)
-                                      :invited-by invited-by}
-                                     db)
+        existing-invites (db.invitation/list-pending-invitations-by-email email db)]
+    ;; Record personal invitation only if not already invited
+    (when-not (some #(= (:organization-id %) organization-id) existing-invites)
+      (db.invitation/insert-invitation {:organization-id organization-id
+                                        :email email
+                                        :token (generate-token)
+                                        :invited-by invited-by}
+                                       db))
     {:user-id user-id
      :email email
      :is-new-user (nil? user)
@@ -68,7 +67,7 @@
   (let [inv (db.invitation/get-invitation-by-token token db)]
     (if (nil? inv)
       (throw (ex-info "Invitation not found" {:type :not-found}))
-      (let [org-id (:organization_id inv)
+      (let [org-id (:organization-id inv)
             is-in-org? (boolean (db.player/get-org-player-by-user-id user-id org-id db))
             user (db.user/find-user-by-id user-id db)]
 
@@ -92,7 +91,7 @@
 (s/defn revoke-invitation
   [invitation-id :- s/Int organization-id :- s/Int db]
   (let [inv (db.invitation/get-invitation-by-id invitation-id db)]
-    (when (and inv (= (:organization_id inv) organization-id))
+    (when (and inv (= (:organization-id inv) organization-id))
       (db.invitation/delete-invitation invitation-id db))))
 
 (s/defn create-organization :- models.organization/Organization

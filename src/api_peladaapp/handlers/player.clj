@@ -3,12 +3,16 @@
    [api-peladaapp.adapters.player :as adapter.player]
    [api-peladaapp.controllers.player :as controller.player]
    [api-peladaapp.helpers.exception :as exception]
-   [api-peladaapp.helpers.responses :refer [created deleted ok]]))
+   [api-peladaapp.helpers.responses :refer [created deleted ok]]
+   [api-peladaapp.logic.authorization :as auth]))
 
 (defn create [request]
   (try (let [db (:database request)
              body (:body request)
-             player (adapter.player/create-request->model body)]
+             player (adapter.player/create-request->model body)
+             user-id (auth/get-user-id-from-request request)
+             org-id (:organization-id player)]
+         (auth/require-organization-admin! user-id org-id db)
          (-> (controller.player/create-player player db)
              adapter.player/model->response
              created))
@@ -16,12 +20,18 @@
 
 (defn delete [request]
   (try (let [db (:database request)
-             id (get-in request [:params :id])]
+             id (Integer/parseInt (str (get-in request [:params :id])))
+             user-id (auth/get-user-id-from-request request)
+             player (controller.player/get-player id db)
+             org-id (:organization-id player)]
+         (auth/require-organization-admin! user-id org-id db)
          (deleted (controller.player/delete-player id db)))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn list-by-org [request]
   (try (let [db (:database request)
-             org-id (get-in request [:params :organization_id])]
+             org-id (Integer/parseInt (str (get-in request [:params :organization_id])))
+             user-id (auth/get-user-id-from-request request)]
+         (auth/require-organization-member! user-id org-id db)
          (ok (map adapter.player/model->response (controller.player/list-players org-id db))))
        (catch Exception e (exception/api-exception-handler e))))

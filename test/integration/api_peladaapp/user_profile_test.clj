@@ -30,12 +30,12 @@
       (is (= "Profile User" (:name body)))
       (is (= "profile@example.com" (:email body))))))
 
-(deftest get-user-profile-not-found
+(deftest get-user-profile-unauthorized
   (let [app (-> th/*test-system* :app :handler)
         token (th/register-and-login! app {:name "Any" :email "any@any.com" :password "any"})]
     (let [resp (app (-> (mock/request :get "/api/user/9999")
                         (mock/header "Authorization" (str "Token " token))))]
-      (is (= 404 (:status resp))))))
+      (is (= 403 (:status resp))))))
 
 (deftest update-user-profile-success
   (let [app (-> th/*test-system* :app :handler)

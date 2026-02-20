@@ -8,4 +8,7 @@
 
 (defn get-key
   [key]
-  (get data key))
+  (if (= key :jwt-secret)
+    (or (System/getenv "JWT_SECRET")
+        (get data key nil))
+    (get data key)))

@@ -1,5 +1,6 @@
 (ns api-peladaapp.handlers.organization
   (:require
+   [api-peladaapp.adapters.invitation :as adapter.invitation]
    [api-peladaapp.adapters.organization :as adapter.organization]
    [api-peladaapp.controllers.organization :as controller.organization]
    [api-peladaapp.db.user :as db.user]
@@ -20,7 +21,9 @@
 
 (defn get-by-id [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))]
+             id (Integer/parseInt (str (get-in request [:params :id])))
+             user-id (auth/get-user-id-from-request request)]
+         (auth/require-organization-member! user-id id db)
          (-> (controller.organization/get-organization id db)
              adapter.organization/model->response
              ok))
@@ -36,14 +39,17 @@
 
 (defn list-by-user [request]
   (try (let [db (:database request)
-             user-id (Integer/parseInt (str (get-in request [:params :user_id])))]
-         (ok (controller.organization/list-user-organizations user-id db)))
+             target-user-id (Integer/parseInt (str (get-in request [:params :user_id])))]
+         (auth/require-self-or-admin! request target-user-id)
+         (ok (controller.organization/list-user-organizations target-user-id db)))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn get-statistics [request]
   (try (let [db (:database request)
              id (Integer/parseInt (get-in request [:params :id]))
-             year (Integer/parseInt (get-in request [:query-params "year"]))]
+             year (Integer/parseInt (get-in request [:query-params "year"]))
+             user-id (auth/get-user-id-from-request request)]
+         (auth/require-organization-member! user-id id db)
          (-> (controller.organization/get-statistics id year db)
              ok))
        (catch NumberFormatException _ (bad-request "Invalid ID or Year format"))
@@ -73,14 +79,14 @@
 (defn get-invitation-info [request]
   (try (let [db (:database request)
              token (get-in request [:params :token])]
-         (ok (controller.organization/get-invitation-by-token token db)))
+         (ok (adapter.invitation/model->response (controller.organization/get-invitation-by-token token db))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn list-pending-invitations [request]
   (try (let [db (:database request)
              user-id (auth/get-user-id-from-request request)
              user (db.user/find-user-by-id user-id db)]
-         (ok (controller.organization/list-pending-invitations (:email user) db)))
+         (ok (map adapter.invitation/model->response (controller.organization/list-pending-invitations (:email user) db))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn accept-invitation [request]
@@ -97,7 +103,7 @@
              organization-id (Integer/parseInt (str (get-in request [:params :id])))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id organization-id db)
-         (ok (controller.organization/list-organization-invitations organization-id db)))
+         (ok (map adapter.invitation/model->response (controller.organization/list-organization-invitations organization-id db))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn revoke-invitation [request]
