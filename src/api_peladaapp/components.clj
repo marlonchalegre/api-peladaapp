@@ -3,6 +3,7 @@
    [api-peladaapp.server :as server]
    [clojure.string :as str]
    [com.stuartsierra.component :as component]
+   [next.jdbc :as jdbc]
    [next.jdbc.connection :as connection]
    [ring.adapter.jetty :refer [run-jetty]])
   (:import
@@ -27,8 +28,16 @@
                           (do
                             (println "Using local SQLite database")
                             (merge {:dbtype "sqlite" :dbname "peladaapp.db"} db-spec)))
-          ds (connection/component HikariDataSource final-db-spec)]
-      (assoc this :database (component/start ds))))
+          ds-component (connection/component HikariDataSource final-db-spec)
+          started-ds (component/start ds-component)]
+      ;; Enable WAL mode for local SQLite
+      (when-not (and turso-url turso-token)
+        (try
+          (with-open [conn (jdbc/get-connection started-ds)]
+            (jdbc/execute! conn ["PRAGMA journal_mode=WAL;"]))
+          (catch Exception e
+            (println "Warning: Could not enable WAL mode:" (.getMessage e)))))
+      (assoc this :database started-ds)))
   (stop [this]
     (println "Stopping Database component...")
     (when-let [ds (:database this)]

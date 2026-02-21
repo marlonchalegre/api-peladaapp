@@ -1,0 +1,11 @@
+# Litestream configuration for SQLite replication to Cloudflare R2
+access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
+secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
+
+dbs:
+  - path: /app/data/peladaapp.db
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_BUCKET}
+        endpoint: ${LITESTREAM_ENDPOINT}
+        region: us-east-1

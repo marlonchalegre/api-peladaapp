@@ -25,13 +25,22 @@ RUN --mount=type=cache,target=/root/.m2 \
 FROM eclipse-temurin:23-jre
 WORKDIR /app
 
+# Install Litestream
+RUN apt-get update && apt-get install -y curl && \
+    curl -L https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-amd64.deb -o litestream.deb && \
+    dpkg -i litestream.deb && \
+    rm litestream.deb && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /app/app.jar /app/app.jar
 COPY --from=builder /app/resources /app/resources
+COPY litestream.yml /etc/litestream.yml
+COPY run.sh /app/run.sh
+RUN chmod +x /app/run.sh
 
 EXPOSE 8080
 
 # Production runtime JVM opts
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
 
-ENTRYPOINT ["java"]
-CMD ["-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/app.jar"]
+ENTRYPOINT ["/app/run.sh"]
