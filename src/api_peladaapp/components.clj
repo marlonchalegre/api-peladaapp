@@ -22,7 +22,8 @@
                             (Class/forName "com.dbeaver.jdbc.driver.libsql.LibSqlDriver")
                             {:jdbcUrl url
                              :user ""
-                             :password turso-token})
+                             :password turso-token
+                             :connectionTestQuery "SELECT 1"})
                           (do
                             (println "Using local SQLite database")
                             (merge {:dbtype "sqlite" :dbname "peladaapp.db"} db-spec)))
