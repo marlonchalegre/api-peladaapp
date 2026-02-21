@@ -18,13 +18,13 @@
                           (let [url (str "jdbc:" 
                                          (if (clojure.string/starts-with? turso-url "libsql://")
                                            turso-url
-                                           (str "libsql://" turso-url))
-                                         "?authToken=" turso-token)]
-                            (println (str "Using Turso (LibSQL) Cloud Database: " 
-                                          (clojure.string/replace url #"(authToken=)[^&]+" "$1****")))
+                                           (str "libsql://" turso-url)))]
+                            (println (str "Using Turso (LibSQL) Cloud Database: " url))
                             ;; Force load the driver class for DriverManager
                             (Class/forName "org.conagyurig.LibSqlDriver")
-                            {:jdbcUrl url})
+                            {:jdbcUrl url
+                             :user ""
+                             :password turso-token})
                           (do
                             (println "Using local SQLite database")
                             (merge {:dbtype "sqlite" :dbname "peladaapp.db"} db-spec)))

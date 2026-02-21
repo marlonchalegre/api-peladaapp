@@ -16,9 +16,12 @@
         db-spec (if (and turso-url turso-token)
                   (do
                     (Class/forName "org.conagyurig.LibSqlDriver")
-                    {:jdbcUrl (str "jdbc:libsql://" 
-                                   (str/replace turso-url #"^libsql://" "") 
-                                   "?authToken=" turso-token)})
+                    {:jdbcUrl (str "jdbc:" 
+                                   (if (str/starts-with? turso-url "libsql://")
+                                     turso-url
+                                     (str "libsql://" turso-url)))
+                     :user ""
+                     :password turso-token})
                   {:dbtype "sqlite" :dbname db-name})
         skip-migrations (= "true" (System/getenv "SKIP_MIGRATIONS"))
         options {:db-spec db-spec
