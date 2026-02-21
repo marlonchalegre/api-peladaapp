@@ -18,7 +18,7 @@
                           (do
                             (println "Using Turso (LibSQL) Cloud Database")
                             ;; Force load the driver class for DriverManager
-                            (Class/forName "com.dbeaver.jdbc.driver.libsql.LibSqlDriver")
+                            (Class/forName "org.conagyurig.LibSqlDriver")
                             {:jdbcUrl (str "jdbc:libsql://" 
                                            (str/replace turso-url #"^libsql://" "") 
                                            "?authToken=" turso-token)})

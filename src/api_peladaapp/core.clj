@@ -15,7 +15,7 @@
         ;; Build the same spec as in components.clj
         db-spec (if (and turso-url turso-token)
                   (do
-                    (Class/forName "com.dbeaver.jdbc.driver.libsql.LibSqlDriver")
+                    (Class/forName "org.conagyurig.LibSqlDriver")
                     {:jdbcUrl (str "jdbc:libsql://" 
                                    (str/replace turso-url #"^libsql://" "") 
                                    "?authToken=" turso-token)})
