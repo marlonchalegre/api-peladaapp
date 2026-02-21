@@ -26,16 +26,22 @@
                  :skip-migrations skip-migrations}
         migratus-config {:store :database
                          :migration-dir "migrations"
-                         :db db-spec}]
-    (when-not skip-migrations
-      (println (str "[MIGRATION] Starting migration process for " (or (:jdbcUrl db-spec) (:dbname db-spec)) " ..."))
-      (try
-        (migratus/migrate migratus-config)
-        (println "[MIGRATION] Finished migration process.")
-        (catch Exception e
-          (println "[MIGRATION] ERROR during migration:")
-          (.printStackTrace e)
-          (System/exit 1))))
+                         :db db-spec}
+        ;; Check if we are using Turso
+        is-turso (and turso-url turso-token)]
+    (if (and (not skip-migrations) (not is-turso))
+      (do
+        (println (str "[MIGRATION] Starting migration process for " (:dbname db-spec) " ..."))
+        (try
+          (migratus/migrate migratus-config)
+          (println "[MIGRATION] Finished migration process.")
+          (catch Exception e
+            (println "[MIGRATION] ERROR during migration:")
+            (.printStackTrace e)
+            (System/exit 1))))
+      (if is-turso
+        (println "[MIGRATION] Skipping automated Migratus migrations for Turso (Cloud DB). Please run migrations manually or via CI.")
+        (println "[MIGRATION] Migrations skipped via environment variable.")))
 
     (println "[SYSTEM] Initializing components...")
     (try
