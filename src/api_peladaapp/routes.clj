@@ -66,6 +66,7 @@
     (POST "/organizations" [] handler.organization/create)
     (GET "/organizations/:id" [] handler.organization/get-by-id)
     (DELETE "/organizations/:id" [] handler.organization/delete)
+    (POST "/organizations/:id/leave" [] handler.organization/leave)
     (GET "/organizations/:id/statistics" [] handler.organization/get-statistics)
     (POST "/organizations/:id/invite" [] handler.organization/invite)
     (GET "/organizations/:id/invite-link" [] handler.organization/get-invite-link)

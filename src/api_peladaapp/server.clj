@@ -2,9 +2,9 @@
   (:require
    [api-peladaapp.handlers.auth :as auth]
    [api-peladaapp.routes     :as routes]
-   [clojure.string           :as str]
    [buddy.auth.accessrules   :refer [wrap-access-rules]]
    [buddy.auth.middleware    :refer [wrap-authentication wrap-authorization]]
+   [clojure.string           :as str]
    [next.jdbc                :as jdbc]
    [ring.middleware.json     :refer [wrap-json-body wrap-json-response]]
    [ring.middleware.params   :refer [wrap-params]])
@@ -35,13 +35,13 @@
 
 ;; In dev (lein-ring), we don't start the Component system, so we must
 ;; initialize the database and inject it into every request ourselves.
-(def ^:private db-spec 
+(def ^:private db-spec
   (let [turso-url (System/getenv "TURSO_DATABASE_URL")
         turso-token (System/getenv "TURSO_AUTH_TOKEN")]
     (if (and turso-url turso-token)
       (do
         (Class/forName "com.dbeaver.jdbc.driver.libsql.LibSqlDriver")
-        {:jdbcUrl (str "jdbc:dbeaver:libsql:https://" 
+        {:jdbcUrl (str "jdbc:dbeaver:libsql:https://"
                        (str/replace turso-url #"^libsql://" ""))
          :user ""
          :password turso-token})

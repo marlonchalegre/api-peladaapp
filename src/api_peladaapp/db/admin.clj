@@ -41,6 +41,13 @@
                              where oa.user_id = ?" user_id])
        (map adapter.admin/db->model)))
 
+(s/defn count-admins-by-organization :- s/Int
+  [organization_id db]
+  (let [result (jdbc/execute-one! db
+                                  ["select count(*) as count from organizationadmins where organization_id = ?"
+                                   organization_id])]
+    (:count result)))
+
 (s/defn is-user-admin-of-organization? :- s/Bool
   [user_id organization_id db]
   (let [result (jdbc/execute-one! db

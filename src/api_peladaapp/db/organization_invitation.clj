@@ -17,7 +17,7 @@
              (:email invitation)
              (:token invitation)
              (:invited-by invitation)]
-        result (jdbc/execute! db ["INSERT INTO OrganizationInvitations (organization_id, email, token, invited_by) VALUES (?, ?, ?, ?)" 
+        result (jdbc/execute! db ["INSERT INTO OrganizationInvitations (organization_id, email, token, invited_by) VALUES (?, ?, ?, ?)"
                                   (nth row 0) (nth row 1) (nth row 2) (nth row 3)])]
     (affected-rows-count (first result))))
 

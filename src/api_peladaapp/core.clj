@@ -16,7 +16,7 @@
         db-spec (if (and turso-url turso-token)
                   (do
                     (Class/forName "com.dbeaver.jdbc.driver.libsql.LibSqlDriver")
-                    {:jdbcUrl (str "jdbc:dbeaver:libsql:https://" 
+                    {:jdbcUrl (str "jdbc:dbeaver:libsql:https://"
                                    (str/replace turso-url #"^libsql://" ""))
                      :user ""
                      :password turso-token})
