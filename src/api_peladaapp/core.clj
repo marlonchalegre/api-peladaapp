@@ -2,14 +2,22 @@
   (:gen-class)
   (:require
    [api-peladaapp.components :as core.components]
+   [clojure.string :as str]
    [com.stuartsierra.component :as component]
    [migratus.core :as migratus]))
 
 (defn -main
   [& _args]
   (println "[SYSTEM] Backend process starting...")
-  (let [db-name (or (System/getenv "DB_NAME") "peladaapp.db")
-        db-spec {:dbtype "sqlite" :dbname db-name}
+  (let [turso-url (System/getenv "TURSO_DATABASE_URL")
+        turso-token (System/getenv "TURSO_AUTH_TOKEN")
+        db-name (or (System/getenv "DB_NAME") "peladaapp.db")
+        ;; Build the same spec as in components.clj
+        db-spec (if (and turso-url turso-token)
+                  {:jdbcUrl (str "jdbc:libsql://" 
+                                 (str/replace turso-url #"^libsql://" "") 
+                                 "?authToken=" turso-token)}
+                  {:dbtype "sqlite" :dbname db-name})
         skip-migrations (= "true" (System/getenv "SKIP_MIGRATIONS"))
         options {:db-spec db-spec
                  :skip-migrations skip-migrations}
@@ -17,7 +25,7 @@
                          :migration-dir "migrations"
                          :db db-spec}]
     (when-not skip-migrations
-      (println "[MIGRATION] Starting migration process for" db-name "...")
+      (println (str "[MIGRATION] Starting migration process for " (or (:jdbcUrl db-spec) (:dbname db-spec)) " ..."))
       (try
         (migratus/migrate migratus-config)
         (println "[MIGRATION] Finished migration process.")

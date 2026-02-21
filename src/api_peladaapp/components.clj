@@ -1,6 +1,7 @@
 (ns api-peladaapp.components
   (:require
    [api-peladaapp.server :as server]
+   [clojure.string :as str]
    [com.stuartsierra.component :as component]
    [next.jdbc.connection :as connection]
    [ring.adapter.jetty :refer [run-jetty]])
@@ -11,7 +12,17 @@
   component/Lifecycle
   (start [this]
     (println "Starting Database component...")
-    (let [final-db-spec (merge {:dbtype "sqlite" :dbname "peladaapp.db"} db-spec)
+    (let [turso-url (System/getenv "TURSO_DATABASE_URL")
+          turso-token (System/getenv "TURSO_AUTH_TOKEN")
+          final-db-spec (if (and turso-url turso-token)
+                          (do
+                            (println "Using Turso (LibSQL) Cloud Database")
+                            {:jdbcUrl (str "jdbc:libsql://" 
+                                           (str/replace turso-url #"^libsql://" "") 
+                                           "?authToken=" turso-token)})
+                          (do
+                            (println "Using local SQLite database")
+                            (merge {:dbtype "sqlite" :dbname "peladaapp.db"} db-spec)))
           ds (connection/component HikariDataSource final-db-spec)]
       (assoc this :database (component/start ds))))
   (stop [this]
