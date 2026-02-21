@@ -15,7 +15,7 @@
                  [com.github.seancorfield/next.jdbc "1.3.1086"]
                  [medley/medley "1.4.0"]
                  [org.xerial/sqlite-jdbc  "3.49.0.0"]
-                 [io.github.conagyurig/libsql-jdbc "0.1.0"]
+                 [com.dbeaver.jdbc/com.dbeaver.jdbc.driver.libsql "1.0.5"]
                  [migratus "1.6.4"]
                  [prismatic/schema "1.4.1"]
                  [com.stuartsierra/component "1.1.0"]

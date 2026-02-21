@@ -15,13 +15,11 @@
     (let [turso-url (System/getenv "TURSO_DATABASE_URL")
           turso-token (System/getenv "TURSO_AUTH_TOKEN")
           final-db-spec (if (and turso-url turso-token)
-                          (let [url (str "jdbc:" 
-                                         (if (clojure.string/starts-with? turso-url "libsql://")
-                                           turso-url
-                                           (str "libsql://" turso-url)))]
+                          (let [url (str "jdbc:dbeaver:libsql:https://" 
+                                         (clojure.string/replace turso-url #"^libsql://" ""))]
                             (println (str "Using Turso (LibSQL) Cloud Database: " url))
                             ;; Force load the driver class for DriverManager
-                            (Class/forName "org.conagyurig.LibSqlDriver")
+                            (Class/forName "com.dbeaver.jdbc.driver.libsql.LibSqlDriver")
                             {:jdbcUrl url
                              :user ""
                              :password turso-token})

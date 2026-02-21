@@ -15,11 +15,9 @@
         ;; Build the same spec as in components.clj
         db-spec (if (and turso-url turso-token)
                   (do
-                    (Class/forName "org.conagyurig.LibSqlDriver")
-                    {:jdbcUrl (str "jdbc:" 
-                                   (if (str/starts-with? turso-url "libsql://")
-                                     turso-url
-                                     (str "libsql://" turso-url)))
+                    (Class/forName "com.dbeaver.jdbc.driver.libsql.LibSqlDriver")
+                    {:jdbcUrl (str "jdbc:dbeaver:libsql:https://" 
+                                   (str/replace turso-url #"^libsql://" ""))
                      :user ""
                      :password turso-token})
                   {:dbtype "sqlite" :dbname db-name})
