@@ -150,6 +150,7 @@ flowchart TD
 - `GET /api/users` (paginated)
 - `GET/PUT/DELETE /api/user/:id`
 - POST/GET /api/organizations (GET paginated), GET /api/organizations/:id/statistics
+- POST /api/organizations/:id/leave
 - POST /api/players, GET /api/organizations/:id/players
 - POST/GET /api/peladas, POST /api/peladas/:id/begin, POST /api/peladas/:id/close, POST /api/peladas/:id/teams/randomize
 - POST /api/peladas/:id/attendance, POST /api/peladas/:id/close-attendance, GET /api/peladas/:id/dashboard-data
