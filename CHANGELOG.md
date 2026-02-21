@@ -2,6 +2,30 @@
 All notable changes to this project will be documented in this file. This change log follows the conventions of [keepachangelog.com](http://keepachangelog.com/).
 
 ## [Unreleased]
+### Added
+- **Recurso de Sair da Organização**
+  - Jogadores agora podem voluntariamente sair de uma organização.
+  - Salvaguarda para impedir que o último administrador saia da organização.
+  - Endpoint `POST /api/organizations/:id/leave`.
+  - Novos testes de integração para o fluxo de saída.
+- **Suporte a Turso/LibSQL**
+  - Adicionado driver `io.github.conagyurig/libsql-jdbc` para compatibilidade com bancos de dados na nuvem Turso.
+  - Configuração dinâmica via variável de ambiente `TURSO_DATABASE_URL`.
+- **Testes End-to-End (E2E)**
+  - Suite de testes completa usando Playwright.
+  - Script orchestrador `e2e-test.sh` com suporte a execução de testes específicos e gravação de vídeo.
+
+### Changed
+- **Otimização de Docker**
+  - builds otimizados com BuildKit e cache de dependências npm.
+  - Redução do tempo de build e verificação de dependências em runtime.
+- **Melhorias na Interface (Tablet)**
+  - Correção de comportamento de clique em listas de organizações para dispositivos touch.
+  - Botão "Gerenciar" agora redireciona diretamente para a página de gestão.
+
+### Fixed
+- Limpeza de logs de console em ambiente de produção.
+- Melhoria na estabilidade das migrations automatizadas.
 
 ## [0.3.0] - 2025-01-29
 ### Added
