@@ -27,7 +27,8 @@ WORKDIR /app
 
 # Install Litestream
 RUN apt-get update && apt-get install -y curl && \
-    curl -L https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-amd64.deb -o litestream.deb && \
+    ARCH=$(dpkg --print-architecture) && \
+    curl -L "https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-${ARCH}.deb" -o litestream.deb && \
     dpkg -i litestream.deb && \
     rm litestream.deb && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
