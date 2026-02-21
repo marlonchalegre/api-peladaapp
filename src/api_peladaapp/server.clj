@@ -39,9 +39,11 @@
   (let [turso-url (System/getenv "TURSO_DATABASE_URL")
         turso-token (System/getenv "TURSO_AUTH_TOKEN")]
     (if (and turso-url turso-token)
-      {:jdbcUrl (str "jdbc:libsql://" 
-                     (str/replace turso-url #"^libsql://" "") 
-                     "?authToken=" turso-token)}
+      (do
+        (Class/forName "io.github.conagyurig.libsql.LibSqlDriver")
+        {:jdbcUrl (str "jdbc:libsql://" 
+                       (str/replace turso-url #"^libsql://" "") 
+                       "?authToken=" turso-token)})
       {:dbtype "sqlite"
        :dbname (or (System/getenv "DB_NAME") "peladaapp.db")})))
 

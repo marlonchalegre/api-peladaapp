@@ -17,6 +17,8 @@
           final-db-spec (if (and turso-url turso-token)
                           (do
                             (println "Using Turso (LibSQL) Cloud Database")
+                            ;; Force load the driver class for DriverManager
+                            (Class/forName "io.github.conagyurig.libsql.LibSqlDriver")
                             {:jdbcUrl (str "jdbc:libsql://" 
                                            (str/replace turso-url #"^libsql://" "") 
                                            "?authToken=" turso-token)})

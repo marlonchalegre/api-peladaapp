@@ -14,9 +14,11 @@
         db-name (or (System/getenv "DB_NAME") "peladaapp.db")
         ;; Build the same spec as in components.clj
         db-spec (if (and turso-url turso-token)
-                  {:jdbcUrl (str "jdbc:libsql://" 
-                                 (str/replace turso-url #"^libsql://" "") 
-                                 "?authToken=" turso-token)}
+                  (do
+                    (Class/forName "io.github.conagyurig.libsql.LibSqlDriver")
+                    {:jdbcUrl (str "jdbc:libsql://" 
+                                   (str/replace turso-url #"^libsql://" "") 
+                                   "?authToken=" turso-token)})
                   {:dbtype "sqlite" :dbname db-name})
         skip-migrations (= "true" (System/getenv "SKIP_MIGRATIONS"))
         options {:db-spec db-spec
