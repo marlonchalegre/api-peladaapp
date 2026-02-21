@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.handlers.auth :as auth]
    [api-peladaapp.routes     :as routes]
+   [clojure.string           :as str]
    [buddy.auth.accessrules   :refer [wrap-access-rules]]
    [buddy.auth.middleware    :refer [wrap-authentication wrap-authorization]]
    [next.jdbc                :as jdbc]
@@ -34,8 +35,15 @@
 
 ;; In dev (lein-ring), we don't start the Component system, so we must
 ;; initialize the database and inject it into every request ourselves.
-(def ^:private db-spec {:dbtype "sqlite"
-                        :dbname (or (System/getenv "DB_NAME") "peladaapp.db")})
+(def ^:private db-spec 
+  (let [turso-url (System/getenv "TURSO_DATABASE_URL")
+        turso-token (System/getenv "TURSO_AUTH_TOKEN")]
+    (if (and turso-url turso-token)
+      {:jdbcUrl (str "jdbc:libsql://" 
+                     (str/replace turso-url #"^libsql://" "") 
+                     "?authToken=" turso-token)}
+      {:dbtype "sqlite"
+       :dbname (or (System/getenv "DB_NAME") "peladaapp.db")})))
 
 (defonce ^:private datasource
   (jdbc/get-datasource db-spec))
