@@ -1,20 +1,8 @@
-# Backend development Dockerfile with live reload via lein-ring
-FROM clojure:temurin-21-lein
-
+FROM clojure:temurin-23-lein
 RUN apt-get update && apt-get install -y sqlite3 && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
-
-# Cache deps
 COPY project.clj ./
 RUN lein deps
-
-# Copy source
 COPY . .
-
-# Expose backend port
 EXPOSE 8000
-
-# Run the main function
-ENV JVM_OPTS="-Dorg.slf4j.simpleLogger.defaultLogLevel=debug"
 CMD ["lein", "run"]
