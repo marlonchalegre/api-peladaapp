@@ -59,7 +59,20 @@
                      (assoc request key value))]
       (handler request*))))
 
+(defn wrap-exception-log [handler]
+  (fn [request]
+    (try
+      (let [response (handler request)]
+        (when (= 500 (:status response))
+          (println "[SERVER 500]" (:uri request) (:body response)))
+        response)
+      (catch Throwable e
+        (println "[FATAL ERROR]" (:uri request) (.getMessage e))
+        (.printStackTrace e)
+        (throw e)))))
+
 (def app (as-> #'routes/app-handler $
+           (wrap-exception-log $)
            (wrap-params $)
            (wrap-json-body $ {:keywords? true :bigdecimals? true})
            ;; Provide the DataSource directly

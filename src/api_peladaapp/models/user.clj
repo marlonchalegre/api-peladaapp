@@ -10,9 +10,9 @@
 
 (s/defschema User
   {:id s/Int
-   :name s/Str
+   (s/optional-key :name) s/Str
    :email s/Str
-   :password s/Str
+   (s/optional-key :password) s/Str
    (s/optional-key :position) (s/enum "Striker" "Midfielder" "Defender" "Goalkeeper")})
 
 (s/defschema UserProfileUpdate
