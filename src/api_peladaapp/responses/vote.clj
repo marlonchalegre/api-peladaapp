@@ -4,26 +4,27 @@
 
 (s/defschema VoteResponse
   {:id s/Int
-   :pelada_id s/Int
-   :voter_id s/Int
-   :target_id s/Int
+   :pelada-id s/Int
+   :voter-id s/Int
+   :target-id s/Int
    :stars s/Int
-   (s/optional-key :created_at) s/Any})
+   (s/optional-key :created-at) s/Any})
 
 (s/defschema BatchVoteResponse
-  {:votes_cast s/Int})
+  {:votes-cast s/Int})
 
 (s/defschema EligiblePlayer
-  {:player_id s/Int
+  {:player-id s/Int
    :name s/Str})
 
 (s/defschema VotingInfoResponse
-  {:can_vote s/Bool
-   :has_voted s/Bool
-   :eligible_players [EligiblePlayer]
-   (s/optional-key :voter_player_id) (s/maybe s/Int)
+  {:can-vote s/Bool
+   :has-voted s/Bool
+   :eligible-players [EligiblePlayer]
+   (s/optional-key :current-votes) [VoteResponse]
+   (s/optional-key :voter-player-id) (s/maybe s/Int)
    (s/optional-key :message) s/Str})
 
 (s/defschema NormalizedScoreResponse
-  {:player_id s/Int
+  {:player-id s/Int
    :score s/Num})

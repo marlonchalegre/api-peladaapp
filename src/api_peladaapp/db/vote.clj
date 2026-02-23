@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.adapters.vote :as adapter.vote]
    [api-peladaapp.models.vote :as models.vote]
+   [next.jdbc :as jdbc]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
@@ -16,9 +17,10 @@
 (s/defn insert-vote :- s/Int
   [{:keys [pelada-id voter-id target-id stars]}
    db]
-  (-> (sql/insert! db :votes {:pelada_id pelada-id :voter_id voter-id :target_id target-id :stars stars})
-      affected-rows-count
-      int))
+  (let [row {:pelada_id pelada-id :voter_id voter-id :target_id target-id :stars stars}]
+    (-> (sql/insert! db :votes row)
+        affected-rows-count
+        int)))
 
 (s/defn list-votes-by-pelada :- [models.vote/Vote]
   [pelada-id db]
@@ -54,10 +56,13 @@
   [votes-data db]
   (if (empty? votes-data)
     0
-    (let [rows (map (fn [v]
-                      {:pelada_id (:pelada-id v)
-                       :voter_id (:voter-id v)
-                       :target_id (:target-id v)
-                       :stars (:stars v)})
-                    votes-data)]
-      (count (sql/insert-multi! db :votes rows)))))
+    (let [query "INSERT INTO votes (pelada_id, voter_id, target_id, stars) VALUES (?, ?, ?, ?)"
+          params (map (fn [v]
+                        [(:pelada-id v)
+                         (:voter-id v)
+                         (:target-id v)
+                         (:stars v)])
+                      votes-data)]
+      (doseq [p params]
+        (jdbc/execute! db (into [query] p)))
+      (count votes-data))))

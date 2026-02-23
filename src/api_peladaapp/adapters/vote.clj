@@ -4,6 +4,7 @@
    [api-peladaapp.models.vote :as models.vote]
    [api-peladaapp.requests.vote :as requests.vote]
    [api-peladaapp.responses.vote :as responses.vote]
+   [medley.core :as medley.core]
    [schema.core :as s]))
 
 (s/defn create-request->model :- models.vote/Vote
@@ -14,13 +15,35 @@
    :stars (:stars request)})
 
 (s/defn model->response :- responses.vote/VoteResponse
-  [{:keys [id pelada-id voter-id target-id stars created-at]}]
-  {:id id
-   :pelada_id pelada-id
-   :voter_id voter-id
-   :target_id target-id
-   :stars stars
-   :created_at created-at})
+  [model]
+  {:id (:id model)
+   :pelada_id (:pelada-id model)
+   :voter_id (:voter-id model)
+   :target_id (:target-id model)
+   :stars (:stars model)
+   :created_at (:created-at model)})
+
+(s/defn batch-vote-model->response
+  [model]
+  {:votes_cast (:votes-cast model)})
+
+(s/defn voting-info-model->response
+  [model]
+  (let [eligible-players (mapv (fn [p] {:player_id (:player-id p) :name (:name p)})
+                               (:eligible-players model))
+        current-votes (mapv model->response (:current-votes model))]
+    (medley.core/assoc-some
+     {:can_vote (:can-vote model)
+      :has_voted (:has-voted model)
+      :eligible_players eligible-players
+      :current_votes current-votes}
+     :voter_player_id (:voter-player-id model)
+     :message (:message model))))
+
+(s/defn normalized-score-model->response
+  [model]
+  {:player_id (:player-id model)
+   :score (:score model)})
 
 (s/defn db->model :- models.vote/Vote
   [v]

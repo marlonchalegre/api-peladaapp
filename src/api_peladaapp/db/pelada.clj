@@ -9,10 +9,7 @@
    [api-peladaapp.logic.score :as logic.score]
    [medley.core :as medley.core]
    [next.jdbc.sql :as sql]
-   [schema.core :as s])
-  (:import
-   [java.time LocalDateTime ZoneId]
-   [java.time.format DateTimeFormatter]))
+   [schema.core :as s]))
 
 (defn- affected-rows-count
   [result]
@@ -74,8 +71,7 @@
    limit :- s/Int
    offset :- s/Int
    db]
-  (let [cutoff-time (.format (.minusHours (LocalDateTime/now (ZoneId/of "UTC")) 24)
-                             DateTimeFormatter/ISO_LOCAL_DATE_TIME)]
+  (let [cutoff-time (str (.minus (java.time.Instant/now) (java.time.Duration/ofHours 24)))]
     (->> (sql/query db ["SELECT p.*, o.name as organization_name
                          FROM Peladas p
                          JOIN OrganizationPlayers op ON op.organization_id = p.organization_id
@@ -143,7 +139,7 @@
           ;; Add user info to available players
           available-players-with-users (map (fn [player]
                                               (assoc player :user (get users-map (:user-id player))
-                                                     :attendance_status (get attendance-map (:id player) "pending")))
+                                                     :attendance-status (get attendance-map (:id player) "pending")))
                                             available-players)
 
           ;; Calculate normalized scores for all players in org
@@ -154,12 +150,12 @@
 
       {:pelada pelada
        :teams teams-with-players
-       :available_players available-players-with-users
+       :available-players available-players-with-users
        :scores scores-map
        :attendance (filter (fn [a] (some #(= (:player_id a) (:id %)) all-org-players))
                            (map (fn [a] (assoc a :player (let [p (first (filter #(= (:player_id a) (:id %)) all-players-in-org))]
                                                            (assoc p :user (get users-map (:user-id p))))))
                                 attendance))
-       :users_map users-map
-       :org_players_map (into {} (map (juxt :id identity)) all-players-in-org)})
+       :users-map users-map
+       :org-players-map (into {} (map (juxt :id identity)) all-players-in-org)})
     (throw (ex-info "Pelada not found" {:type :not-found :message "Pelada not found"}))))

@@ -41,8 +41,9 @@
                               ;; If parsing fails, try adding :00Z suffix for incomplete ISO timestamps
                                (Instant/parse (str closed-at ":00Z")))))
           now (Instant/now)
-          hours-since-close (.toHours (Duration/between closed-instant now))]
-      (when (> hours-since-close 24)
+          duration (Duration/between closed-instant now)
+          limit (Duration/ofHours 24)]
+      (when (pos? (.compareTo duration limit))
         (throw (ex-info "Voting window closed"
                         {:type :bad-request
                          :message "Voting is only allowed within 24 hours after pelada closes"}))))))

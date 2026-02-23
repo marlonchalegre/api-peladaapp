@@ -49,16 +49,22 @@
           pelada {:status "closed" :closed-at two-hours-ago}]
       (is (nil? (vote.logic/ensure-voting-window-open pelada)))))
 
-  (testing "Exactly 24 hours should pass"
+  (testing "Almost 24 hours should pass"
     (let [now (Instant/now)
-          exactly-24h-ago (.minus now (Duration/ofHours 24))
-          pelada {:status "closed" :closed-at exactly-24h-ago}]
+          almost-24h-ago (.minus now (Duration/ofMinutes (- (* 24 60) 1)))
+          pelada {:status "closed" :closed-at almost-24h-ago}]
       (is (nil? (vote.logic/ensure-voting-window-open pelada)))))
 
   (testing "After 24 hours should throw"
     (let [now (Instant/now)
           twenty-five-hours-ago (.minus now (Duration/ofHours 25))
           pelada {:status "closed" :closed-at twenty-five-hours-ago}]
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Voting window closed"
+                            (vote.logic/ensure-voting-window-open pelada))))
+    (let [now (Instant/now)
+          ;; 24 hours and 1 minute ago
+          just-over-24h-ago (.minus now (Duration/ofMinutes (+ (* 24 60) 1)))
+          pelada {:status "closed" :closed-at (str just-over-24h-ago)}]
       (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Voting window closed"
                             (vote.logic/ensure-voting-window-open pelada))))))
 

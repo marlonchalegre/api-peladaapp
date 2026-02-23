@@ -3,6 +3,7 @@
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.vote :as db.vote]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.logic.vote :as vote.logic]
    [api-peladaapp.models.vote :as models.vote]
    [api-peladaapp.responses.vote :as responses.vote]
@@ -37,7 +38,7 @@
     (doseq [fv full-votes]
       (vote.logic/validate-vote fv))
     (db.vote/insert-votes-batch full-votes db))
-  {:votes_cast (count votes)})
+  {:votes-cast (count votes)})
 
 (s/defn list-votes :- [models.vote/Vote]
   [pelada-id :- s/Int db]
@@ -48,7 +49,7 @@
   [pelada-id :- s/Int player-id :- s/Int db]
   (let [votes (db.vote/list-votes-for-player pelada-id player-id db)
         res (vote.logic/normalized-score player-id votes)]
-    {:player_id (:player-id res)
+    {:player-id (:player-id res)
      :score (:score res)}))
 
 (s/defn get-voting-info :- responses.vote/VotingInfoResponse
@@ -64,25 +65,42 @@
           (throw (ex-info "User is not a player in this organization"
                           {:type :forbidden :message "User is not a player in this organization"})))
 
-        ;; Get all players who participated (were in teams) with their names
-        (let [query "SELECT op.id as player_id, u.name
-                     FROM OrganizationPlayers op
-                     JOIN Users u ON u.id = op.user_id
-                     WHERE op.id IN (
-                       SELECT player_id FROM TeamPlayers tp
-                       JOIN Teams t ON t.id = tp.team_id
-                       WHERE t.pelada_id = ?
-                     )
-                     AND op.id != ?"
-              eligible-players (sql/query db [query pelada-id voter-player-id])
-              has-voted (db.vote/has-voter-voted? pelada-id voter-player-id db)]
-          {:can_vote true
-           :has_voted has-voted
-           :eligible_players (mapv #(update-keys % (comp keyword name)) eligible-players)
-           :voter_player_id voter-player-id}))
+        ;; Verify voter participated in the pelada (was in a team)
+        (let [participation-query "SELECT 1 FROM TeamPlayers tp
+                                   JOIN Teams t ON t.id = tp.team_id
+                                   WHERE t.pelada_id = ? AND tp.player_id = ?"
+              participated (seq (sql/query db [participation-query pelada-id voter-player-id]))]
+          (when-not participated
+            (throw (ex-info "Player did not participate in this pelada"
+                            {:type :forbidden :message "Only players who participated can vote"})))
+
+          ;; Get all players who participated (were in teams) with their names
+          (let [query "SELECT op.id as player_id, u.name
+                       FROM OrganizationPlayers op
+                       JOIN Users u ON u.id = op.user_id
+                       WHERE op.id IN (
+                         SELECT player_id FROM TeamPlayers tp
+                         JOIN Teams t ON t.id = tp.team_id
+                         WHERE t.pelada_id = ?
+                       )
+                       AND op.id != ?"
+                eligible-players-raw (sql/query db [query pelada-id voter-player-id])
+                eligible-players (mapv (fn [p]
+                                         (let [up (misc/unamespace p)]
+                                           {:player-id (:player_id up) :name (:name up)}))
+                                       eligible-players-raw)
+                has-voted (db.vote/has-voter-voted? pelada-id voter-player-id db)
+                current-votes (if has-voted
+                                (db.vote/list-votes-by-voter pelada-id voter-player-id db)
+                                [])]
+            {:can-vote true
+             :has-voted has-voted
+             :eligible-players eligible-players
+             :current-votes current-votes
+             :voter-player-id voter-player-id})))
       (catch Exception e
         (let [data (ex-data e)]
-          {:can_vote false
-           :has_voted false
-           :eligible_players []
+          {:can-vote false
+           :has-voted false
+           :eligible-players []
            :message (or (:message data) (.getMessage e))})))))

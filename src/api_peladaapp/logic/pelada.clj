@@ -43,8 +43,9 @@
   (let [pelada (db.pelada/get-pelada pelada-id db) ;; Re-fetch pelada to ensure latest status and closed_at
         can-vote (try (logic.vote/validate-voting-eligibility pelada) true (catch Exception _ false))
         has-voted (db.vote/has-voter-voted? pelada-id player-id db)]
-    {:can_vote can-vote
-     :has_voted has-voted
+    {:can-vote can-vote
+     :has-voted has-voted
+     :eligible-players [] ;; In this simplified context we don't need players
      :message (if (not can-vote)
                 "Voting is not open or has closed."
                 "")}))
