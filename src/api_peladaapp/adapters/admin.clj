@@ -20,8 +20,9 @@
     created-at (assoc :created_at created-at)
     user_name (assoc :user_name user_name)
     user_email (assoc :user_email user_email)
+    (:user-username model) (assoc :user_username (:user-username model))
     organization_name (assoc :organization_name organization_name)
-    ;; Sometimes these are kebab-cased in model if they come from joined results mapped to model
+        ;; Sometimes these are kebab-cased in model if they come from joined results mapped to model
     (:user-name model) (assoc :user_name (:user-name model))
     (:user-email model) (assoc :user_email (:user-email model))
     (:organization-name model) (assoc :organization_name (:organization-name model))))
@@ -33,5 +34,6 @@
              :user-id (:user_id p)}
       (:created_at p) (assoc :created-at (:created_at p))
       (:user_name p) (assoc :user-name (:user_name p))
+      (:user_username p) (assoc :user-username (:user_username p))
       (:user_email p) (assoc :user-email (:user_email p))
       (:organization_name p) (assoc :organization-name (:organization_name p)))))

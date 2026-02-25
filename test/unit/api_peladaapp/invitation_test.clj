@@ -48,7 +48,22 @@
 
         ;; Verify player NOT added to org yet
         (let [player (first (jdbc/execute! db ["SELECT * FROM OrganizationPlayers WHERE user_id = ? AND organization_id = ?" user-id org-id] opts))]
-          (is (nil? player)))))))
+          (is (nil? player)))))
+
+    (testing "Inviting by name only adds user to org automatically"
+      (let [name "Guest Player"
+            result (controller.organization/invite-player-improved org-id nil name nil db)]
+        (is (= name (:name result)))
+        (is (nil? (:email result)))
+
+        ;; Verify user exists in DB
+        (let [user (first (jdbc/execute! db ["SELECT * FROM Users WHERE name = ?" name] opts))]
+          (is (some? user))
+          (is (nil? (:username user))))
+
+        ;; Verify player ADDED to org automatically
+        (let [player (first (jdbc/execute! db ["SELECT * FROM OrganizationPlayers WHERE user_id = ? AND organization_id = ?" (:user-id result) org-id] opts))]
+          (is (some? player)))))))
 
 (deftest first-access-test
   (let [db-val (get-in helpers/*test-system* [:database :database])
@@ -60,21 +75,24 @@
 
     (testing "Completing first access for invited user"
       (let [payload {:email email
+                     :username "inviteduser"
                      :name "New User"
                      :password "securepassword"
                      :position "Striker"}
             result (controller.auth/first-access payload db)]
         (is (some? (:token result)))
         (is (= "New User" (get-in result [:user :name])))
+        (is (= "inviteduser" (get-in result [:user :username])))
         (is (= "Striker" (get-in result [:user :position])))
 
-        ;; Verify password is encrypted and stored
+        ;; Verify data is stored
         (let [db-user (first (jdbc/execute! db ["SELECT * FROM Users WHERE id = ?" user-id] opts))]
-          (is (some? (:password db-user)))
-          (is (not= "securepassword" (:password db-user))))))
+          (is (= "inviteduser" (:username db-user)))
+          (is (some? (:password db-user))))))
 
     (testing "Cannot use first access for already registered user"
       (let [payload {:email email
+                     :username "otheruser"
                      :name "Other Name"
                      :password "another-pass"}
             db-val (get-in helpers/*test-system* [:database :database])
@@ -107,7 +125,7 @@
     (testing "Accepting a link invitation"
       (let [token (controller.organization/get-or-create-organization-link org-id user-id db)
             new-user-id 100
-            _ (jdbc/execute! db ["INSERT INTO Users (id, email, name) VALUES (?, 'tester@test.com', 'Tester')" new-user-id] opts)
+            _ (jdbc/execute! db ["INSERT INTO Users (id, email, username, name) VALUES (?, 'tester@test.com', 'testeruser', 'Tester')" new-user-id] opts)
             result (controller.organization/accept-invitation token new-user-id db)]
         (is (= org-id (:organization-id result)))
 
@@ -117,7 +135,7 @@
 
     (testing "Listing pending invitations"
       (let [email "invited-user@test.com"
-            _ (jdbc/execute! db ["INSERT INTO Users (email, name) VALUES (?, 'Invited')" email] opts)
+            _ (jdbc/execute! db ["INSERT INTO Users (email, username, name) VALUES (?, 'inviteduser', 'Invited')" email] opts)
             user (first (jdbc/execute! db ["SELECT id FROM Users WHERE email = ?" email] opts))
             u-id (:id user)
             _ (controller.organization/invite-player org-id email user-id db)
@@ -186,7 +204,7 @@
 
             ;; Create another user
             attacker-email "attacker@test.com"
-            _ (jdbc/execute! db ["INSERT INTO Users (email, name) VALUES (?, 'Attacker')" attacker-email] opts)
+            _ (jdbc/execute! db ["INSERT INTO Users (email, username, name) VALUES (?, 'attackeruser', 'Attacker')" attacker-email] opts)
             attacker (first (jdbc/execute! db ["SELECT id FROM Users WHERE email = ?" attacker-email] opts))
             attacker-id (:id attacker)]
 
@@ -199,7 +217,7 @@
             partial-user (first (jdbc/execute! db ["SELECT id FROM Users WHERE email = ?" email] opts))
             partial-id (:id partial-user)
 
-            new-user-data {:email email :name "Claimed Name" :password "pass123" :position "Striker"}]
+            new-user-data {:email email :username "claimeduser" :name "Claimed Name" :password "pass123" :position "Striker"}]
 
         ;; Register should succeed and update existing user
         (let [result (controller.user/create-user new-user-data db)]

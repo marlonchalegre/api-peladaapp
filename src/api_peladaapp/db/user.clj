@@ -16,9 +16,24 @@
 
 (s/defn find-user-by-email :- (s/maybe models.user/User)
   "Find a user by email (case-insensitive)"
-  [email :- s/Str
+  [email :- (s/maybe s/Str)
    db]
-  (-> (sql/query db ["SELECT * FROM users WHERE LOWER(email) = LOWER(?)" email]) first adapter.user/db->model))
+  (when email
+    (-> (sql/query db ["SELECT * FROM users WHERE LOWER(email) = LOWER(?)" email]) first adapter.user/db->model)))
+
+(s/defn find-user-by-username :- (s/maybe models.user/User)
+  "Find a user by username (case-insensitive)"
+  [username :- (s/maybe s/Str)
+   db]
+  (when username
+    (-> (sql/query db ["SELECT * FROM users WHERE LOWER(username) = LOWER(?)" username]) first adapter.user/db->model)))
+
+(s/defn find-user-by-identifier :- (s/maybe models.user/User)
+  "Find a user by email or username (case-insensitive)"
+  [identifier :- (s/maybe s/Str)
+   db]
+  (when identifier
+    (-> (sql/query db ["SELECT * FROM users WHERE LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)" identifier identifier]) first adapter.user/db->model)))
 
 (s/defn find-user-by-id :- (s/maybe models.user/User)
   "Find a user in the database by id"
@@ -28,17 +43,27 @@
 
 (s/defn insert-user :- s/Int
   "Insert a user and return its generated id"
-  [{:keys [name email password position]} :- models.user/NewUser
+  [{:keys [name username email password position]} :- models.user/NewUser
    db]
-  (sql/insert! db :users {:name name :email email :password password :position position})
-  (-> (find-user-by-email email db) :id int))
+  (-> (sql/insert! db :users (medley.core/assoc-some {} :name name :username username :email email :password password :position position))
+      affected-rows-count
+      int))
 
 (s/defn insert-partial-user :- s/Int
   "Insert a user with only email and return its generated id"
   [email :- s/Str
    db]
-  (sql/insert! db :users {:email email})
-  (-> (find-user-by-email email db) :id int))
+  (-> (sql/insert! db :users {:email email})
+      affected-rows-count
+      int))
+
+(s/defn insert-user-by-name :- s/Int
+  "Insert a user with only name and return its generated id"
+  [name :- s/Str
+   db]
+  (-> (sql/insert! db :users {:name name})
+      affected-rows-count
+      int))
 
 (s/defn update-user :- s/Int
   "Update a user in the database"
@@ -48,6 +73,7 @@
   (-> (sql/update! db
                    :users
                    (medley.core/assoc-some {} :name (:name user)
+                                           :username (:username user)
                                            :email (:email user)
                                            :password (:password user)
                                            :position (:position user))
@@ -74,33 +100,33 @@
       :count))
 
 (s/defn search-users :- [models.user/User]
-  "Search users by name or email with pagination"
+  "Search users by name, username or email with pagination"
   [db query offset limit]
   (let [q (str "%" (str/lower-case query) "%")]
-    (->> (sql/query db ["SELECT * FROM users WHERE LOWER(name) LIKE ? OR LOWER(email) LIKE ? ORDER BY name LIMIT ? OFFSET ?" q q limit offset])
+    (->> (sql/query db ["SELECT * FROM users WHERE LOWER(name) LIKE ? OR LOWER(username) LIKE ? OR LOWER(email) LIKE ? ORDER BY name LIMIT ? OFFSET ?" q q q limit offset])
          (map adapter.user/db->model))))
 
 (s/defn count-searched-users :- s/Int
   "Count users matching the search query"
   [db query]
   (let [q (str "%" (str/lower-case query) "%")]
-    (-> (sql/query db ["SELECT count(*) as count FROM users WHERE LOWER(name) LIKE ? OR LOWER(email) LIKE ?" q q])
+    (-> (sql/query db ["SELECT count(*) as count FROM users WHERE LOWER(name) LIKE ? OR LOWER(username) LIKE ? OR LOWER(email) LIKE ?" q q q])
         first
         :count)))
 
 (s/defn update-user-profile :- s/Int
-  "Update user profile (name, email, password, position only) in the database"
+  "Update user profile (name, username, email, password, position only) in the database"
   [id :- s/Int
    user :- models.user/User
    db]
-  ;; Only update allowed fields: name, email, password, position
+  ;; Only update allowed fields: name, username, email, password, position
   (-> (sql/update! db
                    :users
                    (medley.core/assoc-some {}
                                            :name (:name user)
+                                           :username (:username user)
                                            :email (:email user)
                                            :password (:password user)
                                            :position (:position user))
                    {:id id})
       affected-rows-count))
-

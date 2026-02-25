@@ -82,11 +82,12 @@
   (try (let [db (:database request)
              organization-id (Integer/parseInt (str (get-in request [:params :id])))
              user-id (auth/get-user-id-from-request request)
-             email (get-in request [:body :email])]
+             email (get-in request [:body :email])
+             name (get-in request [:body :name])]
          (auth/require-organization-admin! user-id organization-id db)
-         (if (str/blank? email)
-           (bad-request "Email is required")
-           (-> (controller.organization/invite-player organization-id email user-id db)
+         (if (and (str/blank? email) (str/blank? name))
+           (bad-request "Email or Name is required")
+           (-> (controller.organization/invite-player-improved organization-id email name user-id db)
                adapter.organization/invite-player-response->frontend
                ok)))
        (catch Exception e (exception/api-exception-handler e))))

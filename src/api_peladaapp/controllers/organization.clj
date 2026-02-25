@@ -7,6 +7,7 @@
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.models.organization :as models.organization]
+   [clojure.string :as str]
    [next.jdbc :as jdbc]
    [schema.core :as s]))
 
@@ -27,30 +28,54 @@
                                        db)
       token)))
 
+(s/defn invite-player-improved
+  "Invites a player by email (handle) or name.
+   If handle is provided, uses/creates user by handle.
+   If only name is provided, creates a user with just a name.
+   In both cases, adds the user to the organization immediately if invited-by is an admin."
+  [organization-id :- s/Int
+   email :- (s/maybe s/Str)
+   name :- (s/maybe s/Str)
+   invited-by :- (s/maybe s/Int)
+   db]
+  (let [user (when-not (str/blank? email) (db.user/find-user-by-email email db))
+        user-id (cond
+                  user (:id user)
+                  (not (str/blank? email)) (db.user/insert-partial-user email db)
+                  (not (str/blank? name)) (db.user/insert-user-by-name name db)
+                  :else (throw (ex-info "Email or Name required" {:type :bad-request})))]
+
+            ;; Add to organization automatically ONLY if invited by name only (Guest user)
+            ;; or if the admin explicitly requested it (future improvement). 
+            ;; For now, maintaining backwards compatibility: email invitations require acceptance.
+    (when (and (str/blank? email) (not (str/blank? name)))
+      (when-not (db.player/get-org-player-by-user-id user-id organization-id db)
+        (db.player/insert-player {:user-id user-id :organization-id organization-id :grade 5.0} db)))
+
+            ;; Record invitation for tracking if email is present
+    (when (not (str/blank? email))
+
+      (let [existing-invites (db.invitation/list-pending-invitations-by-email email db)]
+        (when-not (some #(= (:organization-id %) organization-id) existing-invites)
+          (db.invitation/insert-invitation {:organization-id organization-id
+                                            :email email
+                                            :token (generate-token)
+                                            :invited-by invited-by}
+                                           db))))
+
+    {:user-id user-id
+     :email email
+     :name name
+     :is-new-user (nil? user)
+     :organization-id organization-id}))
+
 (s/defn invite-player
-  "Invites a player to an organization. 
-   If user doesn't exist, creates a partial user.
-   Record personal invitation but DOES NOT add to org yet."
+  "Legacy invite-player wrapper"
   [organization-id :- s/Int
    email :- s/Str
    invited-by :- (s/maybe s/Int)
    db]
-  (let [user (db.user/find-user-by-email email db)
-        user-id (if user
-                  (:id user)
-                  (db.user/insert-partial-user email db))
-        existing-invites (db.invitation/list-pending-invitations-by-email email db)]
-    ;; Record personal invitation only if not already invited
-    (when-not (some #(= (:organization-id %) organization-id) existing-invites)
-      (db.invitation/insert-invitation {:organization-id organization-id
-                                        :email email
-                                        :token (generate-token)
-                                        :invited-by invited-by}
-                                       db))
-    {:user-id user-id
-     :email email
-     :is-new-user (nil? user)
-     :organization-id organization-id}))
+  (invite-player-improved organization-id email nil invited-by db))
 
 (s/defn list-pending-invitations
   [email :- s/Str db]

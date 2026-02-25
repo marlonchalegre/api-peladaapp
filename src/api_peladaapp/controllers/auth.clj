@@ -10,10 +10,10 @@
    [schema.core :as s]))
 
 (s/defn authenticate :- {:token s/Str :user models.user/User}
-  "Authenticate a user by email/password and return a JWT token with user info."
+  "Authenticate a user by email/username and password and return a JWT token with user info."
   [{:keys [email password]} :- models.credential/Credential
    db]
-  (let [user-db (db.user/find-user-by-email email db)
+  (let [user-db (db.user/find-user-by-identifier email db)
         secret (config/get-key :jwt-secret)
         db-pass (:password user-db)]
     (when (nil? user-db)
@@ -27,9 +27,9 @@
 
 (s/defn first-access :- {:token s/Str :user models.user/User}
   "Complete registration for an invited user (who has no password set)."
-  [{:keys [email name password position]} :- models.user/NewUser
+  [{:keys [email username name password position]} :- models.user/NewUser
    db]
-  (let [user-db (db.user/find-user-by-email email db)]
+  (let [user-db (db.user/find-user-by-identifier (or email username) db)]
     (cond
       (nil? user-db)
       (throw (ex-info "User not found. Please ask for an invitation first."
@@ -40,7 +40,7 @@
                       {:type :already-exist :message "User already registered"}))
 
       :else
-      (let [updated-user (as-> {:email email :name name :password password :position position} $
+      (let [updated-user (as-> {:email email :username username :name name :password password :position position} $
                            (logic.user/encrypt-password $)
                            (do (db.user/update-user (:id user-db) $ db)
                                (db.user/find-user-by-id (:id user-db) db)))

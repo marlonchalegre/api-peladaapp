@@ -9,18 +9,27 @@
 (s/defn create-user :- models.user/User
   [user :- models.user/NewUser
    db]
-  (let [existing-user (db.user/find-user-by-email (:email user) db)]
+  (let [username (:username user)
+        email (:email user)
+        existing-user-username (when username (db.user/find-user-by-username username db))
+        existing-user-email (when email (db.user/find-user-by-email email db))]
     (cond
-      ;; User exists and has a password -> Error
-      (and existing-user (:password existing-user))
-      (throw (ex-info nil {:type :already-exist :message "User already exists"}))
+      ;; Username already taken
+      (and existing-user-username (:password existing-user-username))
+      (throw (ex-info "Username already exists" {:type :already-exist :message "Username already exists"}))
+
+      ;; Email already taken
+      (and existing-user-email (:password existing-user-email))
+      (throw (ex-info "Email already exists" {:type :already-exist :message "Email already exists"}))
 
       ;; User exists but has no password (partial) -> Update/Claim
-      existing-user
-      (as-> user $
-        (logic.user/encrypt-password $)
-        (do (db.user/update-user (:id existing-user) $ db)
-            (assoc user :id (:id existing-user))))
+      ;; We prefer matching by email for partial users if available
+      (or existing-user-username existing-user-email)
+      (let [existing-user (or existing-user-email existing-user-username)]
+        (as-> user $
+          (logic.user/encrypt-password $)
+          (do (db.user/update-user (:id existing-user) $ db)
+              (assoc user :id (:id existing-user)))))
 
       ;; User does not exist -> Insert
       :else
@@ -78,7 +87,7 @@
     (pagination/with-pagination-headers users total-count page per-page)))
 
 (s/defn update-user-profile :- models.user/User
-  "Update user profile - only allows updating name, email, password and position. Score is protected."
+  "Update user profile - only allows updating name, username, email, password and position. Score is protected."
   [profile-data :- models.user/UserProfileUpdate
    user-id :- s/Int
    db]
@@ -90,6 +99,7 @@
             ;; Update with new data, only if provided
             updated-user (cond-> base-user
                            (:name profile-data) (assoc :name (:name profile-data))
+                           (:username profile-data) (assoc :username (:username profile-data))
                            (:email profile-data) (assoc :email (:email profile-data))
                            (:password profile-data) (assoc :password (:password profile-data))
                            (:position profile-data) (assoc :position (:position profile-data)))

@@ -8,25 +8,25 @@
 
 (s/defn create-request->model :- models.user/NewUser
   [request :- requests.user/CreateUserRequest]
-  (select-keys request [:name :email :password :position]))
+  (select-keys request [:name :username :email :password :position]))
 
 (s/defn update-request->model :- models.user/UserProfileUpdate
   [request :- requests.user/UpdateUserRequest]
-  (select-keys request [:name :email :password :position]))
+  (select-keys request [:name :username :email :password :position]))
 
 (s/defn update-profile-request->model :- models.user/UserProfileUpdate
   [request :- requests.user/UpdateProfileRequest]
-  (select-keys request [:name :email :password :position]))
+  (select-keys request [:name :username :email :password :position]))
 
 (s/defn model->response :- responses.user/UserResponse
   ([user :- models.user/User]
    (model->response user false))
   ([user :- models.user/User exclude-email? :- s/Bool]
-   (let [fields (if exclude-email? [:id :name :position] [:id :name :email :position])]
+   (let [fields (if exclude-email? [:id :name :username :position] [:id :name :username :email :position])]
      (select-keys user fields))))
 
 (s/defn db->model :- models.user/User
   [user]
   (some-> user
           misc/unamespace
-          (select-keys [:id :name :email :password :position])))
+          (select-keys [:id :name :username :email :password :position])))
