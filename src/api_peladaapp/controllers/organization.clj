@@ -38,7 +38,7 @@
    name :- (s/maybe s/Str)
    invited-by :- (s/maybe s/Int)
    db]
-  (let [user (when-not (str/blank? email) (db.user/find-user-by-email email db))
+  (let [user (when-not (str/blank? email) (db.user/find-user-by-identifier email db))
         user-id (cond
                   user (:id user)
                   (not (str/blank? email)) (db.user/insert-partial-user email db)
