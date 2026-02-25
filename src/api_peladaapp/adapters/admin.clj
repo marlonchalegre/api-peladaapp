@@ -33,7 +33,7 @@
              :organization-id (:organization_id p)
              :user-id (:user_id p)}
       (:created_at p) (assoc :created-at (:created_at p))
-      (:user_name p) (assoc :user-name (:user_name p))
-      (:user_username p) (assoc :user-username (:user_username p))
-      (:user_email p) (assoc :user-email (:user_email p))
-      (:organization_name p) (assoc :organization-name (:organization_name p)))))
+      (or (:user_name p) (:user-name p)) (assoc :user-name (or (:user_name p) (:user-name p)))
+      (or (:user_username p) (:user-username p)) (assoc :user-username (or (:user_username p) (:user-username p)))
+      (or (:user_email p) (:user-email p)) (assoc :user-email (or (:user_email p) (:user-email p)))
+      (or (:organization_name p) (:organization-name p)) (assoc :organization-name (or (:organization_name p) (:organization-name p))))))
