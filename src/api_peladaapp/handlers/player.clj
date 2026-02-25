@@ -18,7 +18,7 @@
              created))
        (catch Exception e (exception/api-exception-handler e))))
 
-(defn update [request]
+(defn update-player-score [request]
   (try (let [db (:database request)
              id (Integer/parseInt (str (get-in request [:params :id])))
              body (:body request)

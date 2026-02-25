@@ -32,7 +32,8 @@
   "Invites a player by email (handle) or name.
    If handle is provided, uses/creates user by handle.
    If only name is provided, creates a user with just a name.
-   Returns invitation info including token for automation."
+   Returns invitation info including token for automation.
+   Prevents duplicate pending invitations."
   [organization-id :- s/Int
    email :- (s/maybe s/Str)
    name :- (s/maybe s/Str)
@@ -43,24 +44,33 @@
                   user (:id user)
                   (not (str/blank? email)) (db.user/insert-partial-user email db)
                   (not (str/blank? name)) (db.user/insert-user-by-name name db)
-                  :else (throw (ex-info "Email or Name required" {:type :bad-request})))]
+                  :else (throw (ex-info "Email or Name required" {:type :bad-request})))
+        identifier (or email (str "guest-" user-id))]
     
-    ;; Record invitation for tracking
-    (let [token (generate-token)]
-      (db.invitation/insert-invitation {:organization-id organization-id
-                                        :email (or email (str "guest-" user-id)) 
-                                        :token token
-                                        :invited-by invited-by}
-                                       db)
-      
+    (if-let [existing (first (db.invitation/list-pending-invitations-by-identifiers [identifier] db))]
       (let [player (db.player/get-org-player-by-user-id user-id organization-id db)]
         {:user-id user-id
          :player-id (:id player)
          :email email
          :name name
-         :token token
+         :token (:token existing)
          :is-new-user (nil? user)
-         :organization-id organization-id}))))
+         :organization-id organization-id})
+      
+      (let [token (generate-token)]
+        (db.invitation/insert-invitation {:organization-id organization-id
+                                          :email identifier
+                                          :token token
+                                          :invited-by invited-by}
+                                         db)
+        (let [player (db.player/get-org-player-by-user-id user-id organization-id db)]
+          {:user-id user-id
+           :player-id (:id player)
+           :email email
+           :name name
+           :token token
+           :is-new-user (nil? user)
+           :organization-id organization-id})))))
 
 (s/defn invite-player
   "Legacy invite-player wrapper"
@@ -109,8 +119,11 @@
           (when-not is-in-org?
             (jdbc/execute! tx ["INSERT INTO OrganizationPlayers (user_id, organization_id, grade) VALUES (?, ?, 5.0)"
                                user-id org-id]))
-          (when (:email inv) ;; Only personal invitations change status
-            (db.invitation/update-invitation-status (:id inv) "accepted" tx)))
+          
+          ;; Clean up all pending invitations for this user in this organization
+          (let [identifiers (remove str/blank? [(:email user) (:username user)])]
+            (db.invitation/mark-all-accepted org-id identifiers tx)))
+        
         {:organization-id org-id}))))
 
 (s/defn list-organization-invitations

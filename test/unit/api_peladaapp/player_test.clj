@@ -25,7 +25,7 @@
                          :params {:id "1"}
                          :body {:grade 7.5}
                          :identity {:id 99 :is-admin? false}}
-                response (handler.player/update request)]
+                response (handler.player/update-player-score request)]
             (is (= 200 (:status response)))
             (is (= 7.5 (:grade (:body response))))))))
 
@@ -37,7 +37,7 @@
                        :params {:id "1"}
                        :body {:grade 7.5}
                        :identity {:id 99 :is-admin? false}}
-              response (handler.player/update request)]
+              response (handler.player/update-player-score request)]
           (is (= 403 (:status response))))))
 
     (testing "Fails with 404 if player not found"
@@ -46,5 +46,5 @@
                        :params {:id "999"}
                        :body {:grade 7.5}
                        :identity {:id 99 :is-admin? false}}
-              response (handler.player/update request)]
+              response (handler.player/update-player-score request)]
           (is (= 404 (:status response))))))))

@@ -1,9 +1,9 @@
 (ns api-peladaapp.db.organization-invitation
   (:require
    [api-peladaapp.adapters.invitation :as adapter.invitation]
+   [clojure.string :as str]
    [next.jdbc :as jdbc]
    [next.jdbc.result-set :as rs]
-   [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
 (defn- affected-rows-count [result]
@@ -50,8 +50,17 @@
 
 (s/defn update-invitation-status :- s/Int
   [id status db]
-  (-> (sql/update! db :organizationinvitations {:status status} {:id id})
-      affected-rows-count))
+  (let [result (jdbc/execute! db ["UPDATE OrganizationInvitations SET status = ? WHERE id = ?" status id])]
+    (affected-rows-count (first result))))
+
+(s/defn mark-all-accepted :- s/Int
+  [organization-id identifiers db]
+  (let [placeholders (str/join "," (repeat (count identifiers) "LOWER(?)"))
+        sql (str "UPDATE OrganizationInvitations SET status = 'accepted' 
+                  WHERE organization_id = ? AND status = 'pending' AND LOWER(email) IN (" placeholders ")")]
+    (-> (jdbc/execute! db (into [sql organization-id] identifiers))
+        first
+        affected-rows-count)))
 
 (s/defn get-invitation-by-id
   [id db]
@@ -67,10 +76,13 @@
 
 (s/defn list-invitations-by-organization
   [organization-id db]
-  (->> (jdbc/execute! db ["SELECT * FROM OrganizationInvitations WHERE organization_id = ? ORDER BY created_at DESC" organization-id] opts)
+  (->> (jdbc/execute! db ["SELECT * FROM OrganizationInvitations 
+                           WHERE organization_id = ? AND status = 'pending' 
+                           ORDER BY created_at DESC" organization-id] opts)
        (map adapter.invitation/db->model)))
 
 (s/defn delete-invitation :- s/Int
   [id db]
-  (let [result (jdbc/execute! db ["DELETE FROM OrganizationInvitations WHERE id = ?" id])]
-    (affected-rows-count (first result))))
+  (-> (jdbc/execute! db ["DELETE FROM OrganizationInvitations WHERE id = ?" id])
+      first
+      affected-rows-count))

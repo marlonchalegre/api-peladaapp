@@ -58,7 +58,7 @@
 (defroutes api-players
   (context "/api" []
     (POST "/players" [] handler.player/create)
-    (PUT "/players/:id" [] handler.player/update)
+    (PUT "/players/:id" [] handler.player/update-player-score)
     (DELETE "/players/:id" [] handler.player/delete)
     (GET "/organizations/:organization_id/players" [] handler.player/list-by-org)))
 
