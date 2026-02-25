@@ -38,6 +38,16 @@
                       WHERE LOWER(i.email) = LOWER(?) AND i.status = 'pending'" email] opts)
        (map adapter.invitation/db->model)))
 
+(s/defn list-pending-invitations-by-identifiers
+  [identifiers db]
+  (let [placeholders (clojure.string/join "," (repeat (count identifiers) "LOWER(?)"))
+        sql (str "SELECT i.*, o.name as organization_name 
+                  FROM OrganizationInvitations i
+                  JOIN Organizations o ON i.organization_id = o.id
+                  WHERE LOWER(i.email) IN (" placeholders ") AND i.status = 'pending'")]
+    (->> (jdbc/execute! db (into [sql] identifiers) opts)
+         (map adapter.invitation/db->model))))
+
 (s/defn update-invitation-status :- s/Int
   [id status db]
   (-> (sql/update! db :organizationinvitations {:status status} {:id id})

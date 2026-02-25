@@ -74,6 +74,13 @@
   [email :- s/Str db]
   (db.invitation/list-pending-invitations-by-email email db))
 
+(s/defn list-pending-invitations-for-user
+  [email username db]
+  (let [identifiers (remove clojure.string/blank? [email username])]
+    (if (empty? identifiers)
+      []
+      (db.invitation/list-pending-invitations-by-identifiers identifiers db))))
+
 (s/defn get-invitation-by-token
   [token :- s/Str db]
   (if-let [inv (db.invitation/get-invitation-by-token token db)]
