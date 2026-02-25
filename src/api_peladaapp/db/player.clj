@@ -2,11 +2,14 @@
   (:require
    [api-peladaapp.adapters.player :as adapter.player]
    [next.jdbc]
+   [next.jdbc.result-set :as rs]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
 (defn- affected-rows-count [result]
   (-> result vals first))
+
+(def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn insert-player :- s/Int
   [{:keys [user-id organization-id grade position-id]}
@@ -45,6 +48,6 @@
   (->> (next.jdbc/execute! db ["SELECT op.*, u.name as user_name, u.username as user_username, u.email as user_email 
                                 FROM organizationplayers op 
                                 JOIN users u ON op.user_id = u.id 
-                                WHERE op.organization_id = ?" organization-id])
+                                WHERE op.organization_id = ?" organization-id] opts)
        (map adapter.player/db->model)
        vec))

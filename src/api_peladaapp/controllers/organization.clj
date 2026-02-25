@@ -96,10 +96,14 @@
             is-in-org? (boolean (db.player/get-org-player-by-user-id user-id org-id db))
             user (db.user/find-user-by-id user-id db)]
 
-        ;; Security check: if invitation has email, user email must match
-        (when (and (:email inv) (not (clojure.string/starts-with? (:email inv) "guest-")) (not= (:email inv) (:email user)))
-          (throw (ex-info "Invitation does not belong to this user"
-                          {:type :forbidden :message "This invitation was sent to another identifier."})))
+        ;; Security check: if invitation has email, user email or username must match
+        (let [identifier (:email inv)]
+          (when (and identifier 
+                     (not (str/starts-with? identifier "guest-"))
+                     (not= identifier (:email user))
+                     (not= identifier (:username user)))
+            (throw (ex-info "Invitation does not belong to this user"
+                            {:type :forbidden :message "This invitation was sent to another identifier."}))))
 
         (jdbc/with-transaction [tx db]
           (when-not is-in-org?

@@ -2,11 +2,14 @@
   (:require
    [api-peladaapp.adapters.admin :as adapter.admin]
    [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
 (defn- affected-rows-count [result]
   (-> result vals first))
+
+(def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn insert-organization-admin :- s/Int
   [{:keys [organization-id user-id]} db]
@@ -31,14 +34,14 @@
   (->> (jdbc/execute! db ["select oa.*, u.name as user_name, u.username as user_username, u.email as user_email
                              from organizationadmins oa
                              join users u on oa.user_id = u.id
-                             where oa.organization_id = ?" organization_id])
+                             where oa.organization_id = ?" organization_id] opts)
        (map adapter.admin/db->model)))
 
 (s/defn list-organizations-by-admin [user_id db]
   (->> (jdbc/execute! db ["select oa.*, o.name as organization_name
                              from organizationadmins oa
                              join organizations o on oa.organization_id = o.id
-                             where oa.user_id = ?" user_id])
+                             where oa.user_id = ?" user_id] opts)
        (map adapter.admin/db->model)))
 
 (s/defn count-admins-by-organization :- s/Int
