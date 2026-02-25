@@ -18,6 +18,18 @@
              created))
        (catch Exception e (exception/api-exception-handler e))))
 
+(defn update [request]
+  (try (let [db (:database request)
+             id (Integer/parseInt (str (get-in request [:params :id])))
+             body (:body request)
+             player-update (adapter.player/update-request->model body)
+             user-id (auth/get-user-id-from-request request)
+             player (controller.player/get-player id db)
+             org-id (:organization-id player)]
+         (auth/require-organization-admin! user-id org-id db)
+         (ok (adapter.player/model->response (controller.player/update-player id player-update db))))
+       (catch Exception e (exception/api-exception-handler e))))
+
 (defn delete [request]
   (try (let [db (:database request)
              id (Integer/parseInt (str (get-in request [:params :id])))

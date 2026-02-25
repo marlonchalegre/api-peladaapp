@@ -22,7 +22,7 @@
         email "new-player@example.com"]
 
     (testing "Inviting a non-existent user creates a partial user and DOES NOT add to org yet"
-      (let [result (controller.organization/invite-player org-id email nil db)]
+      (let [result (controller.organization/invite-player-improved org-id email nil 99 db)]
         (is (= email (:email result)))
         (is (:is-new-user result))
         (is (= org-id (:organization-id result)))
@@ -36,12 +36,12 @@
         (let [player (first (jdbc/execute! db ["SELECT * FROM OrganizationPlayers WHERE user_id = ? AND organization_id = ?" (:user-id result) org-id] opts))]
           (is (nil? player)))))
 
-    (testing "Inviting an existing user DOES NOT add them to org automatically"
+    (testing "Inviting an existing user DOES NOT add them to org automatically (requires acceptance)"
       (let [existing-email "existing@example.com"
             _ (jdbc/execute! db ["INSERT INTO Users (email, name, password) VALUES (?, ?, ?)" existing-email "Existing" "hashed-pass"] opts)
             user (first (jdbc/execute! db ["SELECT id FROM Users WHERE email = ?" existing-email] opts))
             user-id (:id user)
-            result (controller.organization/invite-player org-id existing-email nil db)]
+            result (controller.organization/invite-player-improved org-id existing-email nil 99 db)]
         (is (= existing-email (:email result)))
         (is (not (:is-new-user result)))
         (is (= user-id (:user-id result)))
@@ -50,20 +50,19 @@
         (let [player (first (jdbc/execute! db ["SELECT * FROM OrganizationPlayers WHERE user_id = ? AND organization_id = ?" user-id org-id] opts))]
           (is (nil? player)))))
 
-    (testing "Inviting by name only adds user to org automatically"
+    (testing "Inviting by name only DOES NOT add user to org automatically (requires acceptance)"
       (let [name "Guest Player"
-            result (controller.organization/invite-player-improved org-id nil name nil db)]
+            result (controller.organization/invite-player-improved org-id nil name 99 db)]
         (is (= name (:name result)))
         (is (nil? (:email result)))
-
+        
         ;; Verify user exists in DB
         (let [user (first (jdbc/execute! db ["SELECT * FROM Users WHERE name = ?" name] opts))]
-          (is (some? user))
-          (is (nil? (:username user))))
+          (is (some? user)))
 
-        ;; Verify player ADDED to org automatically
+        ;; Verify player NOT ADDED to org yet
         (let [player (first (jdbc/execute! db ["SELECT * FROM OrganizationPlayers WHERE user_id = ? AND organization_id = ?" (:user-id result) org-id] opts))]
-          (is (some? player)))))))
+          (is (nil? player)))))))
 
 (deftest first-access-test
   (let [db-val (get-in helpers/*test-system* [:database :database])

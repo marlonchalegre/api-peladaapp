@@ -32,7 +32,7 @@
   "Invites a player by email (handle) or name.
    If handle is provided, uses/creates user by handle.
    If only name is provided, creates a user with just a name.
-   In both cases, adds the user to the organization immediately if invited-by is an admin."
+   Returns invitation info including token for automation."
   [organization-id :- s/Int
    email :- (s/maybe s/Str)
    name :- (s/maybe s/Str)
@@ -44,30 +44,23 @@
                   (not (str/blank? email)) (db.user/insert-partial-user email db)
                   (not (str/blank? name)) (db.user/insert-user-by-name name db)
                   :else (throw (ex-info "Email or Name required" {:type :bad-request})))]
-
-            ;; Add to organization automatically ONLY if invited by name only (Guest user)
-            ;; or if the admin explicitly requested it (future improvement). 
-            ;; For now, maintaining backwards compatibility: email invitations require acceptance.
-    (when (and (str/blank? email) (not (str/blank? name)))
-      (when-not (db.player/get-org-player-by-user-id user-id organization-id db)
-        (db.player/insert-player {:user-id user-id :organization-id organization-id :grade 5.0} db)))
-
-            ;; Record invitation for tracking if email is present
-    (when (not (str/blank? email))
-
-      (let [existing-invites (db.invitation/list-pending-invitations-by-email email db)]
-        (when-not (some #(= (:organization-id %) organization-id) existing-invites)
-          (db.invitation/insert-invitation {:organization-id organization-id
-                                            :email email
-                                            :token (generate-token)
-                                            :invited-by invited-by}
-                                           db))))
-
-    {:user-id user-id
-     :email email
-     :name name
-     :is-new-user (nil? user)
-     :organization-id organization-id}))
+    
+    ;; Record invitation for tracking
+    (let [token (generate-token)]
+      (db.invitation/insert-invitation {:organization-id organization-id
+                                        :email (or email (str "guest-" user-id)) 
+                                        :token token
+                                        :invited-by invited-by}
+                                       db)
+      
+      (let [player (db.player/get-org-player-by-user-id user-id organization-id db)]
+        {:user-id user-id
+         :player-id (:id player)
+         :email email
+         :name name
+         :token token
+         :is-new-user (nil? user)
+         :organization-id organization-id}))))
 
 (s/defn invite-player
   "Legacy invite-player wrapper"
@@ -97,9 +90,9 @@
             user (db.user/find-user-by-id user-id db)]
 
         ;; Security check: if invitation has email, user email must match
-        (when (and (:email inv) (not= (:email inv) (:email user)))
+        (when (and (:email inv) (not (clojure.string/starts-with? (:email inv) "guest-")) (not= (:email inv) (:email user)))
           (throw (ex-info "Invitation does not belong to this user"
-                          {:type :forbidden :message "This invitation was sent to another email address."})))
+                          {:type :forbidden :message "This invitation was sent to another identifier."})))
 
         (jdbc/with-transaction [tx db]
           (when-not is-in-org?

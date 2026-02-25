@@ -27,6 +27,7 @@
 
 (defn invite-player-response->frontend [result]
   {:user_id (:user-id result)
+   :player_id (:player-id result)
    :email (:email result)
    :name (:name result)
    :is_new_user (:is-new-user result)
