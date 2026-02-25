@@ -126,10 +126,22 @@
   (->> (combo/combinations team-ids 2)
        (mapv (fn [[h a]] {:home h :away a}))))
 
+(defn- reorder-for-natural-start
+  "Reorder teams so that circle method starts with 1x2, 3x4, etc.
+   Pattern for even n: [1 3 5 ... n-1 n n-2 ... 4 2]"
+  [teams]
+  (let [n (count teams)
+        sorted (sort teams)]
+    (if (even? n)
+      (let [odds (take-nth 2 sorted)
+            evens (take-nth 2 (rest sorted))]
+        (vec (concat odds (reverse evens))))
+      (vec sorted))))
+
 (defn schedule-matches-with-limit
   "Backtracking scheduler to find a valid sequence of matches."
   [team-ids matches-per-team]
-  (let [teams (vec team-ids)
+  (let [teams (reorder-for-natural-start team-ids)
         n (count teams)
         total-matches (if (and n (pos? n) matches-per-team) (quot (* n matches-per-team) 2) 0)
         all-teams-set (set teams)
