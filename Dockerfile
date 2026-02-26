@@ -22,8 +22,8 @@ RUN --mount=type=cache,target=/root/.m2 \
     && mv target/uberjar/*-standalone.jar /app/app.jar
 
 # --- Runtime image: lean JRE
-# Using Java 23 to support classes compiled with version 67.0
-FROM eclipse-temurin:23-jre
+# Using Java 21 for broad multi-arch support (including arm/v7)
+FROM eclipse-temurin:21-jre
 WORKDIR /app
 
 # Install Litestream
