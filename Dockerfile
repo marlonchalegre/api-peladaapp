@@ -2,7 +2,8 @@
 
 # --- Builder image: builds the uberjar
 # Using Java 23 to match LibSQL driver requirements
-FROM clojure:temurin-23-lein AS builder
+# We build the uberjar on the build platform (usually amd64) to speed up the process
+FROM --platform=$BUILDPLATFORM clojure:temurin-23-lein AS builder
 WORKDIR /app
 
 ENV LEIN_JVM_OPTS="-XX:MaxRAMPercentage=85.0 -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -DSKIP_DB_INIT=true"
@@ -28,7 +29,8 @@ WORKDIR /app
 # Install Litestream
 RUN apt-get update && apt-get install -y curl && \
     ARCH=$(dpkg --print-architecture) && \
-    curl -L "https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-${ARCH}.deb" -o litestream.deb && \
+    if [ "$ARCH" = "armhf" ]; then L_ARCH="arm"; else L_ARCH="$ARCH"; fi && \
+    curl -L "https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-${L_ARCH}.deb" -o litestream.deb && \
     dpkg -i litestream.deb && \
     rm litestream.deb && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
