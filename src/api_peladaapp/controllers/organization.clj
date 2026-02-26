@@ -46,7 +46,7 @@
                   (not (str/blank? name)) (db.user/insert-user-by-name name db)
                   :else (throw (ex-info "Email or Name required" {:type :bad-request})))
         identifier (or email (str "guest-" user-id))]
-    
+
     (if-let [existing (first (db.invitation/list-pending-invitations-by-identifiers [identifier] db))]
       (let [player (db.player/get-org-player-by-user-id user-id organization-id db)]
         {:user-id user-id
@@ -56,7 +56,7 @@
          :token (:token existing)
          :is-new-user (nil? user)
          :organization-id organization-id})
-      
+
       (let [token (generate-token)]
         (db.invitation/insert-invitation {:organization-id organization-id
                                           :email identifier
@@ -108,7 +108,7 @@
 
         ;; Security check: if invitation has email, user email or username must match
         (let [identifier (:email inv)]
-          (when (and identifier 
+          (when (and identifier
                      (not (str/starts-with? identifier "guest-"))
                      (not= identifier (:email user))
                      (not= identifier (:username user)))
@@ -119,11 +119,11 @@
           (when-not is-in-org?
             (jdbc/execute! tx ["INSERT INTO OrganizationPlayers (user_id, organization_id, grade) VALUES (?, ?, 5.0)"
                                user-id org-id]))
-          
+
           ;; Clean up all pending invitations for this user in this organization
           (let [identifiers (remove str/blank? [(:email user) (:username user)])]
             (db.invitation/mark-all-accepted org-id identifiers tx)))
-        
+
         {:organization-id org-id}))))
 
 (s/defn list-organization-invitations

@@ -1,8 +1,7 @@
 (ns api-peladaapp.player-test
   (:require
-   [api-peladaapp.controllers.player :as controller.player]
-   [api-peladaapp.handlers.player :as handler.player]
    [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.handlers.player :as handler.player]
    [api-peladaapp.logic.authorization :as auth]
    [clojure.test :refer [deftest is testing]]))
 
@@ -13,8 +12,8 @@
 
     (testing "Successfully updates player score if user is org admin"
       (let [get-calls (atom 0)]
-        (with-redefs [db.player/get-player (fn [id _] 
-                                             (if (= id 1) 
+        (with-redefs [db.player/get-player (fn [id _]
+                                             (if (= id 1)
                                                (if (= @get-calls 0)
                                                  (do (swap! get-calls inc) mock-player)
                                                  updated-player)
@@ -31,7 +30,7 @@
 
     (testing "Fails with 403 if user is not org admin"
       (with-redefs [db.player/get-player (fn [id _] (if (= id 1) mock-player nil))
-                    auth/require-organization-admin! (fn [_ _ _] 
+                    auth/require-organization-admin! (fn [_ _ _]
                                                        (throw (ex-info "Forbidden" {:type :forbidden})))]
         (let [request {:database db
                        :params {:id "1"}

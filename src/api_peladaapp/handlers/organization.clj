@@ -110,7 +110,7 @@
   (try (let [db (:database request)
              user-id (auth/get-user-id-from-request request)
              user (db.user/find-user-by-id user-id db)]
-         (ok (map adapter.invitation/model->response 
+         (ok (map adapter.invitation/model->response
                   (controller.organization/list-pending-invitations-for-user (:email user) (:username user) db))))
        (catch Exception e (exception/api-exception-handler e))))
 

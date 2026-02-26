@@ -55,7 +55,7 @@
             result (controller.organization/invite-player-improved org-id nil name 99 db)]
         (is (= name (:name result)))
         (is (nil? (:email result)))
-        
+
         ;; Verify user exists in DB
         (let [user (first (jdbc/execute! db ["SELECT * FROM Users WHERE name = ?" name] opts))]
           (is (some? user)))
