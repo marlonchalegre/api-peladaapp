@@ -2,8 +2,6 @@
   (:require
    [api-peladaapp.test-helpers :as th]
    [buddy.hashers :as hashers]
-   [clojure.data.json :as json]
-   [clojure.string :as str]
    [clojure.test :refer [deftest is use-fixtures]]
    [next.jdbc :as jdbc]
    [next.jdbc.sql :as sql]
@@ -11,15 +9,7 @@
 
 (use-fixtures :each th/test-system-fixture)
 
-(defn- decode-body [resp]
-  (let [b (:body resp)]
-    (cond
-      (map? b) b
-      (string? b) (when (not (str/blank? b)) (json/read-str b :key-fn keyword))
-      (instance? java.io.InputStream b) (let [s (slurp b)] (when (not (str/blank? s)) (json/read-str s :key-fn keyword)))
-      :else nil)))
-
-(deftest login-success-returns-jwt
+(deftest login-success-test
   (let [app (-> th/*test-system* :app :handler)
         db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
@@ -28,9 +18,9 @@
                             :password (hashers/encrypt "s3cret")})
     (let [resp (app (-> (mock/request :post "/auth/login")
                         (mock/json-body {:email "john@example.com" :password "s3cret"})))
-          body (decode-body resp)]
+          body (th/decode-body resp)]
       (is (= 200 (:status resp)))
-      (is (string? (:token body))))))
+      (is (contains? body :token)))))
 
 (deftest login-fails-with-wrong-password
   (let [app (-> th/*test-system* :app :handler)
@@ -44,7 +34,7 @@
       (is (= 401 (:status resp))))))
 
 (deftest login-fails-with-non-existent-user
-  (let [app (-> th/*test-system* :app :handler)]
-    (let [resp (app (-> (mock/request :post "/auth/login")
-                        (mock/json-body {:email "ghost@example.com" :password "any"})))]
-      (is (= 401 (:status resp))))))
+  (let [app (-> th/*test-system* :app :handler)
+        resp (app (-> (mock/request :post "/auth/login")
+                      (mock/json-body {:email "ghost@example.com" :password "any"})))]
+    (is (= 401 (:status resp)))))

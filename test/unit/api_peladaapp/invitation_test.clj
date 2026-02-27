@@ -93,9 +93,7 @@
       (let [payload {:email email
                      :username "otheruser"
                      :name "Other Name"
-                     :password "another-pass"}
-            db-val (get-in helpers/*test-system* [:database :database])
-            db (if (fn? db-val) (db-val) db-val)]
+                     :password "another-pass"}]
         ;; It should throw because password was set in previous test if it was same DB, 
         ;; but fixture is :each, so it resets. Wait, I should ensure it HAS a password.
         (jdbc/execute! db ["UPDATE Users SET password = 'already-set' WHERE email = ?" email] opts)
@@ -215,14 +213,9 @@
             _ (jdbc/execute! db ["INSERT INTO Users (email) VALUES (?)" email] opts) ;; Partial user
             partial-user (first (jdbc/execute! db ["SELECT id FROM Users WHERE email = ?" email] opts))
             partial-id (:id partial-user)
-
-            new-user-data {:email email :username "claimeduser" :name "Claimed Name" :password "pass123" :position "Striker"}]
-
-        ;; Register should succeed and update existing user
-        (let [result (controller.user/create-user new-user-data db)]
-          (is (= partial-id (:id result)))
-
-          ;; Verify update in DB
-          (let [updated-user (first (jdbc/execute! db ["SELECT * FROM Users WHERE id = ?" partial-id] opts))]
-            (is (= "Claimed Name" (:name updated-user)))
-            (is (some? (:password updated-user)))))))))
+            new-user-data {:email email :username "claimeduser" :name "Claimed Name" :password "pass123" :position "Striker"}
+            result (controller.user/create-user new-user-data db)
+            updated-user (first (jdbc/execute! db ["SELECT * FROM Users WHERE id = ?" partial-id] opts))]
+        (is (= partial-id (:id result)))
+        (is (= "Claimed Name" (:name updated-user)))
+        (is (some? (:password updated-user)))))))

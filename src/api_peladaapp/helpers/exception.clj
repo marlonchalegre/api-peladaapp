@@ -1,7 +1,8 @@
 (ns api-peladaapp.helpers.exception
   (:require
    [api-peladaapp.helpers.responses :refer [bad-request forbidden not-found
-                                            server-error unauthorized]]))
+                                            server-error too-many-requests
+                                            unauthorized]]))
 
 (defn- exception->map [^Throwable e]
   (let [sw (java.io.StringWriter.)
@@ -24,6 +25,7 @@
       :bad-request         (bad-request (:message data))
       :validation-error    (bad-request (:message data))
       :forbidden           (forbidden (:message data))
+      :too-many-requests   (too-many-requests (:message data))
       (do
         (println "[SERVER ERROR]" (.getMessage e))
         (.printStackTrace e)

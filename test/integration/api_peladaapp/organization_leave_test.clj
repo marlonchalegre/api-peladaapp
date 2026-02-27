@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.server :as server]
    [api-peladaapp.test-helpers :as helpers]
+   [clojure.string :as str]
    [clojure.test :refer [deftest is use-fixtures]]
    [next.jdbc :as jdbc]
    [ring.mock.request :as mock]))
@@ -52,10 +53,10 @@
     (let [leave-resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/leave"))
                               (mock/header "Authorization" (str "Token " token1))))]
       (is (= 400 (:status leave-resp)) "Last admin should not be able to leave")
-      (is (clojure.string/includes? (str (:body leave-resp)) "last administrator")))
+      (is (str/includes? (str (:body leave-resp)) "last administrator")))
 
     ;; 3. Add another admin and then leave
-    (let [token3 (helpers/register-and-login! app {:name "Admin Three" :email "admin3@test.com" :password "pass123"})
+    (let [_ (helpers/register-and-login! app {:name "Admin Three" :email "admin3@test.com" :password "pass123"})
           user3-id (helpers/user-id-by-email db "admin3@test.com")]
       ;; Admin 1 adds Admin 3
       (app (-> (mock/request :post (str "/api/organizations/" org-id "/admins"))

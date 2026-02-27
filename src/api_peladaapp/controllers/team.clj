@@ -37,9 +37,11 @@
   (db.team/list-pelada-teams pelada-id db))
 
 (s/defn add-player :- responses.team/TeamPlayerResponse
-  [team-id :- s/Int player-id :- s/Int db]
-  (db.team/add-player-to-team team-id player-id db)
-  {:team_id team-id :player_id player-id})
+  ([team-id :- s/Int player-id :- s/Int db]
+   (add-player team-id player-id false db))
+  ([team-id :- s/Int player-id :- s/Int is-goalkeeper :- s/Bool db]
+   (db.team/add-player-to-team team-id player-id is-goalkeeper db)
+   {:team_id team-id :player_id player-id :is_goalkeeper is-goalkeeper}))
 
 (s/defn remove-player :- s/Int
   [team-id :- s/Int player-id :- s/Int db]

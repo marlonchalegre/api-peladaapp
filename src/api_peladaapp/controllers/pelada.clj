@@ -129,7 +129,13 @@
         match-lineups (db.match-lineup/list-match-lineups-by-pelada pelada-id db)
 
         ;; Transform team-players into a map
-        team-players-map (group-by :team_id team-players)
+        team-players-map (into {} (map (fn [[tid tps]]
+                                         [tid (map (fn [tp]
+                                                     {:team_id (:team_id tp)
+                                                      :player_id (:player_id tp)
+                                                      :is_goalkeeper false})
+                                                   tps)])
+                                       (group-by :team_id team-players)))
 
         ;; Transform match-lineups into a map of match-id -> team-id -> players
         match-lineups-map (reduce (fn [acc {:keys [match_id team_id] :as lineup}]
@@ -164,7 +170,9 @@
         mapped-pelada (adapter.pelada/model->response pelada)
         mapped-teams (map (fn [team]
                             (assoc (adapter.team/model->response team)
-                                   :players (map (fn [p] (assoc (adapter.player/model->response p) :user (:user p)))
+                                   :players (map (fn [p] (assoc (adapter.player/model->response p)
+                                                                :user (:user p)
+                                                                :is_goalkeeper false))
                                                  (:players team))))
                           (:teams pelada-data))
         mapped-available (map (fn [p]

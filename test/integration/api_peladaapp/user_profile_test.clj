@@ -22,42 +22,42 @@
         db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
         token (th/register-and-login! app {:name "Profile User" :email "profile@example.com" :password "pass"})
-        user-id (th/user-id-by-email ds "profile@example.com")]
-    (let [resp (app (-> (mock/request :get (str "/api/user/" user-id))
-                        (mock/header "Authorization" (str "Token " token))))
-          body (decode-body resp)]
-      (is (= 200 (:status resp)))
-      (is (= "Profile User" (:name body)))
-      (is (= "profile@example.com" (:email body))))))
+        user-id (th/user-id-by-email ds "profile@example.com")
+        resp (app (-> (mock/request :get (str "/api/user/" user-id))
+                      (mock/header "Authorization" (str "Token " token))))
+        body (decode-body resp)]
+    (is (= 200 (:status resp)))
+    (is (= "Profile User" (:name body)))
+    (is (= "profile@example.com" (:email body)))))
 
 (deftest get-user-profile-unauthorized
   (let [app (-> th/*test-system* :app :handler)
-        token (th/register-and-login! app {:name "Any" :email "any@any.com" :password "any"})]
-    (let [resp (app (-> (mock/request :get "/api/user/9999")
-                        (mock/header "Authorization" (str "Token " token))))]
-      (is (= 403 (:status resp))))))
+        token (th/register-and-login! app {:name "Any" :email "any@any.com" :password "any"})
+        resp (app (-> (mock/request :get "/api/user/9999")
+                      (mock/header "Authorization" (str "Token " token))))]
+    (is (= 403 (:status resp)))))
 
 (deftest update-user-profile-success
   (let [app (-> th/*test-system* :app :handler)
         db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
         token (th/register-and-login! app {:name "Old Name" :email "old@example.com" :password "pass"})
-        user-id (th/user-id-by-email ds "old@example.com")]
-    (let [resp (app (-> (mock/request :put (str "/api/user/" user-id "/profile"))
-                        (mock/header "Authorization" (str "Token " token))
-                        (mock/json-body {:name "New Name" :position "Midfielder"})))
-          body (decode-body resp)]
-      (is (= 200 (:status resp)))
-      (is (= "New Name" (:name body)))
-      (is (= "Midfielder" (:position body))))))
+        user-id (th/user-id-by-email ds "old@example.com")
+        resp (app (-> (mock/request :put (str "/api/user/" user-id "/profile"))
+                      (mock/header "Authorization" (str "Token " token))
+                      (mock/json-body {:name "New Name" :position "Midfielder"})))
+        body (decode-body resp)]
+    (is (= 200 (:status resp)))
+    (is (= "New Name" (:name body)))
+    (is (= "Midfielder" (:position body)))))
 
 (deftest delete-user-success
   (let [app (-> th/*test-system* :app :handler)
         db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
         token (th/register-and-login! app {:name "Delete Me" :email "delete@example.com" :password "pass"})
-        user-id (th/user-id-by-email ds "delete@example.com")]
-    (let [resp (app (-> (mock/request :delete (str "/api/user/" user-id))
-                        (mock/header "Authorization" (str "Token " token))))]
-      (is (= 204 (:status resp)))
-      (is (nil? (th/user-id-by-email ds "delete@example.com"))))))
+        user-id (th/user-id-by-email ds "delete@example.com")
+        resp (app (-> (mock/request :delete (str "/api/user/" user-id))
+                      (mock/header "Authorization" (str "Token " token))))]
+    (is (= 204 (:status resp)))
+    (is (nil? (th/user-id-by-email ds "delete@example.com")))))

@@ -1,4 +1,5 @@
 (ns api-peladaapp.handlers.pelada
+  (:refer-clojure :exclude [update])
   (:require
    [api-peladaapp.adapters.pelada :as adapter.pelada]
    [api-peladaapp.controllers.pelada :as controller.pelada]
@@ -111,4 +112,19 @@
          ;; Members can view peladas
          (auth/require-organization-member! user-id org-id db)
          (ok (controller.pelada/get-pelada-dashboard-data id db)))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn update [request]
+  (try (let [db (:database request)
+             id (Integer/parseInt (str (get-in request [:params :id])))
+             body (:body request)
+             pelada-update (adapter.pelada/update-request->model body)
+             user-id (auth/get-user-id-from-request request)
+             pelada (controller.pelada/get-pelada id db)
+             org-id (:organization-id pelada)]
+         ;; Only admins can update peladas
+         (auth/require-organization-admin! user-id org-id db)
+         (-> (controller.pelada/update-pelada id pelada-update db)
+             adapter.pelada/model->response
+             ok))
        (catch Exception e (exception/api-exception-handler e))))

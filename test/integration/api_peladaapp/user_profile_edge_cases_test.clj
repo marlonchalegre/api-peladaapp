@@ -28,8 +28,7 @@
     (testing "Update profile removing email (null/missing)"
       (let [resp (app (-> (mock/request :put (str "/api/user/" user-id "/profile"))
                           (mock/json-body {:name "Updated Name" :username "edge_user"})
-                          auth))
-            body (th/decode-body resp)]
+                          auth))]
         ;; The controller uses cond-> and assoc-some, so if email is missing in JSON, it stays as is.
         ;; But if it's explicitly null or empty, we should check behavior.
         (is (= 200 (:status resp)))))

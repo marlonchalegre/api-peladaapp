@@ -8,6 +8,9 @@
    (s/optional-key :when) s/Str
    (s/optional-key :num_teams) s/Int
    (s/optional-key :players_per_team) s/Int
+   (s/optional-key :fixed_goalkeepers) s/Bool
+   (s/optional-key :home_fixed_goalkeeper_id) s/Int
+   (s/optional-key :away_fixed_goalkeeper_id) s/Int
    (s/optional-key :status) s/Str})
 
 (s/defschema UpdatePeladaRequest
@@ -16,6 +19,9 @@
    (s/optional-key :when) s/Str
    (s/optional-key :num_teams) s/Int
    (s/optional-key :players_per_team) s/Int
+   (s/optional-key :fixed_goalkeepers) s/Bool
+   (s/optional-key :home_fixed_goalkeeper_id) (s/maybe s/Int)
+   (s/optional-key :away_fixed_goalkeeper_id) (s/maybe s/Int)
    (s/optional-key :status) s/Str})
 
 (s/defschema BeginPeladaRequest

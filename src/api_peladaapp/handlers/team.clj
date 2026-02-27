@@ -39,10 +39,11 @@
   (try (let [db (:database request)
              team-id (Integer/parseInt (str (get-in request [:params :id])))
              player-id (Integer/parseInt (str (get-in request [:body :player_id])))
+             is-goalkeeper (get-in request [:body :is_goalkeeper] false)
              user-id (auth/get-user-id-from-request request)
              org-id (get-org-id-from-team team-id db)]
          (auth/require-organization-admin! user-id org-id db)
-         (created (controller.team/add-player team-id player-id db)))
+         (created (controller.team/add-player team-id player-id is-goalkeeper db)))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn remove-player [request]

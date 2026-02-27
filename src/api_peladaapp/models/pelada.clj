@@ -9,5 +9,8 @@
    :scheduled-at s/Any
    :num-teams (s/maybe s/Int)
    :players-per-team (s/maybe s/Int)
+   :fixed-goalkeepers (s/maybe s/Bool)
+   (s/optional-key :home-fixed-goalkeeper-id) (s/maybe s/Int)
+   (s/optional-key :away-fixed-goalkeeper-id) (s/maybe s/Int)
    :status (s/maybe s/Str)
    :closed-at (s/maybe s/Any)})

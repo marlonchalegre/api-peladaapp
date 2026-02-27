@@ -22,6 +22,12 @@
            (nil? d) {:error "forbidden"}
            (string? d) {:message d}
            :else d)})
+(defn too-many-requests [d]
+  {:status 429
+   :body (cond
+           (nil? d) {:error "too-many-requests"}
+           (string? d) {:message d}
+           :else d)})
 (defn server-error [d] {:status 500 :body (or d {:error "server-error"})})
 (defn not-found [d]
   {:status 404

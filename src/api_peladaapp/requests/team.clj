@@ -11,4 +11,5 @@
    (s/optional-key :name) s/Str})
 
 (s/defschema AddPlayerToTeamRequest
-  {:player_id s/Int})
+  {:player_id s/Int
+   (s/optional-key :is_goalkeeper) s/Bool})

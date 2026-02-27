@@ -18,7 +18,7 @@
                                                  (do (swap! get-calls inc) mock-player)
                                                  updated-player)
                                                nil))
-                      db.player/update-player (fn [id update-data _] 1)
+                      db.player/update-player (fn [_ _ _] 1)
                       auth/require-organization-admin! (fn [_ _ _] true)]
           (let [request {:database db
                          :params {:id "1"}

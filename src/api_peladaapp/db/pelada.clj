@@ -16,12 +16,16 @@
   (-> result vals first))
 
 (s/defn insert-pelada :- s/Int
-  [{:keys [organization-id scheduled-at num-teams players-per-team]}
+  [{:keys [organization-id scheduled-at num-teams players-per-team fixed-goalkeepers
+           home-fixed-goalkeeper-id away-fixed-goalkeeper-id]}
    db]
   (let [row (cond-> {:organization_id organization-id :status "attendance"}
               scheduled-at (assoc :scheduled_at scheduled-at)
               num-teams (assoc :num_teams num-teams)
-              players-per-team (assoc :players_per_team players-per-team))]
+              players-per-team (assoc :players_per_team players-per-team)
+              (some? fixed-goalkeepers) (assoc :fixed_goalkeepers (if fixed-goalkeepers 1 0))
+              home-fixed-goalkeeper-id (assoc :home_fixed_goalkeeper_id home-fixed-goalkeeper-id)
+              away-fixed-goalkeeper-id (assoc :away_fixed_goalkeeper_id away-fixed-goalkeeper-id))]
     (-> (sql/insert! db :peladas row)
         affected-rows-count)))
 
@@ -35,13 +39,17 @@
   [id :- s/Int
    pelada
    db]
-  (let [db-row (medley.core/assoc-some {}
-                                       :organization_id (:organization-id pelada)
-                                       :scheduled_at (:scheduled-at pelada)
-                                       :num_teams (:num-teams pelada)
-                                       :players-per-team (:players-per-team pelada)
-                                       :status (:status pelada)
-                                       :closed_at (:closed-at pelada))]
+  (let [db-row (cond-> (medley.core/assoc-some {}
+                                               :organization_id (:organization-id pelada)
+                                               :scheduled_at (:scheduled-at pelada)
+                                               :num_teams (:num-teams pelada)
+                                               :players_per_team (:players_per_team pelada)
+                                               :fixed_goalkeepers (when (some? (:fixed-goalkeepers pelada))
+                                                                    (if (:fixed-goalkeepers pelada) 1 0))
+                                               :status (:status pelada)
+                                               :closed_at (:closed-at pelada))
+                 (contains? pelada :home-fixed-goalkeeper-id) (assoc :home_fixed_goalkeeper_id (:home-fixed-goalkeeper-id pelada))
+                 (contains? pelada :away-fixed-goalkeeper-id) (assoc :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id pelada)))]
     (-> (sql/update! db :peladas db-row {:id id})
         affected-rows-count)))
 
@@ -125,7 +133,7 @@
                                     (assoc team :players (keep (fn [team-player]
                                                                  (when-let [player (first (filter #(= (:player_id team-player) (:id %)) all-players-in-org))]
                                                                    (let [user (get users-map (:user-id player))]
-                                                                     (assoc player :user user))))
+                                                                     (assoc player :user user :is_goalkeeper false))))
                                                                (get team-players-grouped (:id team) []))))
                                   teams)
 

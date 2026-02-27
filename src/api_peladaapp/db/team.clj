@@ -61,7 +61,8 @@
     (nil? result)))
 
 (s/defn validate-team-not-full :- (s/maybe s/Bool)
-  "Validates if the team has not reached the player limit"
+  "Validates if the team has not reached the player limit.
+   Note: Fixed goalkeepers are global and not in TeamPlayers."
   [team-id db]
   (let [query ["SELECT p.players_per_team as max_players, count(tp.player_id) as current_count
                 FROM Teams t
@@ -77,26 +78,29 @@
       true)))
 
 (s/defn add-player-to-team :- s/Int
-  [team-id player-id db]
-  (when-not (validate-player-belongs-to-pelada-org team-id player-id db)
-    (throw (ex-info "Player does not belong to the pelada's organization"
-                    {:type :validation-error
-                     :message "Player does not belong to the pelada's organization"
-                     :team-id team-id
-                     :player-id player-id})))
-  (when-not (validate-player-not-in-another-team-of-same-pelada team-id player-id db)
-    (throw (ex-info "Player is already in a team for this pelada"
-                    {:type :validation-error
-                     :message "Player is already in a team for this pelada"
-                     :team-id team-id
-                     :player-id player-id})))
-  (when-not (validate-team-not-full team-id db)
-    (throw (ex-info "Team is full"
-                    {:type :validation-error
-                     :message "Team is full"
-                     :team-id team-id})))
-  (-> (sql/insert! db :teamplayers {:team_id team-id :player_id player-id})
-      affected-rows-count))
+  ([team-id player-id db]
+   (add-player-to-team team-id player-id false db))
+  ([team-id player-id _is-goalkeeper db]
+   (when-not (validate-player-belongs-to-pelada-org team-id player-id db)
+     (throw (ex-info "Player does not belong to the pelada's organization"
+                     {:type :validation-error
+                      :message "Player does not belong to the pelada's organization"
+                      :team-id team-id
+                      :player-id player-id})))
+   (when-not (validate-player-not-in-another-team-of-same-pelada team-id player-id db)
+     (throw (ex-info "Player is already in a team for this pelada"
+                     {:type :validation-error
+                      :message "Player is already in a team for this pelada"
+                      :team-id team-id
+                      :player-id player-id})))
+   ;; Note: is-goalkeeper is ignored for TeamPlayers validation now because they are global
+   (when-not (validate-team-not-full team-id db)
+     (throw (ex-info "Team is full"
+                     {:type :validation-error
+                      :message "Team is full"
+                      :team-id team-id})))
+   (-> (sql/insert! db :teamplayers {:team_id team-id :player_id player-id})
+       affected-rows-count)))
 
 (s/defn remove-player-from-team :- s/Int
   [team-id player-id db]
@@ -115,7 +119,8 @@
        (map unqualify-row)
        (map (fn [m]
               {:team-id (:team_id m)
-               :player-id (:player_id m)}))))
+               :player-id (:player_id m)
+               :is-goalkeeper false}))))
 
 (s/defn list-team-players-by-pelada [pelada-id db]
   (->> (sql/query db ["SELECT tp.*, t.name as team_name, t.pelada_id

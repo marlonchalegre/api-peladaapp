@@ -47,7 +47,7 @@
                 pos-counts (frequencies (map :position details))]
             {:id (:id team)
              :current-score current-grades
-             :current-count (count current-players)
+             :current-count (count (filter #(not (:is-goalkeeper %)) current-players))
              :max-players players-per-team
              :positions pos-counts}))
         teams))
@@ -78,30 +78,35 @@
   [pelada-id player-ids players-per-team db]
   (when (and players-per-team (pos? players-per-team) (seq player-ids))
     (jdbc/with-transaction [tx db]
-      ;; Clear existing assignments to allow full reshuffle
-      (db.team/clear-teams-players pelada-id tx)
-
       (let [pelada (db.pelada/get-pelada pelada-id tx)
             org-id (:organization-id pelada)
+            home-gk-id (:home-fixed-goalkeeper-id pelada)
+            away-gk-id (:away-fixed-goalkeeper-id pelada)
+            global-gk-ids (set (filter some? [home-gk-id away-gk-id]))]
 
-            ;; Fetch details for players (verifies they belong to org)
-            ;; We assume player-ids are OrganizationPlayer IDs (not User IDs)
-            players-details (get-player-details player-ids org-id tx)
+        ;; Clear existing assignments to allow full reshuffle.
+        ;; Note: In global fixed GK mode, these players are NOT in any team.
+        (db.team/clear-teams-players pelada-id tx)
 
-            ;; Sort players: Position first, then Grade
-            ;; Shuffle first to ensure random order for players with same position/score
-            sorted-players (sort-players-for-balance (shuffle players-details))
+        (let [;; Filter out players who are global fixed goalkeepers
+              remaining-player-ids (remove global-gk-ids player-ids)
 
-            teams (db.team/list-pelada-teams pelada-id tx)
+              ;; Fetch details for players (verifies they belong to org)
+              players-details (get-player-details remaining-player-ids org-id tx)
 
-            ;; Initial team states
-            initial-team-states (get-team-states teams players-per-team org-id tx)]
+              ;; Sort players: Position first, then Grade
+              sorted-players (sort-players-for-balance (shuffle players-details))
 
-        ;; Distribute players
-        (loop [players sorted-players
-               states initial-team-states]
-          (when-let [player (first players)]
-            (let [[team-id new-states] (assign-player-to-best-team player states)]
-              (when team-id
-                (db.team/add-player-to-team team-id (:id player) tx)
-                (recur (rest players) new-states)))))))))
+              teams (db.team/list-pelada-teams pelada-id tx)
+
+              ;; Initial team states
+              initial-team-states (get-team-states teams players-per-team org-id tx)]
+
+          ;; Distribute remaining players
+          (loop [players sorted-players
+                 states initial-team-states]
+            (when-let [player (first players)]
+              (let [[team-id new-states] (assign-player-to-best-team player states)]
+                (when team-id
+                  (db.team/add-player-to-team team-id (:id player) false tx)
+                  (recur (rest players) new-states))))))))))
