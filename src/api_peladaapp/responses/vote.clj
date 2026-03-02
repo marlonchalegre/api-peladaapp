@@ -15,7 +15,10 @@
 
 (s/defschema EligiblePlayer
   {:player-id s/Int
-   :name s/Str})
+   :name s/Str
+   (s/optional-key :goals) s/Int
+   (s/optional-key :assists) s/Int
+   (s/optional-key :own_goals) s/Int})
 
 (s/defschema VotingInfoResponse
   {:can-vote s/Bool

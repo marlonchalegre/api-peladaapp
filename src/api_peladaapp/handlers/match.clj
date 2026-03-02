@@ -19,7 +19,7 @@
              org-id (:organization-id pelada)]
          ;; Only admins can update scores
          (auth/require-organization-admin! user-id org-id db)
-         (pelada-logic/ensure-running pelada)
+         (pelada-logic/ensure-running pelada {:allow-closed? true})
          (-> (match-controller/update-score id (adapter.match/update-score-request->model body) db)
              adapter.match/model->response
              updated))
@@ -35,7 +35,7 @@
              org-id (:organization-id pelada)]
          ;; Only admins can create events
          (auth/require-organization-admin! user-id org-id db)
-         (pelada-logic/ensure-running pelada)
+         (pelada-logic/ensure-running pelada {:allow-closed? true})
          (-> (match-controller/create-event id (adapter.match/create-event-request->model body) db)
              adapter.match/event->response
              updated))
@@ -50,9 +50,9 @@
           match (db.match/get-match id db)
           pelada (pelada-controller/get-pelada (:pelada-id match) db)
           org-id (:organization-id pelada)]
-      ;; Only admins can delete events
+      ;; Only admins can perform this action
       (auth/require-organization-admin! user-id org-id db)
-      (pelada-logic/ensure-running pelada)
+      (pelada-logic/ensure-running pelada {:allow-closed? true})
       (updated (match-controller/delete-last-event id (adapter.match/delete-event-request->model body) db)))
     (catch Exception e
       (exception/api-exception-handler e))))
@@ -69,7 +69,7 @@
           org-id (:organization-id pelada)]
       ;; Only admins can modify lineups
       (auth/require-organization-admin! user-id org-id db)
-      (pelada-logic/ensure-running pelada)
+      (pelada-logic/ensure-running pelada {:allow-closed? true})
       (updated (match-controller/add-lineup-player id (adapter.match/add-lineup-request->model body) db)))
     (catch Exception e (exception/api-exception-handler e))))
 
@@ -84,6 +84,6 @@
           org-id (:organization-id pelada)]
       ;; Only admins can modify lineups
       (auth/require-organization-admin! user-id org-id db)
-      (pelada-logic/ensure-running pelada)
+      (pelada-logic/ensure-running pelada {:allow-closed? true})
       (updated (match-controller/replace-lineup-player id (adapter.match/replace-lineup-request->model body) db)))
     (catch Exception e (exception/api-exception-handler e))))

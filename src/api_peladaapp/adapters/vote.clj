@@ -29,7 +29,12 @@
 
 (s/defn voting-info-model->response
   [model]
-  (let [eligible-players (mapv (fn [p] {:player_id (:player-id p) :name (:name p)})
+  (let [eligible-players (mapv (fn [p]
+                                 {:player_id (:player-id p)
+                                  :name (:name p)
+                                  :goals (:goals p)
+                                  :assists (:assists p)
+                                  :own_goals (:own-goals p)})
                                (:eligible-players model))
         current-votes (mapv model->response (:current-votes model))]
     (medley.core/assoc-some

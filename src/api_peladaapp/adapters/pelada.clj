@@ -12,12 +12,12 @@
   [request :- requests.pelada/CreatePeladaRequest]
   (let [scheduled-at (or (:scheduled_at request) (:when request))]
     (cond-> (medley.core/assoc-some {}
-                                   :organization-id (:organization_id request)
-                                   :scheduled-at scheduled-at
-                                   :num-teams (:num_teams request)
-                                   :players-per-team (:players_per_team request)
-                                   :fixed-goalkeepers (:fixed_goalkeepers request)
-                                   :status (:status request))
+                                    :organization-id (:organization_id request)
+                                    :scheduled-at scheduled-at
+                                    :num-teams (:num_teams request)
+                                    :players-per-team (:players_per_team request)
+                                    :fixed-goalkeepers (:fixed_goalkeepers request)
+                                    :status (:status request))
       (contains? request :home_fixed_goalkeeper_id) (assoc :home-fixed-goalkeeper-id (:home_fixed_goalkeeper_id request))
       (contains? request :away_fixed_goalkeeper_id) (assoc :away-fixed-goalkeeper-id (:away_fixed_goalkeeper_id request)))))
 
@@ -25,12 +25,12 @@
   [request :- requests.pelada/UpdatePeladaRequest]
   (let [scheduled-at (or (:scheduled_at request) (:when request))]
     (cond-> (medley.core/assoc-some {}
-                                   :organization-id (:organization_id request)
-                                   :scheduled-at scheduled-at
-                                   :num-teams (:num_teams request)
-                                   :players-per-team (:players_per_team request)
-                                   :fixed-goalkeepers (:fixed_goalkeepers request)
-                                   :status (:status request))
+                                    :organization-id (:organization_id request)
+                                    :scheduled-at scheduled-at
+                                    :num-teams (:num_teams request)
+                                    :players-per-team (:players_per_team request)
+                                    :fixed-goalkeepers (:fixed_goalkeepers request)
+                                    :status (:status request))
       (contains? request :home_fixed_goalkeeper_id) (assoc :home-fixed-goalkeeper-id (:home_fixed_goalkeeper_id request))
       (contains? request :away_fixed_goalkeeper_id) (assoc :away-fixed-goalkeeper-id (:away_fixed_goalkeeper_id request)))))
 

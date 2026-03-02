@@ -74,20 +74,28 @@
             (throw (ex-info "Player did not participate in this pelada"
                             {:type :forbidden :message "Only players who participated can vote"})))
 
-          ;; Get all players who participated (were in teams) with their names
-          (let [query "SELECT op.id as player_id, u.name
+          ;; Get all players who participated (were in teams) with their names and stats
+          (let [query "SELECT op.id as player_id, u.name, 
+                              COALESCE(s.goals, 0) as goals, 
+                              COALESCE(s.assists, 0) as assists, 
+                              COALESCE(s.own_goals, 0) as own_goals
                        FROM OrganizationPlayers op
                        JOIN Users u ON u.id = op.user_id
+                       LEFT JOIN PeladaPlayerStats s ON s.player_id = op.id AND s.pelada_id = ?
                        WHERE op.id IN (
                          SELECT player_id FROM TeamPlayers tp
                          JOIN Teams t ON t.id = tp.team_id
                          WHERE t.pelada_id = ?
                        )
                        AND op.id != ?"
-                eligible-players-raw (sql/query db [query pelada-id voter-player-id])
+                eligible-players-raw (sql/query db [query pelada-id pelada-id voter-player-id])
                 eligible-players (mapv (fn [p]
                                          (let [up (misc/unamespace p)]
-                                           {:player-id (:player_id up) :name (:name up)}))
+                                           {:player-id (:player_id up)
+                                            :name (:name up)
+                                            :goals (int (or (:goals up) 0))
+                                            :assists (int (or (:assists up) 0))
+                                            :own-goals (int (or (:own_goals up) 0))}))
                                        eligible-players-raw)
                 has-voted (db.vote/has-voter-voted? pelada-id voter-player-id db)
                 current-votes (if has-voted

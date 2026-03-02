@@ -55,8 +55,16 @@
       (let [resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close")) auth))]
         (is (= 200 (:status resp)))))
 
-    (testing "Editing match after pelada is closed should fail"
+    (testing "Editing match after pelada is closed should now succeed for admin"
       (let [resp (app (-> (mock/request :post (str "/api/matches/" match-id "/events"))
                           (mock/json-body {:player_id player-id :event_type "goal"})
                           auth))]
-        (is (= 400 (:status resp)) "Should NOT allow recording events after pelada is closed")))))
+        (is (= 200 (:status resp)) "Should allow recording events after pelada is closed if admin")))
+
+    (testing "Editing match after pelada is closed should FAIL for non-admin"
+      (let [token2 (th/register-and-login! app {:name "Player" :email "player@test.com" :password "pass"})
+            auth2 (fn [req] (mock/header req "Authorization" (str "Token " token2)))
+            resp (app (-> (mock/request :post (str "/api/matches/" match-id "/events"))
+                          (mock/json-body {:player_id player-id :event_type "goal"})
+                          auth2))]
+        (is (= 403 (:status resp)) "Non-admin should be forbidden")))))

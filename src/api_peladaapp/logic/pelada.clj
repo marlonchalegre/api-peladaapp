@@ -17,13 +17,19 @@
                          :message "Pelada already started or closed"}))))
 
 (defn ensure-running
-  "Ensure pelada is currently running. Returns pelada or throws with :bad-request."
-  [pelada]
-  (if (= "running" (:status pelada))
-    pelada
-    (throw (ex-info "Pelada is not running"
-                    {:type :bad-request
-                     :message "Action only allowed while pelada is running"}))))
+  "Ensure pelada is currently running. Returns pelada or throws with :bad-request.
+   Optional :allow-closed? allows closed/voting status."
+  ([pelada] (ensure-running pelada {}))
+  ([pelada opts]
+   (let [status (:status pelada)
+         allowed? (or (= "running" status)
+                      (and (:allow-closed? opts)
+                           (contains? #{"closed" "voting"} status)))]
+     (if allowed?
+       pelada
+       (throw (ex-info "Pelada is not running"
+                       {:type :bad-request
+                        :message (str "Action only allowed while pelada is running. Current status: " status)}))))))
 
 (defn ensure-schedulable-team-count
   "Ensure there are enough teams and team count is even. Returns team ids."
