@@ -17,7 +17,7 @@
              match (db.match/get-match id db)
              pelada (pelada-controller/get-pelada (:pelada-id match) db)
              org-id (:organization-id pelada)]
-         ;; Only admins can update scores
+         ;; Only admins can update scores and finish matches
          (auth/require-organization-admin! user-id org-id db)
          (pelada-logic/ensure-running pelada {:allow-closed? true})
          (-> (match-controller/update-score id (adapter.match/update-score-request->model body) db)
