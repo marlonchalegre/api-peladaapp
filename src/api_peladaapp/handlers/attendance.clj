@@ -29,7 +29,21 @@
            (updated (controller.attendance/update-attendance pelada-id player-id status db))))
        (catch Exception e (exception/api-exception-handler e))))
 
+(defn batch-update-attendance [request]
+  (try (let [db (:database request)
+             pelada-id (Integer/parseInt (str (get-in request [:params :id])))
+             body (:body request)
+             status (:status body)
+             player-ids (:player_ids body)
+             user-id (auth/get-user-id-from-request request)
+             pelada (db.pelada/get-pelada pelada-id db)
+             org-id (:organization-id pelada)]
+         (auth/require-organization-admin! user-id org-id db)
+         (updated (controller.attendance/batch-update-attendance pelada-id player-ids status db)))
+       (catch Exception e (exception/api-exception-handler e))))
+
 (defn close-attendance [request]
+
   (try (let [db (:database request)
              pelada-id (Integer/parseInt (str (get-in request [:params :id])))
              user-id (auth/get-user-id-from-request request)

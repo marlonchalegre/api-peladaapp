@@ -33,8 +33,10 @@
     (GET "/users/:user_id/peladas" [] handler.pelada/list-by-user)
     (POST "/peladas/:id/begin" [] handler.pelada/begin)
     (POST "/peladas/:id/close" [] handler.pelada/close)
+    (POST "/peladas/:id/attendance/batch" [] handler.attendance/batch-update-attendance)
     (POST "/peladas/:id/attendance" [] handler.attendance/update-attendance)
     (POST "/peladas/:id/close-attendance" [] handler.attendance/close-attendance)
+
     (GET "/peladas/:id/dashboard-data" [] handler.pelada/get-dashboard-data)
 
     ;; Teams

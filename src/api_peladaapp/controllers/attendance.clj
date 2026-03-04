@@ -11,7 +11,15 @@
    db]
   (db.attendance/upsert-attendance pelada-id player-id status db))
 
+(s/defn batch-update-attendance :- s/Int
+  [pelada-id :- s/Int
+   player-ids :- [s/Int]
+   status :- s/Str
+   db]
+  (db.attendance/batch-upsert-attendance pelada-id player-ids status db))
+
 (s/defn close-attendance :- s/Any
+
   [pelada-id :- s/Int
    db]
   (let [pelada (db.pelada/get-pelada pelada-id db)]
