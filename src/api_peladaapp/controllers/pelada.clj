@@ -5,6 +5,7 @@
    [api-peladaapp.adapters.player :as adapter.player]
    [api-peladaapp.adapters.team :as adapter.team]
    [api-peladaapp.adapters.vote :as adapter.vote]
+   [api-peladaapp.db.admin :as db.admin]
    [api-peladaapp.db.match :as db.match]
    [api-peladaapp.db.match-event :as db.match-event]
    [api-peladaapp.db.match-lineup :as db.match-lineup]
@@ -158,7 +159,9 @@
    db]
   (let [pelada-data (db.pelada/get-pelada-full-details pelada-id db)
         pelada (:pelada pelada-data)
+        is-admin (db.admin/is-user-admin-of-organization? user-id (:organization-id pelada) db)
         all-org-players (:org-players-map pelada-data)
+
         current-player (some-> (filter #(= user-id (:user-id %)) (vals all-org-players)) first)
         player-id (:id current-player)
         voting-info (if (and (= "closed" (:status pelada)) player-id)
@@ -167,7 +170,7 @@
                       nil)
 
         ;; Map models back to response format
-        mapped-pelada (adapter.pelada/model->response pelada)
+        mapped-pelada (assoc (adapter.pelada/model->response pelada) :is_admin is-admin)
         mapped-teams (map (fn [team]
                             (assoc (adapter.team/model->response team)
                                    :players (map (fn [p] (assoc (adapter.player/model->response p)
@@ -175,6 +178,7 @@
                                                                 :is_goalkeeper false))
                                                  (:players team))))
                           (:teams pelada-data))
+
         mapped-available (map (fn [p]
                                 (assoc (adapter.player/model->response p)
                                        :user (:user p)

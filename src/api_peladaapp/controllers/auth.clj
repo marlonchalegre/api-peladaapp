@@ -23,7 +23,7 @@
     (let [admin-orgs (map :organization-id (db.admin/list-organizations-by-admin (:id user-db) db))
           user-with-orgs (assoc user-db :admin-orgs admin-orgs)]
       {:token (logic.user/build-token user-with-orgs secret)
-       :user user-db})))
+       :user user-with-orgs})))
 
 (s/defn first-access :- {:token s/Str :user models.user/User}
   "Complete registration for an invited user (who has no password set)."
@@ -48,4 +48,4 @@
             admin-orgs (map :organization-id (db.admin/list-organizations-by-admin (:id user-db) db))
             user-with-orgs (assoc updated-user :admin-orgs admin-orgs)]
         {:token (logic.user/build-token user-with-orgs secret)
-         :user updated-user}))))
+         :user user-with-orgs}))))

@@ -5,10 +5,14 @@
 (s/defschema UserResponse
   {:id s/Int
    :name s/Str
+   :username s/Str
    (s/optional-key :email) s/Str
-   (s/optional-key :position) s/Str})
+   (s/optional-key :position) (s/maybe s/Str)
+   (s/optional-key :admin-orgs) [s/Int]})
 
 (s/defschema PublicUserResponse
   {:id s/Int
    :name s/Str
-   (s/optional-key :position) s/Str})
+   :username s/Str
+   (s/optional-key :position) (s/maybe s/Str)})
+

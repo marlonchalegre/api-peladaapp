@@ -1,5 +1,6 @@
 (ns api-peladaapp.controllers.user
   (:require
+   [api-peladaapp.db.admin :as db.admin]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.logic.user :as logic.user]
@@ -58,7 +59,8 @@
   (let [user (db.user/find-user-by-id user-id db)]
     (if (nil? user)
       (throw (ex-info nil {:type :not-found :message "User not found"}))
-      user)))
+      (let [admin-orgs (map :organization-id (db.admin/list-organizations-by-admin user-id db))]
+        (assoc user :admin-orgs admin-orgs)))))
 
 (s/defn delete-user
   [user-id :- s/Int
@@ -108,4 +110,6 @@
                          (logic.user/encrypt-password updated-user)
                          updated-user)]
         (db.user/update-user-profile user-id final-user db)
-        (db.user/find-user-by-id user-id db)))))
+        (let [admin-orgs (map :organization-id (db.admin/list-organizations-by-admin user-id db))]
+          (assoc (db.user/find-user-by-id user-id db) :admin-orgs admin-orgs))))))
+

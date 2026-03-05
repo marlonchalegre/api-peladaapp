@@ -18,7 +18,9 @@
 (s/defn require-organization-admin!
   "Throws exception if user is not an admin of the organization"
   [user-id organization-id db]
+  (println "[AUTH] Checking admin for user:" user-id "org:" organization-id)
   (when-not (user-can-admin-organization? user-id organization-id db)
+    (println "[AUTH] DENIED: user" user-id "is NOT admin of" organization-id)
     (throw (ex-info "User is not an admin of this organization"
                     {:type :forbidden
                      :message "You must be an admin of this organization to perform this action"}))))

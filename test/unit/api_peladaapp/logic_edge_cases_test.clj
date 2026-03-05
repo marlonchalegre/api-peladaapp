@@ -37,8 +37,8 @@
 (deftest user-adapter-edge-cases
   (testing "model->response with missing email"
     (let [user {:id 1 :name "No Email"}]
-      (is (= {:id 1 :name "No Email"} (adapter.user/model->response user)))))
+      (is (= {:id 1 :name "No Email" :admin-orgs []} (adapter.user/model->response user)))))
 
   (testing "model->response with explicit false for exclude-email?"
     (let [user {:id 1 :name "Test" :email "t@t.com"}]
-      (is (= {:id 1 :name "Test" :email "t@t.com"} (adapter.user/model->response user false))))))
+      (is (= {:id 1 :name "Test" :email "t@t.com" :admin-orgs []} (adapter.user/model->response user false))))))

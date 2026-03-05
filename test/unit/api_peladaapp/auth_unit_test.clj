@@ -19,7 +19,7 @@
       (let [result (controllers.auth/authenticate {:email (:email user) :password plain} db)]
         (is (map? result))
         (is (string? (:token result)))
-        (is (= user (:user result)))
+        (is (= (assoc user :admin-orgs []) (:user result)))
         (is @find-called)))))
 
 (deftest authenticate-by-username-test
@@ -36,7 +36,7 @@
       (let [result (controllers.auth/authenticate {:email "testuser" :password plain} db)]
         (is (map? result))
         (is (= "testuser" @find-called))
-        (is (= user (:user result)))))))
+        (is (= (assoc user :admin-orgs []) (:user result)))))))
 
 (deftest authenticate-invalid-password
   (let [plain "s3cret"

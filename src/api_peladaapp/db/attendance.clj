@@ -16,6 +16,7 @@
    player-id :- s/Int
    status :- s/Str
    db]
+  (jdbc/execute! db ["PRAGMA busy_timeout = 5000"])
   (-> (jdbc/execute! db ["INSERT INTO peladaattendance (pelada_id, player_id, status, updated_at)
                           VALUES (?, ?, ?, ?)
                           ON CONFLICT(pelada_id, player_id) DO UPDATE SET
@@ -39,6 +40,7 @@
                        "status = excluded.status, "
                        "updated_at = excluded.updated_at")]
       (jdbc/with-transaction [tx db]
+        (jdbc/execute! tx ["PRAGMA busy_timeout = 5000"])
         (-> (jdbc/execute! tx (into [sql-str] (apply concat rows)))
             affected-rows-count)))))
 

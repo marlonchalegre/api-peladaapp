@@ -4,6 +4,7 @@
    [api-peladaapp.models.user :as models.user]
    [clojure.string :as str]
    [medley.core :as medley.core]
+   [next.jdbc :as jdbc]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
@@ -45,6 +46,7 @@
   "Insert a user and return its generated id"
   [{:keys [name username email password position]} :- models.user/NewUser
    db]
+  (jdbc/execute! db ["PRAGMA busy_timeout = 5000"])
   (-> (sql/insert! db :users (medley.core/assoc-some {} :name name :username username :email email :password password :position position))
       affected-rows-count
       int))
@@ -120,6 +122,7 @@
    user :- models.user/User
    db]
   ;; Only update allowed fields: name, username, email, password, position
+  (jdbc/execute! db ["PRAGMA busy_timeout = 5000"])
   (-> (sql/update! db
                    :users
                    (medley.core/assoc-some {}
@@ -130,3 +133,4 @@
                                            :position (:position user))
                    {:id id})
       affected-rows-count))
+

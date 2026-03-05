@@ -19,6 +19,7 @@
 (s/defn insert-team :- s/Int
   [{:keys [pelada-id name]}
    db]
+  (jdbc/execute! db ["PRAGMA busy_timeout = 5000"])
   (-> (sql/insert! db :teams {:pelada_id pelada-id :name name})
       affected-rows-count))
 

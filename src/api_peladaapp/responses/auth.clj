@@ -5,4 +5,5 @@
 
 (s/defschema AuthResponse
   {:token s/Str
-   :user models.user/PublicUser})
+   :user (assoc models.user/PublicUser (s/optional-key :admin-orgs) [s/Int])})
+

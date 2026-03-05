@@ -15,7 +15,8 @@
    (s/optional-key :name) s/Str
    (s/optional-key :email) s/Str
    (s/optional-key :password) s/Str
-   (s/optional-key :position) (s/enum "Striker" "Midfielder" "Defender" "Goalkeeper")})
+   (s/optional-key :position) (s/enum "Striker" "Midfielder" "Defender" "Goalkeeper")
+   (s/optional-key :admin-orgs) [s/Int]})
 
 (s/defschema UserProfileUpdate
   "Schema for user profile updates - excludes score and other protected fields"
