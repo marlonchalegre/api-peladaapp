@@ -63,12 +63,37 @@
       (throw (ex-info nil {:type :not-found :message "Pelada not found"}))
       pelada)))
 
+(defn- enforce-players-per-team!
+  [pelada-id players-per-team db]
+  (let [teams (db.team/list-pelada-teams pelada-id db)
+        team-players (db.team/list-team-players-by-pelada pelada-id db)
+        team-players-grouped (group-by :team_id team-players)]
+    (doseq [team teams]
+      (let [players (get team-players-grouped (:id team) [])
+            excess (- (count players) players-per-team)]
+        (when (pos? excess)
+          ;; Prioritize keeping goalkeepers, then remove last ones (by original order/ID)
+          (let [to-remove (->> players
+                               (sort-by (fn [p] [(:is_goalkeeper p) (:id p)]) #(compare %2 %1))
+                               (drop players-per-team))]
+            (doseq [p to-remove]
+              (db.team/remove-player-from-team (:team_id p) (:player_id p) db))))))))
+
 (s/defn update-pelada :- models.pelada/Pelada
   [pelada-id :- s/Int pelada :- models.pelada/Pelada db]
-  (let [rows (db.pelada/update-pelada pelada-id pelada db)]
-    (if (zero? rows)
-      (throw (ex-info nil {:type :not-found :message "Pelada not found"}))
-      (db.pelada/get-pelada pelada-id db))))
+  (jdbc/with-transaction [tx db]
+    (let [old-pelada (db.pelada/get-pelada pelada-id tx)
+          rows (db.pelada/update-pelada pelada-id pelada tx)]
+      (when (zero? rows)
+        (throw (ex-info nil {:type :not-found :message "Pelada not found"})))
+
+      ;; Handle player redistribution if players-per-team decreased
+      (when-let [new-count (:players-per-team pelada)]
+        (when (and (:players-per-team old-pelada)
+                   (< new-count (:players-per-team old-pelada)))
+          (enforce-players-per-team! pelada-id new-count tx)))
+
+      (db.pelada/get-pelada pelada-id tx))))
 
 (s/defn delete-pelada :- s/Int
   [pelada-id :- s/Int db]

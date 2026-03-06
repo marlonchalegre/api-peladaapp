@@ -43,15 +43,17 @@
                                                :organization_id (:organization-id pelada)
                                                :scheduled_at (:scheduled-at pelada)
                                                :num_teams (:num-teams pelada)
-                                               :players_per_team (:players_per_team pelada)
+                                               :players_per_team (:players-per-team pelada)
                                                :fixed_goalkeepers (when (some? (:fixed-goalkeepers pelada))
                                                                     (if (:fixed-goalkeepers pelada) 1 0))
                                                :status (:status pelada)
                                                :closed_at (:closed-at pelada))
                  (contains? pelada :home-fixed-goalkeeper-id) (assoc :home_fixed_goalkeeper_id (:home-fixed-goalkeeper-id pelada))
                  (contains? pelada :away-fixed-goalkeeper-id) (assoc :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id pelada)))]
-    (-> (sql/update! db :peladas db-row {:id id})
-        affected-rows-count)))
+    (if (empty? db-row)
+      1
+      (-> (sql/update! db :peladas db-row {:id id})
+          affected-rows-count))))
 
 (s/defn delete-pelada :- s/Int
   [id :- s/Int

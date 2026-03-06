@@ -44,8 +44,8 @@
             away-players (db.team/list-team-players away db)
 
             ;; Base outfield players
-            outfield (concat (map (fn [p] {:match_id match-id :team_id home :player_id (:player-id p) :is_goalkeeper 0}) home-players)
-                             (map (fn [p] {:match_id match-id :team_id away :player_id (:player-id p) :is_goalkeeper 0}) away-players))
+            outfield (concat (map (fn [p] {:match_id match-id :team_id home :player_id (:player-id p) :is_goalkeeper (if (:is-goalkeeper p) 1 0)}) home-players)
+                             (map (fn [p] {:match_id match-id :team_id away :player_id (:player-id p) :is_goalkeeper (if (:is-goalkeeper p) 1 0)}) away-players))
 
             ;; Add fixed goalkeepers if enabled
             ;; Using a map keyed by player_id to ensure uniqueness

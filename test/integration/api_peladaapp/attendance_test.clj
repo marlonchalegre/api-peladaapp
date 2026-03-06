@@ -40,12 +40,6 @@
           org-id (:id (decode-body org-resp))]
       (is (= 201 (:status org-resp)))
 
-        ;; Create player for user
-      (let [player-resp (app (-> (mock/request :post "/api/players")
-                                 (mock/json-body {:organization_id org-id :user_id user-id :grade 5})
-                                 auth))]
-        (is (= 201 (:status player-resp))))
-
         ;; Create pelada
       (let [pelada-resp (app (-> (mock/request :post "/api/peladas")
                                  (mock/json-body {:organization_id org-id})

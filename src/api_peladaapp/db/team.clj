@@ -81,7 +81,7 @@
 (s/defn add-player-to-team :- s/Int
   ([team-id player-id db]
    (add-player-to-team team-id player-id false db))
-  ([team-id player-id _is-goalkeeper db]
+  ([team-id player-id is-goalkeeper db]
    (when-not (validate-player-belongs-to-pelada-org team-id player-id db)
      (throw (ex-info "Player does not belong to the pelada's organization"
                      {:type :validation-error
@@ -100,7 +100,7 @@
                      {:type :validation-error
                       :message "Team is full"
                       :team-id team-id})))
-   (-> (sql/insert! db :teamplayers {:team_id team-id :player_id player-id})
+   (-> (sql/insert! db :teamplayers {:team_id team-id :player_id player-id :is_goalkeeper (if is-goalkeeper 1 0)})
        affected-rows-count)))
 
 (s/defn remove-player-from-team :- s/Int
@@ -121,7 +121,7 @@
        (map (fn [m]
               {:team-id (:team_id m)
                :player-id (:player_id m)
-               :is-goalkeeper false}))))
+               :is-goalkeeper (not= 0 (:is_goalkeeper m))}))))
 
 (s/defn list-team-players-by-pelada [pelada-id db]
   (->> (sql/query db ["SELECT tp.*, t.name as team_name, t.pelada_id
@@ -129,4 +129,6 @@
                         JOIN Teams t ON tp.team_id = t.id
                         WHERE t.pelada_id = ?" pelada-id])
        (map unqualify-row)
+       (map (fn [m]
+              (assoc m :is_goalkeeper (not= 0 (:is_goalkeeper m)))))
        vec))

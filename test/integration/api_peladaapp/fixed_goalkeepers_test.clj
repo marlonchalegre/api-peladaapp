@@ -27,11 +27,6 @@
 
       (is (= 201 (:status org-resp)))
 
-      ;; Add player for user
-      (app (-> (mock/request :post "/api/players")
-               (mock/json-body {"organization_id" org-id "user_id" user-id "grade" 5})
-               auth))
-
       (testing "create pelada with fixed goalkeepers"
         (let [resp (app (-> (mock/request :post "/api/peladas")
                             (auth)
