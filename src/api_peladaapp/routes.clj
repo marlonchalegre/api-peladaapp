@@ -4,6 +4,7 @@
    [api-peladaapp.handlers.attendance :as handler.attendance]
    [api-peladaapp.handlers.auth :as auth]
    [api-peladaapp.handlers.health :as handler.health]
+   [api-peladaapp.handlers.manual-stats :as handler.manual-stats]
    [api-peladaapp.handlers.match :as handler.match]
    [api-peladaapp.handlers.organization :as handler.organization]
    [api-peladaapp.handlers.pelada :as handler.pelada]
@@ -65,6 +66,8 @@
     (DELETE "/organizations/:id" [] handler.organization/delete)
     (POST "/organizations/:id/leave" [] handler.organization/leave)
     (GET "/organizations/:id/statistics" [] handler.organization/get-statistics)
+    (GET "/organizations/:id/manual-stats" [] handler.manual-stats/list-manual-stats)
+    (POST "/organizations/:id/manual-stats" [] handler.manual-stats/upsert-manual-stats)
     (POST "/organizations/:id/invite" [] handler.organization/invite)
     (GET "/organizations/:id/invite-link" [] handler.organization/get-invite-link)
     (GET "/organizations/:id/invitations" [] handler.organization/list-invitations)

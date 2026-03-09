@@ -48,12 +48,14 @@
   [organization_id db]
   (let [result (jdbc/execute-one! db
                                   ["select count(*) as count from organizationadmins where organization_id = ?"
-                                   organization_id])]
+                                   organization_id]
+                                  opts)]
     (:count result)))
 
 (s/defn is-user-admin-of-organization? :- s/Bool
   [user_id organization_id db]
   (let [result (jdbc/execute-one! db
                                   ["select count(*) as count from organizationadmins where user_id = ? and organization_id = ?"
-                                   user_id organization_id])]
-    (> (:count result) 0)))
+                                   user_id organization_id]
+                                  opts)]
+    (> (or (:count result) 0) 0)))

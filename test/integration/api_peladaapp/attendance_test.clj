@@ -110,7 +110,6 @@
           p3-id (:id (decode-body p3-resp))
 
           ;; Find admin's player id (id 1 usually, but let's be safe)
-          details-init (app (-> (mock/request :get (str "/api/organizations/" org-id "/peladas")) auth)) ;; dummy to ensure org is loaded
           all-players (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/players")) auth)))
           p1-id (:id (first (filter #(= (:user_id %) admin-id) all-players)))
 
@@ -118,20 +117,21 @@
           pelada-resp (app (-> (mock/request :post "/api/peladas")
                                (mock/json-body {:organization_id org-id})
                                auth))
-          pelada-id (:id (decode-body pelada-resp))]
+          pelada-id (:id (decode-body pelada-resp))
 
-      ;; 5. Batch update attendance for p2 and p3
-      (let [batch-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance/batch"))
-                                (mock/json-body {:player_ids [p2-id p3-id] :status "confirmed"})
-                                auth))]
-        (is (= 200 (:status batch-resp)))
-        (is (= 2 (:result (decode-body batch-resp))))
+          ;; 5. Batch update attendance for p2 and p3
+          batch-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance/batch"))
+                              (mock/json-body {:player_ids [p2-id p3-id] :status "confirmed"})
+                              auth))]
 
-        ;; 6. Verify they are confirmed
-        (let [details-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) auth))
-              available (:available_players (decode-body details-resp))]
-          (is (some (fn [p] (and (= (:id p) p2-id) (= (:attendance_status p) "confirmed"))) available))
-          (is (some (fn [p] (and (= (:id p) p3-id) (= (:attendance_status p) "confirmed"))) available))
-          (is (some (fn [p] (and (= (:id p) p1-id) (= (:attendance_status p) "pending"))) available)))))))
+      (is (= 200 (:status batch-resp)))
+      (is (= 2 (:result (decode-body batch-resp))))
+
+      ;; 6. Verify they are confirmed
+      (let [details-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) auth))
+            available (:available_players (decode-body details-resp))]
+        (is (some (fn [p] (and (= (:id p) p2-id) (= (:attendance_status p) "confirmed"))) available))
+        (is (some (fn [p] (and (= (:id p) p3-id) (= (:attendance_status p) "confirmed"))) available))
+        (is (some (fn [p] (and (= (:id p) p1-id) (= (:attendance_status p) "pending"))) available))))))
 
 

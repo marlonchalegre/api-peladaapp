@@ -2,22 +2,18 @@
   (:require
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [next.jdbc :as jdbc]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 
 (deftest global-fixed-goalkeepers-flow-test
-  (let [app (-> th/*test-system* :app :handler)
-        db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
+  (let [app (-> th/*test-system* :app :handler)]
 
     ;; Register and login
     (app (-> (mock/request :post "/auth/register") (mock/json-body {"name" "Admin" "email" "admin@test.com" "password" "pass123"})))
     (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {"email" "admin@test.com" "password" "pass123"})))
           token (:token (th/decode-body login))
           auth (fn [req] (mock/header req "authorization" (str "Token " token)))
-          user-id (th/user-id-by-email ds "admin@test.com")
 
           ;; Create organization
           org-resp (app (-> (mock/request :post "/api/organizations")

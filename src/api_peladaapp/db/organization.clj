@@ -54,7 +54,16 @@
    db]
   (let [where-year (if (pos? year) " AND strftime('%Y', p.scheduled_at) = ?" "")
         base-params (if (pos? year) [id (str year)] [id])
-        params (into [] (concat base-params base-params base-params))
+        manual-stats-params (if (pos? year) [id year] [id])
+        params (into [] (concat
+                         base-params ;; RawParticipation 1
+                         base-params ;; RawParticipation 2
+                         base-params ;; PlayerEvents (MatchEvents part)
+                         manual-stats-params ;; PlayerEvents (goals part)
+                         manual-stats-params ;; PlayerEvents (assists part)
+                         manual-stats-params ;; PlayerEvents (own_goals part)
+                         manual-stats-params ;; AllPlayers (ManualStats part)
+                         ))
         sql (str "
 WITH RawParticipation AS (
     SELECT ml.player_id, m.pelada_id
@@ -85,16 +94,41 @@ PlayerEvents AS (
     JOIN Peladas p ON m.pelada_id = p.id
     WHERE p.organization_id = ? " where-year "
     GROUP BY me.player_id, me.event_type
+
+    UNION ALL
+
+    SELECT ms.player_id, 'goal' as event_type, ms.goals as event_count
+    FROM ManualStats ms
+    WHERE ms.organization_id = ? " (if (pos? year) " AND ms.year = ?" "") " AND ms.goals > 0
+
+    UNION ALL
+
+    SELECT ms.player_id, 'assist' as event_type, ms.assists as event_count
+    FROM ManualStats ms
+    WHERE ms.organization_id = ? " (if (pos? year) " AND ms.year = ?" "") " AND ms.assists > 0
+
+    UNION ALL
+
+    SELECT ms.player_id, 'own_goal' as event_type, ms.own_goals as event_count
+    FROM ManualStats ms
+    WHERE ms.organization_id = ? " (if (pos? year) " AND ms.year = ?" "") " AND ms.own_goals > 0
+),
+AllPlayers AS (
+    SELECT player_id FROM PlayerParticipation
+    UNION
+    SELECT player_id FROM ManualStats WHERE organization_id = ? " (if (pos? year) " AND year = ?" "") "
 )
 SELECT 
-    pp.player_id, 
+    ap.player_id, 
     u.name as player_name, 
-    pp.peladas_count,
+    COALESCE(pp.peladas_count, 0) as peladas_count,
     pe.event_type,
-    pe.event_count as count
-FROM PlayerParticipation pp
-JOIN OrganizationPlayers op ON pp.player_id = op.id
+    SUM(pe.event_count) as count
+FROM AllPlayers ap
+JOIN OrganizationPlayers op ON ap.player_id = op.id
 JOIN Users u ON op.user_id = u.id
-LEFT JOIN PlayerEvents pe ON pp.player_id = pe.player_id
+LEFT JOIN PlayerParticipation pp ON ap.player_id = pp.player_id
+LEFT JOIN PlayerEvents pe ON ap.player_id = pe.player_id
+GROUP BY ap.player_id, u.name, pp.peladas_count, pe.event_type
 ")]
     (sql/query db (into [sql] params) {:builder-fn rs/as-unqualified-lower-maps})))
