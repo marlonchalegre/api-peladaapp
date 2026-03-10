@@ -85,9 +85,9 @@
     (DELETE "/organizations/:organization_id/admins/:user_id" [] handler.admin/remove-admin-by-org-and-user)
 
     ;; Votes
-    (POST "/peladas/:pelada_id/votes/batch" [] handler.vote/batch-cast)
-    (GET "/peladas/:pelada_id/voting-info" [] handler.vote/voting-info)
-    (GET "/peladas/:pelada_id/voting-results" [] handler.vote/voting-results)
+    (POST "/peladas/:id/votes/batch" [] handler.vote/batch-cast)
+    (GET "/peladas/:id/voting-info" [] handler.vote/voting-info)
+    (GET "/peladas/:id/voting-results" [] handler.vote/voting-results)
 
     ;; Health
     (GET "/health" [] handler.health/check)))

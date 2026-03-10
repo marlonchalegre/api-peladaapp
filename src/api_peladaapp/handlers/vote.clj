@@ -9,7 +9,7 @@
 
 (defn batch-cast [request]
   (try (let [db (:database request)
-             pelada-id (Integer/parseInt (str (get-in request [:params :pelada_id])))
+             pelada-id (Integer/parseInt (str (get-in request [:params :id])))
              user-id (auth/get-user-id-from-request request)
              ;; We need the player-id, not the user-id, for the votes table
              voting-info (controller.vote/get-voting-info pelada-id user-id db)
@@ -25,7 +25,7 @@
 
 (defn voting-info [request]
   (try (let [db (:database request)
-             pelada-id (Integer/parseInt (str (get-in request [:params :pelada_id])))
+             pelada-id (Integer/parseInt (str (get-in request [:params :id])))
              user-id (auth/get-user-id-from-request request)]
          ;; Use adapter to convert kebab-case internal model to snake_case response
          (ok (adapter.vote/voting-info-model->response
@@ -34,7 +34,7 @@
 
 (defn voting-results [request]
   (try (let [db (:database request)
-             pelada-id (Integer/parseInt (str (get-in request [:params :pelada_id])))]
+             pelada-id (Integer/parseInt (str (get-in request [:params :id])))]
          (ok (adapter.vote/voting-results-model->response
               (controller.vote/get-voting-results pelada-id db))))
        (catch Exception e (exception/api-exception-handler e))))
