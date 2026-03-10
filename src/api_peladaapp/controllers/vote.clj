@@ -116,7 +116,12 @@
 
 (s/defn get-voting-results :- responses.vote/VotingResultsResponse
   [pelada-id :- s/Int db]
-  (let [votes (db.vote/list-votes-by-pelada pelada-id db)
+  (let [pelada (db.pelada/get-pelada pelada-id db)]
+    (when (vote.logic/voting-open? pelada)
+      (throw (ex-info "Voting still in progress"
+                      {:type :bad-request
+                       :message "Results are only available after the voting period ends (24h after close)."})))
+    (let [votes (db.vote/list-votes-by-pelada pelada-id db)
         ;; Get all participants (potential voters)
         participants-query "SELECT op.id as player_id, u.name, u.position,
                                    COALESCE(s.goals, 0) as goals, 
@@ -175,4 +180,4 @@
      :garcom garcoms
      :voters voter-status
      :total-eligible (count participants)
-     :total-voted (count voted-ids)}))
+     :total-voted (count voted-ids)})))
