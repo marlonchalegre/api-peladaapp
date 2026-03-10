@@ -87,6 +87,7 @@
     ;; Votes
     (POST "/peladas/:pelada_id/votes/batch" [] handler.vote/batch-cast)
     (GET "/peladas/:pelada_id/voting-info" [] handler.vote/voting-info)
+    (GET "/peladas/:pelada_id/voting-results" [] handler.vote/voting-results)
 
     ;; Health
     (GET "/health" [] handler.health/check)))

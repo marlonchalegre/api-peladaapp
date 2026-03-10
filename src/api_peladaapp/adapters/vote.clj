@@ -30,11 +30,13 @@
 (s/defn voting-info-model->response
   [model]
   (let [eligible-players (mapv (fn [p]
-                                 {:player_id (:player-id p)
-                                  :name (:name p)
-                                  :goals (:goals p)
-                                  :assists (:assists p)
-                                  :own_goals (:own-goals p)})
+                                 (medley.core/assoc-some
+                                  {:player_id (:player-id p)
+                                   :name (:name p)
+                                   :goals (:goals p)
+                                   :assists (:assists p)
+                                   :own_goals (:own-goals p)}
+                                  :position (:position p)))
                                (:eligible-players model))
         current-votes (mapv model->response (:current-votes model))]
     (medley.core/assoc-some
@@ -44,6 +46,28 @@
       :current_votes current-votes}
      :voter_player_id (:voter-player-id model)
      :message (:message model))))
+
+(s/defn voting-results-model->response
+  [model]
+  (let [map-player (fn [p]
+                     (medley.core/assoc-some
+                      {:player_id (:player-id p)
+                       :name (:name p)
+                       :average_stars (:average-stars p)
+                       :goals (:goals p)
+                       :assists (:assists p)
+                       :own_goals (:own-goals p)}
+                      :position (:position p)))]
+    {:mvp (mapv map-player (:mvp model))
+     :striker (mapv map-player (:striker model))
+     :garcom (mapv map-player (:garcom model))
+     :voters (mapv (fn [v]
+                     {:player_id (:player-id v)
+                      :name (:name v)
+                      :has_voted (:has-voted v)})
+                   (:voters model))
+     :total_eligible (:total-eligible model)
+     :total_voted (:total-voted model)}))
 
 (s/defn normalized-score-model->response
   [model]

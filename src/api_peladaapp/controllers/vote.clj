@@ -75,7 +75,7 @@
                             {:type :forbidden :message "Only players who participated can vote"})))
 
           ;; Get all players who participated (were in teams) with their names and stats
-          (let [query "SELECT op.id as player_id, u.name, 
+          (let [query "SELECT op.id as player_id, u.name, u.position,
                               COALESCE(s.goals, 0) as goals, 
                               COALESCE(s.assists, 0) as assists, 
                               COALESCE(s.own_goals, 0) as own_goals
@@ -93,6 +93,7 @@
                                          (let [up (misc/unamespace p)]
                                            {:player-id (:player_id up)
                                             :name (:name up)
+                                            :position (:position up)
                                             :goals (int (or (:goals up) 0))
                                             :assists (int (or (:assists up) 0))
                                             :own-goals (int (or (:own_goals up) 0))}))
@@ -112,3 +113,66 @@
            :has-voted false
            :eligible-players []
            :message (or (:message data) (.getMessage e))})))))
+
+(s/defn get-voting-results :- responses.vote/VotingResultsResponse
+  [pelada-id :- s/Int db]
+  (let [votes (db.vote/list-votes-by-pelada pelada-id db)
+        ;; Get all participants (potential voters)
+        participants-query "SELECT op.id as player_id, u.name, u.position,
+                                   COALESCE(s.goals, 0) as goals, 
+                                   COALESCE(s.assists, 0) as assists, 
+                                   COALESCE(s.own_goals, 0) as own_goals
+                            FROM OrganizationPlayers op
+                            JOIN Users u ON u.id = op.user_id
+                            LEFT JOIN PeladaPlayerStats s ON s.player_id = op.id AND s.pelada_id = ?
+                            WHERE op.id IN (
+                              SELECT player_id FROM TeamPlayers tp
+                              JOIN Teams t ON t.id = tp.team_id
+                              WHERE t.pelada_id = ?
+                            )"
+        participants-raw (sql/query db [participants-query pelada-id pelada-id])
+        participants (mapv (fn [p]
+                             (let [up (misc/unamespace p)]
+                               {:player-id (:player_id up)
+                                :name (:name up)
+                                :position (:position up)
+                                :goals (int (or (:goals up) 0))
+                                :assists (int (or (:assists up) 0))
+                                :own-goals (int (or (:own_goals up) 0))}))
+                           participants-raw)
+        voted-ids (set (map :voter-id votes))
+        
+        ;; Calculate average stars per player
+        votes-by-target (group-by :target-id votes)
+        player-scores (map (fn [p]
+                             (let [p-votes (get votes-by-target (:player-id p) [])
+                                   avg (if (seq p-votes)
+                                         (double (/ (reduce + (map :stars p-votes)) (count p-votes)))
+                                         0.0)]
+                               (assoc p :average-stars avg)))
+                           participants)
+        
+        ;; Sort for awards
+        mvp (->> player-scores
+                 (sort-by :average-stars >)
+                 (take 3))
+        strikers (->> player-scores
+                      (filter #(> (:goals %) 0))
+                      (sort-by :goals >)
+                      (take 3))
+        garcoms (->> player-scores
+                     (filter #(> (:assists %) 0))
+                     (sort-by :assists >)
+                     (take 3))
+        
+        voter-status (map (fn [p]
+                            {:player-id (:player-id p)
+                             :name (:name p)
+                             :has-voted (voted-ids (:player-id p))})
+                          participants)]
+    {:mvp mvp
+     :striker strikers
+     :garcom garcoms
+     :voters voter-status
+     :total-eligible (count participants)
+     :total-voted (count voted-ids)}))

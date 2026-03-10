@@ -16,9 +16,32 @@
 (s/defschema EligiblePlayer
   {:player-id s/Int
    :name s/Str
+   (s/optional-key :position) (s/maybe s/Str)
    (s/optional-key :goals) s/Int
    (s/optional-key :assists) s/Int
    (s/optional-key :own_goals) s/Int})
+
+(s/defschema VoterStatus
+  {:player-id s/Int
+   :name s/Str
+   :has-voted s/Bool})
+
+(s/defschema PlayerResult
+  {:player-id s/Int
+   :name s/Str
+   :position (s/maybe s/Str)
+   :average-stars s/Num
+   :goals s/Int
+   :assists s/Int
+   :own-goals s/Int})
+
+(s/defschema VotingResultsResponse
+  {:mvp [PlayerResult]
+   :striker [PlayerResult]
+   :garcom [PlayerResult]
+   :voters [VoterStatus]
+   :total-eligible s/Int
+   :total-voted s/Int})
 
 (s/defschema VotingInfoResponse
   {:can-vote s/Bool
