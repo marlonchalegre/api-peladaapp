@@ -76,7 +76,7 @@
       first
       :count))
 
-  (s/defn list-peladas-by-user :- [s/Any]
+(s/defn list-peladas-by-user :- [s/Any]
   [user-id :- s/Int
    limit :- s/Int
    offset :- s/Int

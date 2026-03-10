@@ -1,7 +1,7 @@
 (ns api-peladaapp.voting-results-test
   (:require
    [api-peladaapp.test-helpers :as th]
-   [clojure.test :refer [deftest is use-fixtures testing]]
+   [clojure.test :refer [deftest is testing use-fixtures]]
    [next.jdbc :as jdbc]
    [ring.mock.request :as mock]))
 
@@ -68,7 +68,7 @@
                                     :votes [{:target_id p-admin-id :stars 5}
                                             {:target_id p2-id :stars 4}]})
                    auth-p1))
-          
+
           (let [resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/voting-status")) auth-admin))
                 body (th/decode-body resp)]
             (is (= 1 (:total_voted body)))
@@ -78,14 +78,14 @@
         (testing "Accessing results after voting window closes should succeed"
           ;; Force close-at to be more than 24h ago
           (jdbc/execute! ds ["UPDATE Peladas SET closed_at = datetime('now', '-25 hours') WHERE id = ?" pelada-id])
-          
+
           (let [resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/voting-results")) auth-admin))
                 body (th/decode-body resp)]
             (is (= 200 (:status resp)))
             (is (contains? body :mvp))
             (is (contains? body :voters))
             (is (= 1 (:total_voted body)))
-            
+
             ;; Check MVP results (only Admin and Player 2 received votes)
             (let [mvp-admin (first (filter #(= p-admin-id (:player_id %)) (:mvp body)))
                   mvp-p2 (first (filter #(= p2-id (:player_id %)) (:mvp body)))]

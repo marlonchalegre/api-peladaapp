@@ -175,7 +175,7 @@
                                   :assists (int (or (:assists up) 0))
                                   :own-goals (int (or (:own_goals up) 0))}))
                              participants-raw)
-          
+
           ;; Calculate average stars per player
           votes-by-target (group-by :target-id votes)
           player-scores (map (fn [p]
@@ -185,7 +185,7 @@
                                            0.0)]
                                  (assoc p :average-stars avg)))
                              participants)
-          
+
           ;; Sort for awards
           mvp (->> player-scores
                    (sort-by :average-stars >)

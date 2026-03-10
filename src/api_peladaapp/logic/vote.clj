@@ -1,4 +1,6 @@
 (ns api-peladaapp.logic.vote
+  (:require
+   [clojure.string :as str])
   (:import
    [java.time Duration Instant]))
 
@@ -34,8 +36,8 @@
                        :message "Cannot determine voting window"})))
     (let [closed-instant (cond
                            (instance? Instant closed-at) closed-at
-                           (string? closed-at) (let [s (clojure.string/replace (str closed-at) " " "T")
-                                                     s (if (clojure.string/ends-with? s "Z") s (str s "Z"))]
+                           (string? closed-at) (let [s (str/replace (str closed-at) " " "T")
+                                                     s (if (str/ends-with? s "Z") s (str s "Z"))]
                                                  (Instant/parse s))
                            :else (Instant/parse (str closed-at)))
           now (Instant/now)
