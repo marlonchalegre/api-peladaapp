@@ -69,6 +69,16 @@
      :total_eligible (:total-eligible model)
      :total_voted (:total-voted model)}))
 
+(s/defn voting-status-model->response
+  [model]
+  {:voters (mapv (fn [v]
+                   {:player_id (:player-id v)
+                    :name (:name v)
+                    :has_voted (:has-voted v)})
+                 (:voters model))
+   :total_eligible (:total-eligible model)
+   :total_voted (:total-voted model)})
+
 (s/defn normalized-score-model->response
   [model]
   {:player_id (:player-id model)

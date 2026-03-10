@@ -43,6 +43,11 @@
    :total-eligible s/Int
    :total-voted s/Int})
 
+(s/defschema VotingStatusResponse
+  {:voters [VoterStatus]
+   :total-eligible s/Int
+   :total-voted s/Int})
+
 (s/defschema VotingInfoResponse
   {:can-vote s/Bool
    :has-voted s/Bool
