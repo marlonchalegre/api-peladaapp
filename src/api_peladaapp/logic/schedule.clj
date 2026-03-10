@@ -142,25 +142,29 @@
   "Backtracking scheduler to find a valid sequence of matches."
   [team-ids matches-per-team]
   (let [teams (reorder-for-natural-start team-ids)
-        n (count teams)
-        total-matches (if (and n (pos? n) matches-per-team) (quot (* n matches-per-team) 2) 0)
-        all-teams-set (set teams)
-        initial-stats (zipmap teams (repeat {:played 0 :consecutive-plays 0 :consecutive-rests 0 :doubles-count 0 :last-role nil :home 0 :away 0}))
+        n (count teams)]
+    (if (< n 2)
+      []
+      (let [total-matches (if (and n (pos? n) matches-per-team) (quot (* n matches-per-team) 2) 0)
+            all-teams-set (set teams)
+            initial-stats (zipmap teams (repeat {:played 0 :consecutive-plays 0 :consecutive-rests 0 :doubles-count 0 :last-role nil :home 0 :away 0}))
 
-        round-robin-matches (if (even? n)
-                              (mapv (fn [[h a]] {:home h :away a}) (mapcat identity (circle-method-rounds teams)))
-                              (generate-all-possible-matches teams))
+            round-robin-matches (if (even? n)
+                                  (mapv (fn [[h a]] {:home h :away a}) (mapcat identity (circle-method-rounds teams)))
+                                  (generate-all-possible-matches teams))
 
-        all-possible-matches (vec (take (* 2 total-matches) (cycle round-robin-matches)))
+            all-possible-matches (vec (take (* 2 total-matches) (cycle round-robin-matches)))
 
-        result (find-schedule [] initial-stats all-teams-set total-matches matches-per-team all-possible-matches)]
+            result (find-schedule [] initial-stats all-teams-set total-matches matches-per-team all-possible-matches)]
 
-    (if (and (seq result) (= (count result) total-matches))
-      result
-      (if (seq result)
-        result
-        (throw (ex-info "Could not find a valid schedule with the given constraints."
-                        {:type :bad-request}))))))
+        (if (and (seq result) (= (count result) total-matches))
+          result
+          (if (seq result)
+            result
+            (if (zero? total-matches)
+              []
+              (throw (ex-info "Could not find a valid schedule with the given constraints."
+                              {:type :bad-request})))))))))
 
 (defn schedule-matches
   [team-ids]

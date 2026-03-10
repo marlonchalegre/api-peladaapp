@@ -103,6 +103,41 @@
              ok))
        (catch Exception e (exception/api-exception-handler e))))
 
+(defn get-schedule-preview [request]
+  (try (let [db (:database request)
+             id (Integer/parseInt (str (get-in request [:params :id])))
+             query-params (:query-params request)
+             matches-per-team (Integer/parseInt (or (get query-params "matches_per_team") "2"))
+             user-id (auth/get-user-id-from-request request)
+             pelada (controller.pelada/get-pelada id db)
+             org-id (:organization-id pelada)]
+         (auth/require-organization-admin! user-id org-id db)
+         (ok (controller.pelada/get-schedule-preview id matches-per-team db)))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn save-schedule-plan [request]
+  (try (let [db (:database request)
+             id (Integer/parseInt (str (get-in request [:params :id])))
+             body (:body request)
+             matches-per-team (int (:matches_per_team body))
+             matches (:matches body)
+             user-id (auth/get-user-id-from-request request)
+             pelada (controller.pelada/get-pelada id db)
+             org-id (:organization-id pelada)]
+         (auth/require-organization-admin! user-id org-id db)
+         (ok (controller.pelada/save-schedule-plan id matches-per-team matches db)))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn get-schedule-plan [request]
+  (try (let [db (:database request)
+             id (Integer/parseInt (str (get-in request [:params :id])))
+             user-id (auth/get-user-id-from-request request)
+             pelada (controller.pelada/get-pelada id db)
+             org-id (:organization-id pelada)]
+         (auth/require-organization-admin! user-id org-id db)
+         (ok (controller.pelada/get-schedule-plan id db)))
+       (catch Exception e (exception/api-exception-handler e))))
+
 (defn get-dashboard-data [request]
   (try (let [db (:database request)
              id (Integer/parseInt (str (get-in request [:params :id])))

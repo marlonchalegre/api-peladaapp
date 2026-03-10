@@ -28,6 +28,9 @@
     ;; Peladas
     (POST "/peladas" [] handler.pelada/create)
     (PUT "/peladas/:id" [] handler.pelada/update)
+    (GET "/peladas/:id/schedule/preview" [] handler.pelada/get-schedule-preview)
+    (POST "/peladas/:id/schedule" [] handler.pelada/save-schedule-plan)
+    (GET "/peladas/:id/schedule" [] handler.pelada/get-schedule-plan)
     (GET "/peladas/:id/full-details" [] handler.pelada/get-full-details)
     (DELETE "/peladas/:id" [] handler.pelada/delete)
     (GET "/organizations/:organization_id/peladas" [] handler.pelada/list-by-org)

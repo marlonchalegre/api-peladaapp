@@ -11,12 +11,14 @@
    [api-peladaapp.db.match-lineup :as db.match-lineup]
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.db.schedule :as db.schedule]
    [api-peladaapp.db.team :as db.team]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.logic.pelada :as pelada.logic]
    [api-peladaapp.models.pelada :as models.pelada]
    [api-peladaapp.responses.pelada :as responses.pelada]
+   [clojure.data.json :as json]
    [next.jdbc :as jdbc]
    [schema.core :as s]))
 
@@ -45,6 +47,73 @@
   (->> (db.match/list-matches-by-pelada pelada-id db)
        (map :id)
        (run! #(db.match-lineup/ensure-seeded % db))))
+
+(s/defn get-schedule-preview
+  [pelada-id :- s/Int matches-per-team :- s/Int db]
+  (let [pelada (db.pelada/get-pelada pelada-id db)
+        org-id (:organization-id pelada)
+        teams (db.team/list-pelada-teams pelada-id db)
+        team-ids (mapv :id teams)
+        team-count (count team-ids)]
+    (if (< team-count 2)
+      {:matches [] :is_from_format false}
+      (let [format (db.schedule/get-organization-schedule-format org-id team-count matches-per-team db)
+            random-plan (try (pelada.logic/schedule-matches-for-start team-ids matches-per-team)
+                             (catch Exception _ []))]
+        (if format
+          (let [format-data (json/read-str (:OrganizationScheduleFormats/format_data format))
+                template-plan (map (fn [[h-idx a-idx]]
+                                     {:home (nth team-ids h-idx)
+                                      :away (nth team-ids a-idx)})
+                                   format-data)]
+            {:matches template-plan
+             :template_matches template-plan
+             :random_matches random-plan
+             :is_from_format true})
+          {:matches random-plan
+           :random_matches random-plan
+           :is_from_format false})))))
+
+(s/defn save-schedule-plan
+  [pelada-id :- s/Int matches-per-team :- s/Int matches db]
+  (jdbc/with-transaction [tx db]
+    (let [pelada (db.pelada/get-pelada pelada-id tx)
+          org-id (:organization-id pelada)
+          teams (db.team/list-pelada-teams pelada-id tx)
+          team-ids (mapv :id teams)
+          team-count (count team-ids)]
+
+      ;; Delete old plan
+      (db.schedule/delete-match-plans-by-pelada pelada-id tx)
+
+      ;; Insert new plan
+      (doseq [[idx match] (map-indexed vector matches)]
+        (db.schedule/insert-match-plan {:pelada-id pelada-id
+                                        :home-team-id (:home match)
+                                        :away-team-id (:away match)
+                                        :sequence (inc idx)}
+                                       tx))
+
+      ;; Save/Update format for organization
+      (let [format-data (map (fn [match]
+                               [(.indexOf team-ids (:home match))
+                                (.indexOf team-ids (:away match))])
+                             matches)]
+        (db.schedule/upsert-format {:organization-id org-id
+                                    :team-count team-count
+                                    :matches-per-team matches-per-team
+                                    :format-data (json/write-str format-data)}
+                                   tx))
+      {:status "success"})))
+
+(s/defn get-schedule-plan
+  [pelada-id :- s/Int db]
+  (let [plans (db.schedule/list-match-plans-by-pelada pelada-id db)]
+    (map (fn [p]
+           {:home (:PeladaMatchPlans/home_team_id p)
+            :away (:PeladaMatchPlans/away_team_id p)
+            :sequence (:PeladaMatchPlans/sequence p)})
+         plans)))
 
 (s/defn create-pelada :- models.pelada/Pelada
   "Create pelada and optionally seed default teams. Returns pelada model."
@@ -126,9 +195,14 @@
   (jdbc/with-transaction [tx db]
     (let [matches-per-team (:matches_per_team (or opts {}))
           pelada (db.pelada/get-pelada pelada-id tx)
-          team-ids (->> (fetch-team-ids pelada-id tx)
-                        (pelada.logic/ensure-startable pelada))
-          match-plan (pelada.logic/schedule-matches-for-start team-ids matches-per-team)]
+          saved-plan (db.schedule/list-match-plans-by-pelada pelada-id tx)
+          match-plan (if (seq saved-plan)
+                       (map (fn [p] {:home (:PeladaMatchPlans/home_team_id p)
+                                     :away (:PeladaMatchPlans/away_team_id p)})
+                            saved-plan)
+                       (let [team-ids (->> (fetch-team-ids pelada-id tx)
+                                           (pelada.logic/ensure-startable pelada))]
+                         (pelada.logic/schedule-matches-for-start team-ids matches-per-team)))]
       (persist-match-plan! pelada-id match-plan tx)
       (db.pelada/update-pelada pelada-id {:status "running"} tx)
       (seed-lineups-from-teams! pelada-id tx)
@@ -186,6 +260,7 @@
         pelada (:pelada pelada-data)
         is-admin (db.admin/is-user-admin-of-organization? user-id (:organization-id pelada) db)
         all-org-players (:org-players-map pelada-data)
+        has-schedule-plan (seq (db.schedule/list-match-plans-by-pelada pelada-id db))
 
         current-player (some-> (filter #(= user-id (:user-id %)) (vals all-org-players)) first)
         player-id (:id current-player)
@@ -195,7 +270,9 @@
                       nil)
 
         ;; Map models back to response format
-        mapped-pelada (assoc (adapter.pelada/model->response pelada) :is_admin is-admin)
+        mapped-pelada (assoc (adapter.pelada/model->response pelada)
+                             :is_admin is-admin
+                             :has_schedule_plan (boolean has-schedule-plan))
         mapped-teams (map (fn [team]
                             (assoc (adapter.team/model->response team)
                                    :players (map (fn [p] (assoc (adapter.player/model->response p)

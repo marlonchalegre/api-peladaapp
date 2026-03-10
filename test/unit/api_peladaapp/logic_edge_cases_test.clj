@@ -21,7 +21,10 @@
       (is (= 20 (count res)))))
 
   (testing "Invalid input: 1 team"
-    (is (thrown? Exception (sch/schedule-matches-with-limit [1] 5)))))
+    (is (empty? (sch/schedule-matches-with-limit [1] 5))))
+
+  (testing "Invalid input: 0 teams"
+    (is (empty? (sch/schedule-matches-with-limit [] 5)))))
 
 (deftest vote-logic-edge-cases
   (testing "voting-open? with nil status"
