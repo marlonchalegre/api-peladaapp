@@ -66,7 +66,15 @@
           just-over-24h-ago (.minus now (Duration/ofMinutes (+ (* 24 60) 1)))
           pelada {:status "closed" :closed-at (str just-over-24h-ago)}]
       (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Voting window closed"
-                            (vote.logic/ensure-voting-window-open pelada))))))
+                            (vote.logic/ensure-voting-window-open pelada))))
+
+    (testing "Space-separated SQLite timestamp should be parsed correctly"
+      (let [now (Instant/now)
+            two-hours-ago-str (clojure.string/replace (str (.minus now (Duration/ofHours 2))) "T" " ")
+            ;; Remove Z to make it even more like SQLite standard strings
+            two-hours-ago-str (clojure.string/replace two-hours-ago-str "Z" "")
+            pelada {:status "closed" :closed-at two-hours-ago-str}]
+        (is (nil? (vote.logic/ensure-voting-window-open pelada)))))))
 
 (deftest test-validate-vote
   (testing "Valid vote should pass"

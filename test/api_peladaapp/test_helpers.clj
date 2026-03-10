@@ -81,3 +81,10 @@
           (:Users/id row)
           (:users/id row)
           (get row "id")))))
+
+(defn player-id-by-user-id [ds user-id org-id]
+  (let [row (first (jdbc/execute! ds ["select id from OrganizationPlayers where user_id = ? and organization_id = ?" user-id org-id]))]
+    (when row
+      (or (:id row)
+          (:OrganizationPlayers/id row)
+          (get row "id")))))
