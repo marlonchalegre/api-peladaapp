@@ -32,14 +32,12 @@
       (throw (ex-info "Pelada has no closed_at timestamp"
                       {:type :bad-request
                        :message "Cannot determine voting window"})))
-    (let [closed-instant (if (instance? Instant closed-at)
-                           closed-at
-                          ;; Try to parse, adding :00Z if needed for incomplete timestamps
-                           (try
-                             (Instant/parse (str closed-at))
-                             (catch Exception _
-                              ;; If parsing fails, try adding :00Z suffix for incomplete ISO timestamps
-                               (Instant/parse (str closed-at ":00Z")))))
+    (let [closed-instant (cond
+                           (instance? Instant closed-at) closed-at
+                           (string? closed-at) (let [s (clojure.string/replace (str closed-at) " " "T")
+                                                     s (if (clojure.string/ends-with? s "Z") s (str s "Z"))]
+                                                 (Instant/parse s))
+                           :else (Instant/parse (str closed-at)))
           now (Instant/now)
           duration (Duration/between closed-instant now)
           limit (Duration/ofHours 24)]

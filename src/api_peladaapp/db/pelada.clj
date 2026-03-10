@@ -76,26 +76,25 @@
       first
       :count))
 
-(s/defn list-peladas-by-user :- [s/Any]
+  (s/defn list-peladas-by-user :- [s/Any]
   [user-id :- s/Int
    limit :- s/Int
    offset :- s/Int
    db]
-  (let [cutoff-time (str (.minus (java.time.Instant/now) (java.time.Duration/ofHours 24)))]
-    (->> (sql/query db ["SELECT p.*, o.name as organization_name
-                         FROM Peladas p
-                         JOIN OrganizationPlayers op ON op.organization_id = p.organization_id
-                         JOIN Organizations o ON o.id = p.organization_id
-                         WHERE op.user_id = ?
-                         ORDER BY
-                           CASE
-                             WHEN p.status = 'closed' AND p.closed_at > ? THEN 1
-                             WHEN p.status != 'closed' THEN 2
-                             ELSE 3
-                           END ASC,
-                           p.scheduled_at DESC, p.id DESC
-                         LIMIT ? OFFSET ?" user-id cutoff-time limit offset])
-         (map adapter.pelada/db->model))))
+  (->> (sql/query db ["SELECT p.*, o.name as organization_name
+                       FROM Peladas p
+                       JOIN OrganizationPlayers op ON op.organization_id = p.organization_id
+                       JOIN Organizations o ON o.id = p.organization_id
+                       WHERE op.user_id = ?
+                       ORDER BY
+                         CASE
+                           WHEN p.status = 'closed' AND p.closed_at > datetime('now', '-24 hours') THEN 1
+                           WHEN p.status != 'closed' THEN 2
+                           ELSE 3
+                         END ASC,
+                         p.scheduled_at DESC, p.id DESC
+                       LIMIT ? OFFSET ?" user-id limit offset])
+       (map adapter.pelada/db->model)))
 
 (s/defn count-peladas-by-user :- s/Int
   [user-id :- s/Int
