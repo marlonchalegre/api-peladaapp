@@ -41,7 +41,9 @@
    :garcom [PlayerResult]
    :voters [VoterStatus]
    :total-eligible s/Int
-   :total-voted s/Int})
+   :total-voted s/Int
+   (s/optional-key :organization-id) s/Int
+   (s/optional-key :organization-name) s/Str})
 
 (s/defschema VotingStatusResponse
   {:voters [VoterStatus]

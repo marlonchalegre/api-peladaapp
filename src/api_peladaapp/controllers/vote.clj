@@ -201,4 +201,6 @@
       (assoc status
              :mvp mvp
              :striker strikers
-             :garcom garcoms))))
+             :garcom garcoms
+             :organization-id (:organization-id pelada)
+             :organization-name (:organization-name pelada)))))

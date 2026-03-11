@@ -58,16 +58,19 @@
                        :assists (:assists p)
                        :own_goals (:own-goals p)}
                       :position (:position p)))]
-    {:mvp (mapv map-player (:mvp model))
-     :striker (mapv map-player (:striker model))
-     :garcom (mapv map-player (:garcom model))
-     :voters (mapv (fn [v]
-                     {:player_id (:player-id v)
-                      :name (:name v)
-                      :has_voted (:has-voted v)})
-                   (:voters model))
-     :total_eligible (:total-eligible model)
-     :total_voted (:total-voted model)}))
+    (medley.core/assoc-some
+     {:mvp (mapv map-player (:mvp model))
+      :striker (mapv map-player (:striker model))
+      :garcom (mapv map-player (:garcom model))
+      :voters (mapv (fn [v]
+                      {:player_id (:player-id v)
+                       :name (:name v)
+                       :has_voted (:has-voted v)})
+                    (:voters model))
+      :total_eligible (:total-eligible model)
+      :total_voted (:total-voted model)}
+     :organization_id (:organization-id model)
+     :organization_name (:organization-name model))))
 
 (s/defn voting-status-model->response
   [model]
