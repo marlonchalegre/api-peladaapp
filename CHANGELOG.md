@@ -13,7 +13,7 @@ All notable changes to this project will be documented in this file. This change
   - Configuração dinâmica via variável de ambiente `TURSO_DATABASE_URL`.
 - **Testes End-to-End (E2E)**
   - Suite de testes completa usando Playwright.
-  - Script orchestrador `e2e-test.sh` com suporte a execução de testes específicos e gravação de vídeo.
+  - Scripts `npm run test:e2e` e `npm run test` com suporte a execução de testes específicos e gravação de vídeo.
 
 ### Changed
 - **Otimização de Docker**

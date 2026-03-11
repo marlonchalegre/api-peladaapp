@@ -18,7 +18,7 @@ A Clojure HTTP API to organize casual soccer (pelada) with friends: manage users
 
 ### 🚀 Installation
 
-- Local (Lein):
+- Local (Leiningen):
 ```bash
 # Run tests
 lein test
@@ -31,12 +31,13 @@ lein run
 ```
 
 - Docker:
+Always prefer running commands inside the backend container when the environment is up:
 ```bash
-# Build
-docker build -t api-peladaapp:latest .
+# Run tests inside container
+docker compose exec backend lein test
 
-# Run (ephemeral DB inside the container)
-docker run --rm -p 8080:8080 api-peladaapp:latest
+# Run linting
+docker compose exec backend lein clj-kondo --lint src
 ```
 
 ---
@@ -48,10 +49,10 @@ docker run --rm -p 8080:8080 api-peladaapp:latest
 ---
 
 ### 🔧 Technologies
-- **Language/Runtime**: Clojure 1.11, JVM 21
-- **Web**: Ring, Compojure, Jetty
+- **Language/Runtime**: Clojure 1.12, JVM 23 (Temurin)
+- **Web**: Ring 1.13, Compojure 1.7, Jetty
 - **Auth**: Buddy (sign, auth, hashers) with HS512 JWT
-- **DB**: SQLite (`org.xerial/sqlite-jdbc`), next.jdbc, HikariCP, Migratus
+- **DB**: SQLite (`org.xerial/sqlite-jdbc`), next.jdbc, HikariCP, Migratus. Supports Turso (LibSQL) via JDBC.
 - **Schemas**: Prismatic Schema
 - **Components**: Stuart Sierra Component for lifecycle management
 - **Algorithms**: clojure.math.combinatorics for match scheduling
@@ -67,6 +68,9 @@ docker run --rm -p 8080:8080 api-peladaapp:latest
 - **jwt-secret**: Symmetric key for JWT signing (HS512).
 - **DB**: SQLite file `peladaapp.db` in working dir; handled by HikariCP via `components.clj`.
 - **Migrations**: Managed by Migratus, located in `resources/migrations`.
+- **Environment Variables**:
+  - `PELADA_API_SECURITY_SIGNING_KEY`: JWT secret (overrides config.json).
+  - `TURSO_DATABASE_URL`: Optional Turso/LibSQL connection URL.
 
 ---
 
@@ -108,7 +112,7 @@ docker run --rm -p 8080:8080 api-peladaapp:latest
 ### License
 MIT License. See `LICENSE`.
 
-- **Database schema (consolidated)** includes: `Users`, `Organizations`, `Positions`, `OrganizationPlayers`, `OrganizationAdmins`, `Peladas`, `Teams`, `TeamPlayers`, `Matches`, `MatchEvents`, `MatchLineups`, `MatchSubstitutions`, `Statistics`, `Votes`.
+- **Database schema (consolidated)** includes: `Users`, `Organizations`, `Positions`, `OrganizationPlayers`, `OrganizationAdmins`, `OrganizationInvitations`, `Peladas`, `Teams`, `TeamPlayers`, `Matches`, `MatchEvents`, `MatchLineups`, `MatchSubstitutions`, `Attendance`, `ManualStats`, `PerformanceIndexes`, `Statistics`, `Votes`.
 - **Access control** via Buddy access rules; only `/auth/register` and `/auth/login` are public.
 - **JSON responses** enforced centrally in `helpers/responses.clj`.
 
