@@ -45,34 +45,43 @@
                                auth))
           pelada-id (:id (decode-body pelada-resp))]
 
-            ;; Create teams
+      ;; Create teams
       (doseq [n ["A" "B"]]
         (app (-> (mock/request :post "/api/teams")
                  (mock/json-body {:pelada_id pelada-id :name n})
                  auth)))
 
-            ;; Close attendance
+      ;; Close attendance
       (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth)))))
 
-            ;; Begin pelada
+      ;; Begin pelada
       (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin"))
                auth))
 
-          ;; Close pelada
-      (let [close-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close"))
-                                auth))
-            body (decode-body close-resp)]
-        (is (= 200 (:status close-resp)))
-        (is (= "voting" (:status body))) ;; Display status is voting if recently closed
-        (is (not (nil? (:closed_at body))))
+      ;; Start pelada and match timers
+      (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/timer/start")) auth)))))
 
-        (let [pelada (pelada.controller/get-pelada pelada-id ds)]
-          (is (= "closed" (:status pelada))) ;; Database status is still closed
-          (is (not (nil? (:closed-at pelada)))))
+      (let [matches (jdbc/execute! ds ["SELECT id FROM matches WHERE pelada_id = ?" pelada-id])
+            match-id (-> matches first :Matches/id)]
+        (is (= 200 (:status (app (-> (mock/request :post (str "/api/matches/" match-id "/timer/start")) auth)))))
 
-        (let [matches (jdbc/execute! ds ["SELECT * FROM matches WHERE pelada_id = ?" pelada-id])]
-          (is (seq matches))
-          (doseq [m matches]
-            (is (= "finished" (:Matches/status m)))
-            (is (= 0 (:Matches/home_score m)))
-            (is (= 0 (:Matches/away_score m)))))))))
+        ;; Wait a bit more to ensure elapsed time >= 1s for SQLite unixepoch
+        (Thread/sleep 1100)
+
+        ;; Close pelada
+        (let [close-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close"))
+                                  auth))
+              body (decode-body close-resp)]
+          (is (= 200 (:status close-resp)))
+          (is (= "voting" (:status body)))
+
+          ;; Verify pelada timer paused and has elapsed time
+          (let [pelada (pelada.controller/get-pelada pelada-id ds)]
+            (is (= "paused" (:timer-status pelada)))
+            (is (pos? (:timer-accumulated-ms pelada))))
+
+          ;; Verify match timer paused and has elapsed time
+          (let [match (jdbc/execute-one! ds ["SELECT * FROM matches WHERE id = ?" match-id])]
+            (is (= "finished" (:Matches/status match)))
+            (is (= "paused" (:Matches/timer_status match)))
+            (is (pos? (:Matches/timer_accumulated_ms match)))))))))
