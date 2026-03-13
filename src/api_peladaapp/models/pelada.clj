@@ -13,4 +13,7 @@
    (s/optional-key :home-fixed-goalkeeper-id) (s/maybe s/Int)
    (s/optional-key :away-fixed-goalkeeper-id) (s/maybe s/Int)
    :status (s/maybe s/Str)
-   :closed-at (s/maybe s/Any)})
+   :closed-at (s/maybe s/Any)
+   (s/optional-key :timer-started-at) (s/maybe s/Any)
+   (s/optional-key :timer-accumulated-ms) (s/maybe s/Int)
+   (s/optional-key :timer-status) (s/maybe s/Str)})

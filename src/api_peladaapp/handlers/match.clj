@@ -5,7 +5,7 @@
    [api-peladaapp.controllers.pelada :as pelada-controller]
    [api-peladaapp.db.match :as db.match]
    [api-peladaapp.helpers.exception :as exception]
-   [api-peladaapp.helpers.responses :refer [updated]]
+   [api-peladaapp.helpers.responses :refer [ok updated]]
    [api-peladaapp.logic.authorization :as auth]
    [api-peladaapp.logic.pelada :as pelada-logic]))
 
@@ -23,6 +23,45 @@
          (-> (match-controller/update-score id (adapter.match/update-score-request->model body) db)
              adapter.match/model->response
              updated))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn start-timer [request]
+  (try (let [db (:database request)
+             id (Integer/parseInt (clojure.core/str (get-in request [:params :id])))
+             user-id (auth/get-user-id-from-request request)
+             match (db.match/get-match id db)
+             pelada (pelada-controller/get-pelada (:pelada-id match) db)
+             org-id (:organization-id pelada)]
+         (auth/require-organization-admin! user-id org-id db)
+         (-> (match-controller/start-match-timer id db)
+             adapter.match/model->response
+             ok))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn pause-timer [request]
+  (try (let [db (:database request)
+             id (Integer/parseInt (clojure.core/str (get-in request [:params :id])))
+             user-id (auth/get-user-id-from-request request)
+             match (db.match/get-match id db)
+             pelada (pelada-controller/get-pelada (:pelada-id match) db)
+             org-id (:organization-id pelada)]
+         (auth/require-organization-admin! user-id org-id db)
+         (-> (match-controller/pause-match-timer id db)
+             adapter.match/model->response
+             ok))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn reset-timer [request]
+  (try (let [db (:database request)
+             id (Integer/parseInt (clojure.core/str (get-in request [:params :id])))
+             user-id (auth/get-user-id-from-request request)
+             match (db.match/get-match id db)
+             pelada (pelada-controller/get-pelada (:pelada-id match) db)
+             org-id (:organization-id pelada)]
+         (auth/require-organization-admin! user-id org-id db)
+         (-> (match-controller/reset-match-timer id db)
+             adapter.match/model->response
+             ok))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn create-event [request]

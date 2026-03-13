@@ -44,10 +44,22 @@
             first
             unqualify)))
 
+(defn- position-string->id [pos]
+  (case pos
+    "goalkeeper" 1
+    "defender" 2
+    "midfielder" 3
+    "striker" 4
+    nil))
+
 (s/defn list-players-by-organization [organization-id db]
-  (->> (next.jdbc/execute! db ["SELECT op.*, u.name as user_name, u.username as user_username, u.email as user_email 
+  (->> (next.jdbc/execute! db ["SELECT op.*, u.name as user_name, u.username as user_username, u.email as user_email, u.position as user_position 
                                 FROM organizationplayers op 
                                 JOIN users u ON op.user_id = u.id 
                                 WHERE op.organization_id = ?" organization-id] opts)
+       (map (fn [row]
+              (if (nil? (:position_id row))
+                (assoc row :position_id (position-string->id (:user_position row)))
+                row)))
        (map adapter.player/db->model)
        vec))

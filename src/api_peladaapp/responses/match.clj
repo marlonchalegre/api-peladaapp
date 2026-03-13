@@ -10,14 +10,19 @@
    :sequence s/Int
    :status (s/maybe s/Str)
    :home_score (s/maybe s/Int)
-   :away_score (s/maybe s/Int)})
+   :away_score (s/maybe s/Int)
+   (s/optional-key :timer_started_at) (s/maybe s/Any)
+   (s/optional-key :timer_accumulated_ms) (s/maybe s/Int)
+   (s/optional-key :timer_status) (s/maybe s/Str)})
 
 (s/defschema MatchEventResponse
   {:id s/Int
    :match_id s/Int
    :player_id s/Int
    :event_type s/Str
-   (s/optional-key :created_at) s/Any})
+   (s/optional-key :created_at) s/Any
+   (s/optional-key :session_time_ms) (s/maybe s/Int)
+   (s/optional-key :match_time_ms) (s/maybe s/Int)})
 
 (s/defschema PlayerStatsResponse
   {:player_id s/Int

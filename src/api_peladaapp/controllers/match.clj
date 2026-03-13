@@ -19,11 +19,41 @@
     (db.match/update-score match-id validated-update db)
     (db.match/get-match match-id db)))
 
+(s/defn start-match-timer :- models.match/Match
+  [match-id :- s/Int db]
+  (let [match (db.match/get-match match-id db)]
+    (if (= "running" (:timer-status match))
+      match
+      (let [now (str (java.time.Instant/now))]
+        (db.match/update-match match-id {:timer-status "running" :timer-started-at now} db)
+        (db.match/get-match match-id db)))))
+
+(s/defn pause-match-timer :- models.match/Match
+  [match-id :- s/Int db]
+  (let [match (db.match/get-match match-id db)]
+    (if (not= "running" (:timer-status match))
+      match
+      (let [now (java.time.Instant/now)
+            started-at (java.time.Instant/parse (:timer-started-at match))
+            elapsed (.toMillis (java.time.Duration/between started-at now))
+            new-accumulated (+ (or (:timer-accumulated-ms match) 0) elapsed)]
+        (db.match/update-match match-id {:timer-status "paused"
+                                         :timer-started-at nil
+                                         :timer-accumulated-ms new-accumulated} db)
+        (db.match/get-match match-id db)))))
+
+(s/defn reset-match-timer :- models.match/Match
+  [match-id :- s/Int db]
+  (db.match/update-match match-id {:timer-status "stopped"
+                                   :timer-started-at nil
+                                   :timer-accumulated-ms 0} db)
+  (db.match/get-match match-id db))
+
 (s/defn create-event :- models.match-event/MatchEvent
-  [match-id :- s/Int {:keys [player-id event-type]} db]
+  [match-id :- s/Int {:keys [player-id event-type session-time-ms match-time-ms]} db]
   (let [player-id (match-event.logic/ensure-player-id player-id)
         canonical-type (match-event.logic/canonical-type event-type)
-        event-id (db.match-event/insert-event match-id player-id canonical-type db)]
+        event-id (db.match-event/insert-event match-id player-id canonical-type session-time-ms match-time-ms db)]
     (db.match-event/get-event event-id db)))
 
 (s/defn list-events-by-pelada :- [models.match-event/MatchEvent]

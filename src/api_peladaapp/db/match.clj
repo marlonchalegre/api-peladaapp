@@ -30,14 +30,21 @@
   (-> (sql/get-by-id db :matches id)
       adapter.match/db->model))
 
-(s/defn update-score :- s/Int
-  [id {:keys [home-score away-score status]} db]
+(s/defn update-match :- s/Int
+  [id {:keys [home-score away-score status timer-started-at timer-accumulated-ms timer-status]} db]
   (-> (sql/update! db :matches (cond-> {}
                                  (some? home-score) (assoc :home_score home-score)
                                  (some? away-score) (assoc :away_score away-score)
-                                 status (assoc :status status))
+                                 status (assoc :status status)
+                                 timer-started-at (assoc :timer_started_at timer-started-at)
+                                 (some? timer-accumulated-ms) (assoc :timer_accumulated_ms timer-accumulated-ms)
+                                 timer-status (assoc :timer_status timer-status))
                    {:id id})
       affected-rows-count))
+
+(s/defn update-score :- s/Int
+  [id data db]
+  (update-match id data db))
 
 (s/defn update-sequence :- s/Int
   [id sequence db]

@@ -103,6 +103,42 @@
              ok))
        (catch Exception e (exception/api-exception-handler e))))
 
+(defn start-timer [request]
+  (try (let [db (:database request)
+             id (Integer/parseInt (str (get-in request [:params :id])))
+             user-id (auth/get-user-id-from-request request)
+             pelada (controller.pelada/get-pelada id db)
+             org-id (:organization-id pelada)]
+         (auth/require-organization-admin! user-id org-id db)
+         (-> (controller.pelada/start-pelada-timer id db)
+             adapter.pelada/model->response
+             ok))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn pause-timer [request]
+  (try (let [db (:database request)
+             id (Integer/parseInt (str (get-in request [:params :id])))
+             user-id (auth/get-user-id-from-request request)
+             pelada (controller.pelada/get-pelada id db)
+             org-id (:organization-id pelada)]
+         (auth/require-organization-admin! user-id org-id db)
+         (-> (controller.pelada/pause-pelada-timer id db)
+             adapter.pelada/model->response
+             ok))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn reset-timer [request]
+  (try (let [db (:database request)
+             id (Integer/parseInt (str (get-in request [:params :id])))
+             user-id (auth/get-user-id-from-request request)
+             pelada (controller.pelada/get-pelada id db)
+             org-id (:organization-id pelada)]
+         (auth/require-organization-admin! user-id org-id db)
+         (-> (controller.pelada/reset-pelada-timer id db)
+             adapter.pelada/model->response
+             ok))
+       (catch Exception e (exception/api-exception-handler e))))
+
 (defn get-schedule-preview [request]
   (try (let [db (:database request)
              id (Integer/parseInt (str (get-in request [:params :id])))

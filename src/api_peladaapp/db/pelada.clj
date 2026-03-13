@@ -47,7 +47,10 @@
                                                :fixed_goalkeepers (when (some? (:fixed-goalkeepers pelada))
                                                                     (if (:fixed-goalkeepers pelada) 1 0))
                                                :status (:status pelada)
-                                               :closed_at (:closed-at pelada))
+                                               :closed_at (:closed-at pelada)
+                                               :timer_started_at (:timer-started-at pelada)
+                                               :timer_accumulated_ms (:timer-accumulated-ms pelada)
+                                               :timer_status (:timer-status pelada))
                  (contains? pelada :home-fixed-goalkeeper-id) (assoc :home_fixed_goalkeeper_id (:home-fixed-goalkeeper-id pelada))
                  (contains? pelada :away-fixed-goalkeeper-id) (assoc :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id pelada)))]
     (if (empty? db-row)

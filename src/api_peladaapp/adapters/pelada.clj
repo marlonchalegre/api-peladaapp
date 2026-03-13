@@ -30,7 +30,10 @@
                                     :num-teams (:num_teams request)
                                     :players-per-team (:players_per_team request)
                                     :fixed-goalkeepers (:fixed_goalkeepers request)
-                                    :status (:status request))
+                                    :status (:status request)
+                                    :timer-started-at (:timer_started_at request)
+                                    :timer-accumulated-ms (:timer_accumulated_ms request)
+                                    :timer-status (:timer_status request))
       (contains? request :home_fixed_goalkeeper_id) (assoc :home-fixed-goalkeeper-id (:home_fixed_goalkeeper_id request))
       (contains? request :away_fixed_goalkeeper_id) (assoc :away-fixed-goalkeeper-id (:away_fixed_goalkeeper_id request)))))
 
@@ -50,7 +53,10 @@
         (medley.core/assoc-some
          :organization_name (:organization-name model)
          :home_fixed_goalkeeper_id (:home-fixed-goalkeeper-id model)
-         :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id model)))))
+         :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id model)
+         :timer_started_at (:timer-started-at model)
+         :timer_accumulated_ms (:timer-accumulated-ms model)
+         :timer_status (:timer-status model)))))
 
 (s/defn db->model :- models.pelada/Pelada
   [pelada]
@@ -68,4 +74,7 @@
                             :home-fixed-goalkeeper-id (:home_fixed_goalkeeper_id p)
                             :away-fixed-goalkeeper-id (:away_fixed_goalkeeper_id p)
                             :status (:status p)
-                            :closed-at (:closed_at p))))
+                            :closed-at (:closed_at p)
+                            :timer-started-at (:timer_started_at p)
+                            :timer-accumulated-ms (:timer_accumulated_ms p)
+                            :timer-status (:timer_status p))))

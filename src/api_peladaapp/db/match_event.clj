@@ -23,17 +23,21 @@
       adapter.match/db-event->model))
 
 (s/defn insert-event :- s/Int
-  [match-id :- s/Int player-id :- s/Int event-type :- s/Str db]
-  (-> (sql/insert! db :matchevents {:match_id match-id
-                                    :player_id player-id
-                                    :event_type event-type})
-      affected-rows-count
-      int))
+  ([match-id player-id event-type db]
+   (insert-event match-id player-id event-type nil nil db))
+  ([match-id :- s/Int player-id :- s/Int event-type :- s/Str session-time-ms match-time-ms db]
+   (-> (sql/insert! db :matchevents (cond-> {:match_id match-id
+                                             :player_id player-id
+                                             :event_type event-type}
+                                      session-time-ms (assoc :session_time_ms session-time-ms)
+                                      match-time-ms (assoc :match_time_ms match-time-ms)))
+       affected-rows-count
+       int)))
 
 (s/defn list-events-by-pelada :- [models.match-event/MatchEvent]
   [pelada-id :- s/Int db]
   (->> (jdbc/execute! db
-                      ["select e.id, e.match_id, e.player_id, e.event_type, e.created_at
+                      ["select e.id, e.match_id, e.player_id, e.event_type, e.created_at, e.session_time_ms, e.match_time_ms
                      from MatchEvents e
                      join Matches m on m.id = e.match_id
                      where m.pelada_id = ?

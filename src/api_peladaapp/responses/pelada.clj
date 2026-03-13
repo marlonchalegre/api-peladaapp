@@ -14,7 +14,10 @@
    (s/optional-key :away_fixed_goalkeeper_id) (s/maybe s/Int)
    (s/optional-key :status) (s/maybe s/Str)
    (s/optional-key :closed_at) (s/maybe s/Any)
-   (s/optional-key :is_admin) s/Bool})
+   (s/optional-key :is_admin) s/Bool
+   (s/optional-key :timer_started_at) (s/maybe s/Any)
+   (s/optional-key :timer_accumulated_ms) (s/maybe s/Int)
+   (s/optional-key :timer_status) (s/maybe s/Str)})
 
 (s/defschema PeladaBeginResponse
   {:matches_created s/Int})

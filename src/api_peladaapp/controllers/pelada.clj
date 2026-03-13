@@ -215,6 +215,36 @@
     (db.pelada/update-pelada pelada-id {:status "closed" :closed-at (str (java.time.Instant/now))} tx)
     (db.pelada/get-pelada pelada-id tx)))
 
+(s/defn start-pelada-timer :- models.pelada/Pelada
+  [pelada-id :- s/Int db]
+  (let [pelada (db.pelada/get-pelada pelada-id db)]
+    (if (= "running" (:timer-status pelada))
+      pelada
+      (let [now (str (java.time.Instant/now))]
+        (db.pelada/update-pelada pelada-id {:timer-status "running" :timer-started-at now} db)
+        (db.pelada/get-pelada pelada-id db)))))
+
+(s/defn pause-pelada-timer :- models.pelada/Pelada
+  [pelada-id :- s/Int db]
+  (let [pelada (db.pelada/get-pelada pelada-id db)]
+    (if (not= "running" (:timer-status pelada))
+      pelada
+      (let [now (java.time.Instant/now)
+            started-at (java.time.Instant/parse (:timer-started-at pelada))
+            elapsed (.toMillis (java.time.Duration/between started-at now))
+            new-accumulated (+ (or (:timer-accumulated-ms pelada) 0) elapsed)]
+        (db.pelada/update-pelada pelada-id {:timer-status "paused"
+                                            :timer-started-at nil
+                                            :timer-accumulated-ms new-accumulated} db)
+        (db.pelada/get-pelada pelada-id db)))))
+
+(s/defn reset-pelada-timer :- models.pelada/Pelada
+  [pelada-id :- s/Int db]
+  (db.pelada/update-pelada pelada-id {:timer-status "stopped"
+                                      :timer-started-at nil
+                                      :timer-accumulated-ms 0} db)
+  (db.pelada/get-pelada pelada-id db))
+
 (s/defn get-pelada-dashboard-data :- responses.pelada/PeladaDashboardResponse
   [pelada-id :- s/Int db]
   (let [pelada (db.pelada/get-pelada pelada-id db)

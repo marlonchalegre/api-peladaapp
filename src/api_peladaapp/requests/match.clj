@@ -9,7 +9,9 @@
 
 (s/defschema CreateMatchEventRequest
   {:player_id s/Int
-   :event_type s/Str})
+   :event_type s/Str
+   (s/optional-key :session_time_ms) (s/maybe s/Int)
+   (s/optional-key :match_time_ms) (s/maybe s/Int)})
 
 (s/defschema DeleteMatchEventRequest
   {:player_id s/Int
