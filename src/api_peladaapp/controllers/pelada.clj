@@ -208,13 +208,6 @@
       (seed-lineups-from-teams! pelada-id tx)
       {:matches_created (count match-plan)})))
 
-(s/defn close-pelada :- models.pelada/Pelada
-  [pelada-id :- s/Int db]
-  (jdbc/with-transaction [tx db]
-    (db.match/finish-all-by-pelada pelada-id tx)
-    (db.pelada/update-pelada pelada-id {:status "closed" :closed-at (str (java.time.Instant/now))} tx)
-    (db.pelada/get-pelada pelada-id tx)))
-
 (s/defn start-pelada-timer :- models.pelada/Pelada
   [pelada-id :- s/Int db]
   (let [pelada (db.pelada/get-pelada pelada-id db)]
@@ -244,6 +237,15 @@
                                       :timer-started-at nil
                                       :timer-accumulated-ms 0} db)
   (db.pelada/get-pelada pelada-id db))
+
+(s/defn close-pelada :- models.pelada/Pelada
+  [pelada-id :- s/Int db]
+  (jdbc/with-transaction [tx db]
+    (db.match/finish-all-by-pelada pelada-id tx)
+    ;; Ensure timer is paused when closing
+    (pause-pelada-timer pelada-id tx)
+    (db.pelada/update-pelada pelada-id {:status "closed" :closed-at (str (java.time.Instant/now))} tx)
+    (db.pelada/get-pelada pelada-id tx)))
 
 (s/defn get-pelada-dashboard-data :- responses.pelada/PeladaDashboardResponse
   [pelada-id :- s/Int db]
