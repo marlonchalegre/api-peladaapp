@@ -52,6 +52,21 @@
       affected-rows-count))
 
 (s/defn finish-all-by-pelada
-  "Finish all matches for a pelada. Matches not yet finished are closed as 0x0 draws."
+  "Finish all matches for a pelada. Matches not yet finished are closed.
+   It also ensures timers are stopped and accumulated time is calculated for running matches."
   [pelada-id :- s/Int db]
-  (jdbc/execute! db ["UPDATE matches SET status = 'finished', home_score = 0, away_score = 0 WHERE pelada_id = ? AND status != 'finished'" pelada-id]))
+  (let [now (str (java.time.Instant/now))]
+    (jdbc/execute! db
+                   ["UPDATE matches
+                     SET
+                       timer_accumulated_ms = CASE
+                         WHEN timer_status = 'running' THEN COALESCE(timer_accumulated_ms, 0) + (unixepoch(?) * 1000 - unixepoch(timer_started_at) * 1000)
+                         ELSE COALESCE(timer_accumulated_ms, 0)
+                       END,
+                       timer_status = 'paused',
+                       timer_started_at = NULL,
+                       status = 'finished',
+                       home_score = COALESCE(home_score, 0),
+                       away_score = COALESCE(away_score, 0)
+                     WHERE pelada_id = ? AND status != 'finished'"
+                    now pelada-id])))
