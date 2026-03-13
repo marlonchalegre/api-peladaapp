@@ -48,7 +48,47 @@
       (is (= 1 (:peladas_played stat)))
       (is (= 2 (:goal stat)))
       (is (= 1 (:assist stat)))
-      (is (= 0 (:own_goal stat))))))
+      (is (= 0 (:own_goal stat)))
+      (is (= 0.0 (:avg_rating stat))))))
+
+(deftest organization-statistics-with-rating-test
+  (let [app (-> th/*test-system* :app :handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
+        token (th/register-and-login! app {:name "User Rating" :email "rating@test.com" :password "pass123"})
+        user-id (th/user-id-by-email ds "rating@test.com")
+        _ (jdbc/execute! ds ["INSERT INTO Organizations (name) VALUES ('Rating Org')"])
+        org-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)
+        _ (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, grade) VALUES (?, ?, 5.0)" org-id user-id])
+        player-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)
+        _ (jdbc/execute! ds ["INSERT INTO Peladas (organization_id, scheduled_at, status) VALUES (?, '2026-03-13 10:00:00', 'closed')" org-id])
+        pelada-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)
+        _ (jdbc/execute! ds ["INSERT INTO Teams (pelada_id, name) VALUES (?, 'Team Rating')" pelada-id])
+        team-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)
+        _ (jdbc/execute! ds ["INSERT INTO Teams (pelada_id, name) VALUES (?, 'Opponent')" pelada-id])
+        opp-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)
+        _ (jdbc/execute! ds ["INSERT INTO Matches (pelada_id, home_team_id, away_team_id, sequence, status) VALUES (?, ?, ?, 1, 'finished')" pelada-id team-id opp-id])
+        match-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)]
+
+    (jdbc/execute! ds ["INSERT INTO MatchLineups (match_id, team_id, player_id) VALUES (?, ?, ?)" match-id team-id player-id])
+
+    ;; Add Votes
+    (jdbc/execute! ds ["INSERT INTO Votes (pelada_id, voter_id, target_id, stars) VALUES (?, ?, ?, 5)" pelada-id player-id player-id])
+
+    (let [token2 (th/register-and-login! app {:name "User 2" :email "user2@test.com" :password "pass123"})
+          user2-id (th/user-id-by-email ds "user2@test.com")
+          _ (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, grade) VALUES (?, ?, 5.0)" org-id user2-id])
+          player2-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)]
+      (jdbc/execute! ds ["INSERT INTO Votes (pelada_id, voter_id, target_id, stars) VALUES (?, ?, ?, 4)" pelada-id player2-id player-id]))
+
+    (let [response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
+                            (mock/query-string {:year 2026})
+                            ((th/auth-header token))))
+          body (th/decode-body response)
+          stat (first (filter #(= "User Rating" (:player_name %)) body))]
+
+      (is (= 200 (:status response)))
+      (is (= 4.5 (:avg_rating stat))))))
 
 (deftest legacy-statistics-fallback-test
   (let [app (-> th/*test-system* :app :handler)

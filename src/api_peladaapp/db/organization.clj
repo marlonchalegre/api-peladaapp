@@ -63,6 +63,7 @@
                          manual-stats-params ;; PlayerEvents (assists part)
                          manual-stats-params ;; PlayerEvents (own_goals part)
                          manual-stats-params ;; AllPlayers (ManualStats part)
+                         base-params ;; PlayerRatings
                          ))
         sql (str "
 WITH RawParticipation AS (
@@ -117,11 +118,20 @@ AllPlayers AS (
     SELECT player_id FROM PlayerParticipation
     UNION
     SELECT player_id FROM ManualStats WHERE organization_id = ? " (if (pos? year) " AND year = ?" "") "
+),
+PlayerRatings AS (
+    SELECT v.target_id as player_id, AVG(v.stars) as avg_rating
+    FROM Votes v
+    JOIN Peladas p ON v.pelada_id = p.id
+    WHERE p.organization_id = ? " where-year "
+    GROUP BY v.target_id
 )
 SELECT 
     ap.player_id, 
     u.name as player_name, 
+    u.position as player_position,
     COALESCE(pp.peladas_count, 0) as peladas_count,
+    COALESCE(pr.avg_rating, 0.0) as avg_rating,
     pe.event_type,
     SUM(pe.event_count) as count
 FROM AllPlayers ap
@@ -129,6 +139,7 @@ JOIN OrganizationPlayers op ON ap.player_id = op.id
 JOIN Users u ON op.user_id = u.id
 LEFT JOIN PlayerParticipation pp ON ap.player_id = pp.player_id
 LEFT JOIN PlayerEvents pe ON ap.player_id = pe.player_id
-GROUP BY ap.player_id, u.name, pp.peladas_count, pe.event_type
+LEFT JOIN PlayerRatings pr ON ap.player_id = pr.player_id
+GROUP BY ap.player_id, u.name, u.position, pp.peladas_count, pr.avg_rating, pe.event_type
 ")]
     (sql/query db (into [sql] params) {:builder-fn rs/as-unqualified-lower-maps})))

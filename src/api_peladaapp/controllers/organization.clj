@@ -197,7 +197,9 @@
                 (let [first-row (first player-rows)
                       base {:player_id (:player_id first-row)
                             :player_name (:player_name first-row)
+                            :player_position (:player_position first-row)
                             :peladas_played (:peladas_count first-row)
+                            :avg_rating (:avg_rating first-row)
                             :goal 0
                             :assist 0
                             :own_goal 0}]
