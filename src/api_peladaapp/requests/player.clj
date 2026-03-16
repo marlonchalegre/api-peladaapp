@@ -6,10 +6,12 @@
   {:user_id s/Int
    :organization_id s/Int
    (s/optional-key :grade) s/Num
-   (s/optional-key :position_id) s/Int})
+   (s/optional-key :position_id) s/Int
+   (s/optional-key :member_type) s/Str})
 
 (s/defschema UpdatePlayerRequest
   {(s/optional-key :user_id) s/Int
    (s/optional-key :organization_id) s/Int
    (s/optional-key :grade) s/Num
-   (s/optional-key :position_id) s/Int})
+   (s/optional-key :position_id) s/Int
+   (s/optional-key :member_type) s/Str})

@@ -25,8 +25,16 @@
            (when (nil? current-player)
              (throw (ex-info "User is not a player in this organization" {:type :forbidden}))))
 
-         (let [player-id (or target-player-id (:id current-player))]
-           (updated (controller.attendance/update-attendance pelada-id player-id status db))))
+         (let [player-id (or target-player-id (:id current-player))
+               target-player (if target-player-id
+                               (db.player/get-player target-player-id db)
+                               current-player)
+               final-status (if (and (= status "confirmed")
+                                     (not target-player-id)
+                                     (= "diarista" (:member-type target-player)))
+                              "waitlist"
+                              status)]
+           (updated (controller.attendance/update-attendance pelada-id player-id final-status db))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn batch-update-attendance [request]

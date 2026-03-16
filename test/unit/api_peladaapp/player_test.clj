@@ -28,6 +28,28 @@
             (is (= 200 (:status response)))
             (is (= 7.5 (:grade (:body response))))))))
 
+    (testing "Successfully updates member_type if user is org admin"
+      (let [get-calls (atom 0)
+            mock-diarista {:id 1 :organization-id 10 :user-id 2 :member-type "diarista"}
+            updated-mensalista {:id 1 :organization-id 10 :user-id 2 :member-type "mensalista"}]
+        (with-redefs [db.player/get-player (fn [id _]
+                                             (if (= id 1)
+                                               (if (= @get-calls 0)
+                                                 (do (swap! get-calls inc) mock-diarista)
+                                                 updated-mensalista)
+                                               nil))
+                      db.player/update-player (fn [_ update-data _]
+                                                (is (= "mensalista" (:member-type update-data)))
+                                                1)
+                      auth/require-organization-admin! (fn [_ _ _] true)]
+          (let [request {:database db
+                         :params {:id "1"}
+                         :body {:member_type "mensalista"}
+                         :identity {:id 99 :is-admin? false}}
+                response (handler.player/update-player-score request)]
+            (is (= 200 (:status response)))
+            (is (= "mensalista" (:member_type (:body response))))))))
+
     (testing "Fails with 403 if user is not org admin"
       (with-redefs [db.player/get-player (fn [id _] (if (= id 1) mock-player nil))
                     auth/require-organization-admin! (fn [_ _ _]

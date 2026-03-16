@@ -13,7 +13,8 @@
                           :user-id (:user_id request)
                           :organization-id (:organization_id request)
                           :grade (:grade request)
-                          :position-id (:position_id request)))
+                          :position-id (:position_id request)
+                          :member-type (:member_type request)))
 
 (s/defn update-request->model :- models.player/Player
   [request :- requests.player/UpdatePlayerRequest]
@@ -21,16 +22,18 @@
                           :user-id (:user_id request)
                           :organization-id (:organization_id request)
                           :grade (:grade request)
-                          :position-id (:position_id request)))
+                          :position-id (:position_id request)
+                          :member-type (:member_type request)))
 
 (s/defn model->response :- responses.player/PlayerResponse
-  [{:keys [id user-id organization-id grade position-id user-name user-username user-email]}]
+  [{:keys [id user-id organization-id grade position-id member-type user-name user-username user-email]}]
   (medley.core/assoc-some {}
                           :id id
                           :user_id user-id
                           :organization_id organization-id
                           :grade grade
                           :position_id position-id
+                          :member_type member-type
                           :user_name user-name
                           :user_username user-username
                           :user_email user-email))
@@ -44,6 +47,7 @@
                             :organization-id (:organization_id row)
                             :grade (:grade row)
                             :position-id (:position_id row)
+                            :member-type (:member_type row)
                             :user-name (or (:user_name row) (:user-name row))
                             :user-username (or (:user_username row) (:user-username row))
                             :user-email (or (:user_email row) (:user-email row)))))

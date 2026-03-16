@@ -40,6 +40,13 @@
           org-id (:id (decode-body org-resp))]
       (is (= 201 (:status org-resp)))
 
+      ;; Get admin player id and make them mensalista so they skip waitlist
+      (let [players (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/players")) auth)))
+            p1-id (:id (first (filter #(= (:user_id %) user-id) players)))]
+        (app (-> (mock/request :put (str "/api/players/" p1-id))
+                 (mock/json-body {:member_type "mensalista"})
+                 auth)))
+
         ;; Create pelada
       (let [pelada-resp (app (-> (mock/request :post "/api/peladas")
                                  (mock/json-body {:organization_id org-id})
@@ -133,5 +140,61 @@
         (is (some (fn [p] (and (= (:id p) p2-id) (= (:attendance_status p) "confirmed"))) available))
         (is (some (fn [p] (and (= (:id p) p3-id) (= (:attendance_status p) "confirmed"))) available))
         (is (some (fn [p] (and (= (:id p) p1-id) (= (:attendance_status p) "pending"))) available))))))
+
+(deftest diarista-waitlist-test
+  (let [app (-> th/*test-system* :app :handler)
+        db-file (:db-file th/*test-system*)
+        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
+    ;; 1. Register admin and 1 diarista user
+    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Admin" :email "admin@ex.com" :password "p"})))
+    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Diarista" :email "diarista@ex.com" :password "p"})))
+
+    (let [admin-login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "admin@ex.com" :password "p"})))
+          admin-token (:token (decode-body admin-login))
+          admin-auth (fn [req] (mock/header req "authorization" (str "Token " admin-token)))
+          admin-id (th/user-id-by-email ds "admin@ex.com")
+
+          diarista-login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "diarista@ex.com" :password "p"})))
+          diarista-token (:token (decode-body diarista-login))
+          diarista-auth (fn [req] (mock/header req "authorization" (str "Token " diarista-token)))
+          diarista-id (th/user-id-by-email ds "diarista@ex.com")
+
+          ;; 2. Create organization
+          org-resp (app (-> (mock/request :post "/api/organizations")
+                            (mock/json-body {:name "Waitlist Club"})
+                            admin-auth))
+          org-id (:id (decode-body org-resp))
+
+          ;; 3. Create player for diarista
+          p-resp (app (-> (mock/request :post "/api/players")
+                          (mock/json-body {:organization_id org-id :user_id diarista-id :member_type "diarista"})
+                          admin-auth))
+          p-id (:id (decode-body p-resp))
+
+          ;; 4. Create pelada
+          pelada-resp (app (-> (mock/request :post "/api/peladas")
+                               (mock/json-body {:organization_id org-id})
+                               admin-auth))
+          pelada-id (:id (decode-body pelada-resp))]
+
+      ;; 5. Diarista tries to confirm attendance
+      (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance"))
+               (mock/json-body {:status "confirmed"})
+               diarista-auth))
+
+      ;; 6. Verify diarista is in waitlist
+      (let [details-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) admin-auth))
+            available (:available_players (decode-body details-resp))]
+        (is (some (fn [p] (and (= (:id p) p-id) (= (:attendance_status p) "waitlist"))) available)))
+
+      ;; 7. Admin moves diarista to confirmed
+      (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance"))
+               (mock/json-body {:player_id p-id :status "confirmed"})
+               admin-auth))
+
+      ;; 8. Verify diarista is now confirmed
+      (let [details-resp2 (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) admin-auth))
+            available2 (:available_players (decode-body details-resp2))]
+        (is (some (fn [p] (and (= (:id p) p-id) (= (:attendance_status p) "confirmed"))) available2))))))
 
 

@@ -8,7 +8,7 @@
    :username s/Str
    (s/optional-key :email) s/Str
    (s/optional-key :position) (s/maybe s/Str)
-   (s/optional-key :admin-orgs) [s/Int]})
+   (s/optional-key :admin_orgs) [s/Int]})
 
 (s/defschema PublicUserResponse
   {:id s/Int

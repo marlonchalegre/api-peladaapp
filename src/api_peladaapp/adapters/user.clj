@@ -23,10 +23,10 @@
    (model->response user false))
   ([user :- models.user/User exclude-email? :- s/Bool]
    (let [fields (if exclude-email?
-                  [:id :name :username :position :admin-orgs]
-                  [:id :name :username :email :position :admin-orgs])]
+                  [:id :name :username :position]
+                  [:id :name :username :email :position])]
      (-> (select-keys user fields)
-         (update :admin-orgs #(or % []))))))
+         (assoc :admin_orgs (or (:admin-orgs user) []))))))
 
 (s/defn db->model :- models.user/User
   [user]

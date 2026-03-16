@@ -12,19 +12,21 @@
 (def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn insert-player :- s/Int
-  [{:keys [user-id organization-id grade position-id]}
+  [{:keys [user-id organization-id grade position-id member-type]}
    db]
-  (-> (sql/insert! db :organizationplayers {:user_id user-id
-                                            :organization_id organization-id
-                                            :grade grade
-                                            :position_id position-id})
+  (-> (sql/insert! db :organizationplayers (cond-> {:user_id user-id
+                                                    :organization_id organization-id
+                                                    :grade grade
+                                                    :position_id position-id}
+                                             member-type (assoc :member_type member-type)))
       affected-rows-count))
 
 (s/defn update-player :- s/Int
   [id player db]
   (let [db-row (cond-> {}
                  (contains? player :grade) (assoc :grade (:grade player))
-                 (contains? player :position-id) (assoc :position_id (:position-id player)))]
+                 (contains? player :position-id) (assoc :position_id (:position-id player))
+                 (contains? player :member-type) (assoc :member_type (:member-type player)))]
     (-> (sql/update! db :organizationplayers db-row {:id id})
         affected-rows-count)))
 
@@ -39,10 +41,9 @@
 
 (s/defn get-org-player-by-user-id :- s/Any
   [user-id organization-id db]
-  (let [unqualify #(update-keys % (comp keyword name))]
-    (some-> (sql/find-by-keys db :organizationplayers {:user_id user-id :organization_id organization-id})
-            first
-            unqualify)))
+  (some-> (sql/find-by-keys db :organizationplayers {:user_id user-id :organization_id organization-id})
+          first
+          adapter.player/db->model))
 
 (defn- position-string->id [pos]
   (case pos
