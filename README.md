@@ -71,6 +71,8 @@ docker compose exec backend lein clj-kondo --lint src
 - **Environment Variables**:
   - `PELADA_API_SECURITY_SIGNING_KEY`: JWT secret (overrides config.json).
   - `TURSO_DATABASE_URL`: Optional Turso/LibSQL connection URL.
+  - `WAHA_API_KEY`: API key for WAHA WhatsApp integration.
+  - `WAHA_BASE_PATH`: Base path for WAHA service (e.g., `/waha`). Must be consistent with Nginx proxy configuration.
 
 ---
 
