@@ -17,4 +17,6 @@
    (s/optional-key :timer-started-at) (s/maybe s/Any)
    (s/optional-key :timer-accumulated-ms) (s/maybe s/Int)
    (s/optional-key :timer-status) (s/maybe s/Str)
-   (s/optional-key :vote-ended-message-sent) (s/maybe s/Bool)})
+   (s/optional-key :vote-ended-message-sent) (s/maybe s/Bool)
+   (s/optional-key :vote-reminder-12h-sent) (s/maybe s/Bool)
+   (s/optional-key :vote-reminder-23h-sent) (s/maybe s/Bool)})

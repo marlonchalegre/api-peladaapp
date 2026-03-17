@@ -31,12 +31,12 @@
           misc/unamespace
           (select-keys [:id :name :waha_api_url :waha_instance :waha_group_id :waha_enabled :waha_start_msg_enabled :waha_end_msg_enabled :waha_attendance_reminder_enabled :waha_vote_reminder_enabled :waha_vote_ended_msg_enabled])
           (update-keys (comp keyword #(str/replace % "_" "-") name))
-          (update :waha-enabled #(not= 0 %))
-          (update :waha-start-msg-enabled #(not= 0 %))
-          (update :waha-end-msg-enabled #(not= 0 %))
-          (update :waha-attendance-reminder-enabled #(not= 0 %))
-          (update :waha-vote-reminder-enabled #(not= 0 %))
-          (update :waha-vote-ended-msg-enabled #(not= 0 %))))
+          (update :waha-enabled #(= 1 %))
+          (update :waha-start-msg-enabled #(= 1 %))
+          (update :waha-end-msg-enabled #(= 1 %))
+          (update :waha-attendance-reminder-enabled #(= 1 %))
+          (update :waha-vote-reminder-enabled #(= 1 %))
+          (update :waha-vote-ended-msg-enabled #(= 1 %))))
 
 (defn accept-invitation-response->frontend [result]
   {:organization_id (:organization-id result)})

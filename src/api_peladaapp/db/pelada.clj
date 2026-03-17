@@ -52,7 +52,11 @@
                                                :timer_accumulated_ms (:timer-accumulated-ms pelada)
                                                :timer_status (:timer-status pelada)
                                                :vote_ended_message_sent (when (some? (:vote-ended-message-sent pelada))
-                                                                          (if (:vote-ended-message-sent pelada) 1 0)))
+                                                                          (if (:vote-ended-message-sent pelada) 1 0))
+                                               :vote_reminder_12h_sent (when (some? (:vote-reminder-12h-sent pelada))
+                                                                         (if (:vote-reminder-12h-sent pelada) 1 0))
+                                               :vote_reminder_23h_sent (when (some? (:vote-reminder-23h-sent pelada))
+                                                                         (if (:vote-reminder-23h-sent pelada) 1 0)))
                  (contains? pelada :home-fixed-goalkeeper-id) (assoc :home_fixed_goalkeeper_id (:home-fixed-goalkeeper-id pelada))
                  (contains? pelada :away-fixed-goalkeeper-id) (assoc :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id pelada)))]
     (if (empty? db-row)
@@ -110,6 +114,28 @@
                        WHERE op.user_id = ?" user-id])
       first
       :count))
+
+(s/defn list-peladas-for-vote-notification :- [s/Any]
+  [db]
+  (->> (sql/query db ["SELECT * FROM Peladas 
+                       WHERE status = 'closed' 
+                       AND vote_ended_message_sent = 0 
+                       AND closed_at < datetime('now', '-24 hours')"])
+       (map adapter.pelada/db->model)))
+
+(s/defn list-peladas-for-vote-reminders :- [{:pelada s/Any :type s/Keyword}]
+  [db]
+  (let [rem-12h (->> (sql/query db ["SELECT * FROM Peladas 
+                                     WHERE status = 'closed' 
+                                     AND vote_reminder_12h_sent = 0 
+                                     AND closed_at < datetime('now', '-12 hours')"])
+                     (map (fn [p] {:pelada (adapter.pelada/db->model p) :type :12h})))
+        rem-23h (->> (sql/query db ["SELECT * FROM Peladas 
+                                     WHERE status = 'closed' 
+                                     AND vote_reminder_23h_sent = 0 
+                                     AND closed_at < datetime('now', '-23 hours')"])
+                     (map (fn [p] {:pelada (adapter.pelada/db->model p) :type :23h})))]
+    (concat rem-12h rem-23h)))
 
 (s/defn get-pelada-full-details :- s/Any
   [pelada-id :- s/Int

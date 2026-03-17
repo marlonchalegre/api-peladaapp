@@ -5,7 +5,6 @@
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.vote :as db.vote]
    [api-peladaapp.logic.notifications :as notifications]
-   [api-peladaapp.logic.vote :as logic.vote]
    [chime.core :as chime]
    [clojure.tools.logging :as log]
    [com.stuartsierra.component :as component])
@@ -28,7 +27,7 @@
          (filter #(.isAfter % (.toInstant now))))))
 
 (defn- run-reminders! [db]
-  (log/info "Running automated reminders...")
+  (log/info "Running automated attendance reminders...")
   (let [orgs (db.organization/list-all-organizations db)]
     (doseq [org orgs]
       (let [org-id (:id org)]
@@ -38,31 +37,34 @@
             (doseq [p active-peladas]
               (let [pending (db.attendance/list-pending-attendance-by-pelada (:id p) db)]
                 (when (seq pending)
-                  (notifications/send-notification! org-id :attendance-reminder {:pending-players pending} db))))))
-
-        ;; Vote reminders
-        (when (:waha-vote-reminder-enabled org)
-          (let [closed-peladas (filter #(= "closed" (:status %)) (db.pelada/list-peladas org-id 10 0 db))]
-            (doseq [p closed-peladas]
-              (when (logic.vote/voting-open? p)
-                (let [pending (db.vote/list-pending-voters-by-pelada (:id p) db)]
-                  (when (seq pending)
-                    (notifications/send-notification! org-id :vote-reminder {:pending-voters pending} db)))))))))))
+                  (notifications/send-notification! org-id :attendance-reminder {:pending-players pending} db))))))))))
 
 (defn- check-vote-ended! [db]
-  (log/info "Checking for ended voting periods...")
-  (let [orgs (db.organization/list-all-organizations db)]
-    (doseq [org orgs]
-      (let [org-id (:id org)]
-        (when (:waha-vote-ended-msg-enabled org)
-          (let [peladas (filter (fn [p] (and (= "closed" (:status p))
-                                             (not (:vote-ended-message-sent p))
-                                             (not (logic.vote/voting-open? p))))
-                                (db.pelada/list-peladas org-id 10 0 db))]
-            (doseq [p peladas]
-              (let [ranking (db.vote/list-ranking-by-pelada (:id p) db)]
-                (notifications/send-notification! org-id :vote-ended {:ranking ranking} db)
-                (db.pelada/update-pelada (:id p) {:vote-ended-message-sent true} db)))))))))
+  (log/info "Checking for ended voting periods and reminders...")
+  ;; 1. Check for Ended Voting (24h)
+  (let [peladas (db.pelada/list-peladas-for-vote-notification db)]
+    (doseq [p peladas]
+      (let [org-id (:organization-id p)
+            org (db.organization/get-organization org-id db)]
+        (when (and org (:waha-vote-ended-msg-enabled org))
+          (let [ranking (db.vote/list-ranking-by-pelada (:id p) db)]
+            (notifications/send-notification! org-id :vote-ended {:ranking ranking} db)
+            (db.pelada/update-pelada (:id p) {:vote-ended-message-sent true} db))))))
+
+  ;; 2. Check for Vote Reminders (12h and 23h)
+  (let [reminders (db.pelada/list-peladas-for-vote-reminders db)]
+    (doseq [{:keys [pelada type]} reminders]
+      (let [org-id (:organization-id pelada)
+            org (db.organization/get-organization org-id db)]
+        (when (and org (:waha-vote-reminder-enabled org))
+          (let [pending (db.vote/list-pending-voters-by-pelada (:id pelada) db)]
+            (when (seq pending)
+              (notifications/send-notification! org-id :vote-reminder {:pending-voters pending} db))
+            (db.pelada/update-pelada (:id pelada)
+                                     (if (= type :12h)
+                                       {:vote-reminder-12h-sent true}
+                                       {:vote-reminder-23h-sent true})
+                                     db)))))))
 
 (defrecord Scheduler [database reminder-chime vote-ended-chime]
   component/Lifecycle

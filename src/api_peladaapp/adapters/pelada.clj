@@ -57,7 +57,9 @@
          :timer_started_at (:timer-started-at model)
          :timer_accumulated_ms (:timer-accumulated-ms model)
          :timer_status (:timer-status model)
-         :vote_ended_message_sent (boolean (:vote-ended-message-sent model))))))
+         :vote_ended_message_sent (boolean (:vote-ended-message-sent model))
+         :vote_reminder_12h_sent (boolean (:vote-reminder-12h-sent model))
+         :vote_reminder_23h_sent (boolean (:vote-reminder-23h-sent model))))))
 
 (s/defn db->model :- models.pelada/Pelada
   [pelada]
@@ -70,7 +72,7 @@
                             :num-teams (:num_teams p)
                             :players-per-team (:players_per_team p)
                             :fixed-goalkeepers (if (contains? p :fixed_goalkeepers)
-                                                 (not= 0 (:fixed_goalkeepers p))
+                                                 (= 1 (:fixed_goalkeepers p))
                                                  false)
                             :home-fixed-goalkeeper-id (:home_fixed_goalkeeper_id p)
                             :away-fixed-goalkeeper-id (:away_fixed_goalkeeper_id p)
@@ -80,5 +82,11 @@
                             :timer-accumulated-ms (:timer_accumulated_ms p)
                             :timer-status (:timer_status p)
                             :vote-ended-message-sent (if (contains? p :vote_ended_message_sent)
-                                                       (not= 0 (:vote_ended_message_sent p))
-                                                       false))))
+                                                       (= 1 (:vote_ended_message_sent p))
+                                                       false)
+                            :vote-reminder-12h-sent (if (contains? p :vote_reminder_12h_sent)
+                                                      (= 1 (:vote_reminder_12h_sent p))
+                                                      false)
+                            :vote-reminder-23h-sent (if (contains? p :vote_reminder_23h_sent)
+                                                      (= 1 (:vote_reminder_23h_sent p))
+                                                      false))))

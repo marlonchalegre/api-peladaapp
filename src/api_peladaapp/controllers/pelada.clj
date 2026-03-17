@@ -14,6 +14,7 @@
    [api-peladaapp.db.schedule :as db.schedule]
    [api-peladaapp.db.team :as db.team]
    [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.db.vote :as db.vote]
    [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.logic.notifications :as notifications]
    [api-peladaapp.logic.pelada :as pelada.logic]
@@ -258,8 +259,22 @@
     (let [pelada (db.pelada/get-pelada pelada-id tx)]
       ;; WAHA Notification
       (try
-        (let [stats (db.match-event/list-player-stats-by-pelada pelada-id tx)]
-          (notifications/send-notification! (:organization-id pelada) :end {:stats stats} tx))
+        (let [matches (db.match/list-matches-by-pelada pelada-id tx)
+              teams (db.team/list-pelada-teams pelada-id tx)
+              events (db.match-event/list-events-by-pelada pelada-id tx)
+              lineups (db.match-lineup/list-match-lineups-by-pelada pelada-id tx)
+              team-players (db.team/list-team-players-with-names-by-pelada pelada-id tx)]
+          (notifications/send-notification! (:organization-id pelada) :end
+                                            {:pelada pelada
+                                             :matches matches
+                                             :teams teams
+                                             :events events
+                                             :lineups lineups
+                                             :team-players team-players}
+                                            tx))
+        (let [pending (db.vote/list-pending-voters-by-pelada pelada-id tx)]
+          (when (seq pending)
+            (notifications/send-notification! (:organization-id pelada) :vote-reminder {:pending-voters pending} tx)))
         (catch Exception _ nil))
       pelada)))
 

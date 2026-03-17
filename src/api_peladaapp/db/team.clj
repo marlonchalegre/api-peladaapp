@@ -134,7 +134,7 @@
        vec))
 
 (s/defn list-team-players-with-names-by-pelada [pelada-id db]
-  (->> (sql/query db ["SELECT tp.*, t.name as team_name, u.name as player_name
+  (->> (sql/query db ["SELECT tp.*, t.name as team_name, u.name as player_name, u.position
                         FROM TeamPlayers tp
                         JOIN Teams t ON tp.team_id = t.id
                         JOIN OrganizationPlayers op ON tp.player_id = op.id
