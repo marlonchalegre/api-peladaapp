@@ -82,11 +82,6 @@
    :total_eligible (:total-eligible model)
    :total_voted (:total-voted model)})
 
-(s/defn normalized-score-model->response
-  [model]
-  {:player_id (:player-id model)
-   :score (:score model)})
-
 (s/defn db->model :- models.vote/Vote
   [v]
   (when-let [p (some-> v misc/unamespace)]

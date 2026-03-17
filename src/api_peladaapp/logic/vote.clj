@@ -70,14 +70,3 @@
     true
     (catch Exception _
       false)))
-
-(defn normalized-score
-  "Normalize player's average stars (1..5) into 1..10 scale."
-  [player-id votes]
-  (let [stars (map :stars votes)
-        avg (if (seq stars)
-              (/ (reduce + stars) (count stars))
-              0.0)
-        normalized (* 2.0 avg)]
-    {:player-id player-id
-     :score normalized}))

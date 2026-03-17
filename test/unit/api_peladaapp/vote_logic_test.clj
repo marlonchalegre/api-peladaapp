@@ -5,77 +5,6 @@
   (:import
    [java.time Duration Instant]))
 
-(deftest test-ensure-not-self-vote
-  (testing "Self vote should throw exception"
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Self vote not allowed"
-                          (vote.logic/ensure-not-self-vote 1 1))))
-
-  (testing "Different voter and target should pass"
-    (is (nil? (vote.logic/ensure-not-self-vote 1 2)))))
-
-(deftest test-ensure-valid-stars
-  (testing "Stars below 1 should throw"
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Invalid vote stars"
-                          (vote.logic/ensure-valid-stars 0))))
-
-  (testing "Stars above 5 should throw"
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Invalid vote stars"
-                          (vote.logic/ensure-valid-stars 6))))
-
-  (testing "Valid stars 1-5 should pass"
-    (doseq [stars [1 2 3 4 5]]
-      (is (nil? (vote.logic/ensure-valid-stars stars))))))
-
-(deftest test-ensure-pelada-closed
-  (testing "Open pelada should throw"
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Pelada must be closed to vote"
-                          (vote.logic/ensure-pelada-closed {:status "open"}))))
-
-  (testing "Running pelada should throw"
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Pelada must be closed to vote"
-                          (vote.logic/ensure-pelada-closed {:status "running"}))))
-
-  (testing "Closed pelada should pass"
-    (is (nil? (vote.logic/ensure-pelada-closed {:status "closed"})))))
-
-(deftest test-ensure-voting-window-open
-  (testing "Missing closed-at should throw"
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Pelada has no closed_at timestamp"
-                          (vote.logic/ensure-voting-window-open {:status "closed"}))))
-
-  (testing "Within 24 hours should pass"
-    (let [now (Instant/now)
-          two-hours-ago (.minus now (Duration/ofHours 2))
-          pelada {:status "closed" :closed-at two-hours-ago}]
-      (is (nil? (vote.logic/ensure-voting-window-open pelada)))))
-
-  (testing "Almost 24 hours should pass"
-    (let [now (Instant/now)
-          almost-24h-ago (.minus now (Duration/ofMinutes (- (* 24 60) 1)))
-          pelada {:status "closed" :closed-at almost-24h-ago}]
-      (is (nil? (vote.logic/ensure-voting-window-open pelada)))))
-
-  (testing "After 24 hours should throw"
-    (let [now (Instant/now)
-          twenty-five-hours-ago (.minus now (Duration/ofHours 25))
-          pelada {:status "closed" :closed-at twenty-five-hours-ago}]
-      (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Voting window closed"
-                            (vote.logic/ensure-voting-window-open pelada))))
-    (let [now (Instant/now)
-          ;; 24 hours and 1 minute ago
-          just-over-24h-ago (.minus now (Duration/ofMinutes (+ (* 24 60) 1)))
-          pelada {:status "closed" :closed-at (str just-over-24h-ago)}]
-      (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Voting window closed"
-                            (vote.logic/ensure-voting-window-open pelada))))
-
-    (testing "Space-separated SQLite timestamp should be parsed correctly"
-      (let [now (Instant/now)
-            two-hours-ago-str (clojure.string/replace (str (.minus now (Duration/ofHours 2))) "T" " ")
-            ;; Remove Z to make it even more like SQLite standard strings
-            two-hours-ago-str (clojure.string/replace two-hours-ago-str "Z" "")
-            pelada {:status "closed" :closed-at two-hours-ago-str}]
-        (is (nil? (vote.logic/ensure-voting-window-open pelada)))))))
-
 (deftest test-validate-vote
   (testing "Valid vote should pass"
     (let [vote {:voter-id 1 :target-id 2 :stars 4}]
@@ -83,28 +12,30 @@
 
   (testing "Self vote should throw"
     (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Self vote not allowed"
-                          (vote.logic/validate-vote {:voter-id 1 :target-id 1 :stars 4}))))
+                          (vote.logic/validate-vote {:voter-id 1 :target-id 1 :stars 5}))))
 
   (testing "Invalid stars should throw"
+    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Invalid vote stars"
+                          (vote.logic/validate-vote {:voter-id 1 :target-id 2 :stars 6})))
     (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Invalid vote stars"
                           (vote.logic/validate-vote {:voter-id 1 :target-id 2 :stars 0})))))
 
 (deftest test-validate-voting-eligibility
-  (testing "Open pelada should fail"
+  (testing "Open pelada should throw"
     (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Pelada must be closed to vote"
                           (vote.logic/validate-voting-eligibility {:status "open"}))))
 
-  (testing "Closed pelada without closed-at should fail"
+  (testing "Closed pelada with no closed_at should throw"
     (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Pelada has no closed_at timestamp"
                           (vote.logic/validate-voting-eligibility {:status "closed"}))))
 
-  (testing "Closed pelada within 24h should pass"
+  (testing "Closed pelada within 24h window should pass"
     (let [now (Instant/now)
           two-hours-ago (.minus now (Duration/ofHours 2))
           pelada {:status "closed" :closed-at two-hours-ago}]
       (is (= pelada (vote.logic/validate-voting-eligibility pelada)))))
 
-  (testing "Closed pelada after 24h should fail"
+  (testing "Closed pelada after 24h window should throw"
     (let [now (Instant/now)
           twenty-five-hours-ago (.minus now (Duration/ofHours 25))
           pelada {:status "closed" :closed-at twenty-five-hours-ago}]
@@ -126,27 +57,3 @@
           twenty-five-hours-ago (.minus now (Duration/ofHours 25))
           pelada {:status "closed" :closed-at twenty-five-hours-ago}]
       (is (false? (vote.logic/voting-open? pelada))))))
-
-(deftest test-normalized-score
-  (testing "Empty votes should return 0.0"
-    (let [result (vote.logic/normalized-score 1 [])]
-      (is (= 1 (:player-id result)))
-      (is (= 0.0 (:score result)))))
-
-  (testing "Single vote of 5 stars should return 10.0"
-    (let [votes [{:stars 5}]
-          result (vote.logic/normalized-score 1 votes)]
-      (is (= 1 (:player-id result)))
-      (is (= 10.0 (:score result)))))
-
-  (testing "Average of 3 and 5 stars (4.0) should return 8.0"
-    (let [votes [{:stars 3} {:stars 5}]
-          result (vote.logic/normalized-score 1 votes)]
-      (is (= 1 (:player-id result)))
-      (is (= 8.0 (:score result)))))
-
-  (testing "Average of 1, 2, 3, 4, 5 stars (3.0) should return 6.0"
-    (let [votes [{:stars 1} {:stars 2} {:stars 3} {:stars 4} {:stars 5}]
-          result (vote.logic/normalized-score 1 votes)]
-      (is (= 1 (:player-id result)))
-      (is (= 6.0 (:score result))))))

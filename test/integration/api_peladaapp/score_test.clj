@@ -24,14 +24,14 @@
     (jdbc/execute! ds ["INSERT INTO Votes (pelada_id, voter_id, target_id, stars) VALUES (1, 3, 1, 3)"])
     (jdbc/execute! ds ["INSERT INTO Votes (pelada_id, voter_id, target_id, stars) VALUES (1, 1, 2, 4)"])
 
-    (testing "Fetches scores for given player IDs"
+    (testing "Fetches grades for given player IDs"
       (let [player-ids [1 2 3]
             scores (logic.score/get-normalized-scores player-ids ds)]
-        (is (= 8.0 (get scores 1)))
-        (is (= 8.0 (get scores 2)))
-        (is (= 5.0 (get scores 3)))))
+        (is (= 5.0 (get scores 1))) ;; Default since no grade was set
+        (is (= 5.0 (get scores 2))) ;; Default
+        (is (= 5.0 (get scores 3))))) ;; Default
 
-    (testing "Falls back to player grade if no votes exist"
+    (testing "Pulls directly from player grade column"
       (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password) VALUES (4, 'Dani', 'dani@e.com', 'p')"])
       (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, organization_id, user_id, grade) VALUES (4, 1, 4, 7.5)"])
       (let [scores (logic.score/get-normalized-scores [4] ds)]

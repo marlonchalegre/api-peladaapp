@@ -57,7 +57,3 @@
    (s/optional-key :current-votes) [VoteResponse]
    (s/optional-key :voter-player-id) (s/maybe s/Int)
    (s/optional-key :message) s/Str})
-
-(s/defschema NormalizedScoreResponse
-  {:player-id s/Int
-   :score s/Num})

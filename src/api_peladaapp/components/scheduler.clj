@@ -3,7 +3,9 @@
    [api-peladaapp.db.attendance :as db.attendance]
    [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.db.pelada :as db.pelada]
+   [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.vote :as db.vote]
+   [api-peladaapp.logic.grade :as logic.grade]
    [api-peladaapp.logic.notifications :as notifications]
    [chime.core :as chime]
    [clojure.tools.logging :as log]
@@ -48,6 +50,18 @@
             org (db.organization/get-organization org-id db)]
         (when (and org (:waha-vote-ended-msg-enabled org))
           (let [ranking (db.vote/list-ranking-by-pelada (:id p) db)]
+            ;; Automated Grade Update
+            (doseq [r ranking]
+              (let [player-id (:player-id r)
+                    avg-stars (:avg-stars r)
+                    performance (logic.grade/performance-from-stars avg-stars)
+                    current-player (db.player/get-player player-id db)
+                    current-grade (or (:grade current-player) 5.0)
+                    new-grade (logic.grade/calculate-new-grade current-grade performance)]
+                (log/info (format "Updating player %d grade: %.2f -> %.2f (perf: %.2f)"
+                                  player-id current-grade new-grade performance))
+                (db.player/update-player-grade player-id new-grade db)))
+
             (notifications/send-notification! org-id :vote-ended {:ranking ranking} db)
             (db.pelada/update-pelada (:id p) {:vote-ended-message-sent true} db))))))
 

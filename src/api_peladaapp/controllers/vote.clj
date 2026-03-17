@@ -44,14 +44,6 @@
   [pelada-id :- s/Int db]
   (db.vote/list-votes-by-pelada pelada-id db))
 
-(s/defn compute-normalized-score :- responses.vote/NormalizedScoreResponse
-  "Normalize a player's average stars (1..5) into 1..10 scale."
-  [pelada-id :- s/Int player-id :- s/Int db]
-  (let [votes (db.vote/list-votes-for-player pelada-id player-id db)
-        res (vote.logic/normalized-score player-id votes)]
-    {:player-id (:player-id res)
-     :score (:score res)}))
-
 (s/defn get-voting-info :- responses.vote/VotingInfoResponse
   "Get voting eligibility info for a voter in a pelada."
   [pelada-id :- s/Int user-id :- s/Int db]

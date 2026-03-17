@@ -8,25 +8,25 @@
   (testing "Empty player-ids returns empty map"
     (is (= {} (score.logic/get-normalized-scores [] {}))))
 
-  (testing "Returns default 5.0 for player with no votes"
+  (testing "Returns default 5.0 for player with no record in DB"
     (with-redefs [jdbc/execute! (fn [_ _ _] [])] ;; DB returns empty
       (let [scores (score.logic/get-normalized-scores [1] {})]
         (is (= 5.0 (get scores 1))))))
 
-  (testing "Returns normalized score (x2) for player with votes"
-    ;; Mock DB returning average stars 4.5
-    (with-redefs [jdbc/execute! (fn [_ _ _] [{:id 1 :avg_stars 4.5}])]
+  (testing "Returns stored grade from DB"
+    ;; Mock DB returning grade 9.0
+    (with-redefs [jdbc/execute! (fn [_ _ _] [{:id 1 :grade 9.0}])]
       (let [scores (score.logic/get-normalized-scores [1] {})]
         (is (= 9.0 (get scores 1))))))
 
-  (testing "Returns mixed results: existing scores normalized, missing ones defaulted"
-    ;; Mock DB returning score for player 1 only
-    (with-redefs [jdbc/execute! (fn [_ _ _] [{:id 1 :avg_stars 3.5}])]
+  (testing "Returns mixed results: existing grades from DB, missing ones defaulted"
+    ;; Mock DB returning grade for player 1 only
+    (with-redefs [jdbc/execute! (fn [_ _ _] [{:id 1 :grade 7.5}])]
       (let [scores (score.logic/get-normalized-scores [1 2] {})]
-        (is (= 7.0 (get scores 1)))   ;; 3.5 * 2
+        (is (= 7.5 (get scores 1)))
         (is (= 5.0 (get scores 2))))))
 
-  (testing "Falls back to grade if no votes exist"
-    (with-redefs [jdbc/execute! (fn [_ _ _] [{:id 1 :grade 8.5 :avg_stars nil}])]
+  (testing "Defaults to 5.0 if grade is nil in DB"
+    (with-redefs [jdbc/execute! (fn [_ _ _] [{:id 1 :grade nil}])]
       (let [scores (score.logic/get-normalized-scores [1] {})]
-        (is (= 8.5 (get scores 1))))))) ;; Default
+        (is (= 5.0 (get scores 1)))))))

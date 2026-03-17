@@ -30,6 +30,12 @@
     (-> (sql/update! db :organizationplayers db-row {:id id})
         affected-rows-count)))
 
+(s/defn update-player-grade :- s/Int
+  "Surgically update a player's grade."
+  [id grade db]
+  (-> (sql/update! db :organizationplayers {:grade grade} {:id id})
+      affected-rows-count))
+
 (s/defn delete-player :- s/Int
   [id db]
   (-> (sql/delete! db :organizationplayers {:id id})

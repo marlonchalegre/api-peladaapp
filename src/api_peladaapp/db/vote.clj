@@ -1,6 +1,7 @@
 (ns api-peladaapp.db.vote
   (:require
    [api-peladaapp.adapters.vote :as adapter.vote]
+   [api-peladaapp.logic.grade :as logic.grade]
    [api-peladaapp.models.vote :as models.vote]
    [next.jdbc :as jdbc]
    [next.jdbc.result-set :as rs]
@@ -82,7 +83,7 @@
            {:player-id (:target_id r)
             :player-name (:player_name r)
             :avg-stars (:avg_stars r)
-            :score (* 2.0 (:avg_stars r))
+            :score (logic.grade/performance-from-stars (:avg_stars r))
             :vote-count (:vote_count r)})
          results)))
 
