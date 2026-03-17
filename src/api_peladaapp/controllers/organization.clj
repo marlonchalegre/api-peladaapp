@@ -29,6 +29,20 @@
                                        db)
       token)))
 
+(s/defn reset-organization-link :- s/Str
+  "Deletes any existing public link and creates a new one"
+  [organization-id :- s/Int
+   user-id :- s/Int
+   db]
+  (jdbc/with-transaction [tx db]
+    (db.invitation/delete-link-invitation-by-org organization-id tx)
+    (let [token (generate-token)]
+      (db.invitation/insert-invitation {:organization-id organization-id
+                                        :token token
+                                        :invited-by user-id}
+                                       tx)
+      token)))
+
 (s/defn invite-player-improved
   "Invites a player by email (handle) or name.
    If handle is provided, uses/creates user by handle.

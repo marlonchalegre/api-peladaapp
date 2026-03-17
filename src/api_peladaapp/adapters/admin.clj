@@ -21,6 +21,7 @@
     user_name (assoc :user_name user_name)
     user_email (assoc :user_email user_email)
     (:user-username model) (assoc :user_username (:user-username model))
+    (:user-position model) (assoc :user_position (:user-position model))
     organization_name (assoc :organization_name organization_name)
         ;; Sometimes these are kebab-cased in model if they come from joined results mapped to model
     (:user-name model) (assoc :user_name (:user-name model))
@@ -36,4 +37,5 @@
       (or (:user_name p) (:user-name p)) (assoc :user-name (or (:user_name p) (:user-name p)))
       (or (:user_username p) (:user-username p)) (assoc :user-username (or (:user_username p) (:user-username p)))
       (or (:user_email p) (:user-email p)) (assoc :user-email (or (:user_email p) (:user-email p)))
+      (or (:user_position p) (:user-position p)) (assoc :user-position (or (:user_position p) (:user-position p)))
       (or (:organization_name p) (:organization-name p)) (assoc :organization-name (or (:organization_name p) (:organization-name p))))))

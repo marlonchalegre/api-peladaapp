@@ -219,3 +219,27 @@
         (is (= partial-id (:id result)))
         (is (= "Claimed Name" (:name updated-user)))
         (is (some? (:password updated-user)))))))
+
+(deftest reset-link-invitation-test
+  (let [db-val (get-in helpers/*test-system* [:database :database])
+        db (if (fn? db-val) (db-val) db-val)
+        org-name "Reset Link Org"
+        _ (jdbc/execute! db ["INSERT INTO Organizations (name) VALUES (?)" org-name] opts)
+        org (first (jdbc/execute! db ["SELECT id FROM Organizations WHERE name = ?" org-name] opts))
+        org-id (:id org)
+        user-id 99]
+
+    (testing "Resetting a link invitation replaces the old token"
+      (let [token1 (controller.organization/get-or-create-organization-link org-id user-id db)
+            _ (is (string? token1))
+            token2 (controller.organization/reset-organization-link org-id user-id db)]
+        (is (string? token2))
+        (is (not= token1 token2))
+
+        ;; Verify old token is gone
+        (is (thrown-with-msg? Exception #"Invitation not found"
+                              (controller.organization/get-invitation-by-token token1 db)))
+
+        ;; Verify new token exists
+        (let [inv (controller.organization/get-invitation-by-token token2 db)]
+          (is (= org-id (:organization-id inv))))))))

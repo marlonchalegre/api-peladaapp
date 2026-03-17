@@ -74,6 +74,12 @@
           first
           adapter.invitation/db->model))
 
+(s/defn delete-link-invitation-by-org :- s/Int
+  [org-id db]
+  (-> (jdbc/execute! db ["DELETE FROM OrganizationInvitations WHERE organization_id = ? AND email IS NULL" org-id])
+      first
+      affected-rows-count))
+
 (s/defn list-invitations-by-organization
   [organization-id db]
   (->> (jdbc/execute! db ["SELECT * FROM OrganizationInvitations 

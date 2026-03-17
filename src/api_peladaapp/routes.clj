@@ -79,6 +79,7 @@
     (GET "/organizations/:id/manual-stats" [] handler.manual-stats/list-manual-stats)
     (POST "/organizations/:id/manual-stats" [] handler.manual-stats/upsert-manual-stats)
     (POST "/organizations/:id/invite" [] handler.organization/invite)
+    (POST "/organizations/:id/invite-link/reset" [] handler.organization/reset-invite-link)
     (POST "/organizations/:id/waha/test" [] handler.organization/test-waha)
     (GET "/organizations/:id/invite-link" [] handler.organization/get-invite-link)
     (GET "/organizations/:id/invitations" [] handler.organization/list-invitations)

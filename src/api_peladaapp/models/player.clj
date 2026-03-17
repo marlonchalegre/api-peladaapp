@@ -10,4 +10,5 @@
    :position-id (s/maybe s/Int)
    (s/optional-key :member-type) s/Str
    (s/optional-key :user-name) s/Str
-   (s/optional-key :user-email) s/Str})
+   (s/optional-key :user-email) s/Str
+   (s/optional-key :user-position) (s/maybe s/Str)})

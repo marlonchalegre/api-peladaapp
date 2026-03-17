@@ -113,6 +113,14 @@
          (ok {:token (controller.organization/get-or-create-organization-link organization-id user-id db)}))
        (catch Exception e (exception/api-exception-handler e))))
 
+(defn reset-invite-link [request]
+  (try (let [db (:database request)
+             organization-id (Integer/parseInt (str (get-in request [:params :id])))
+             user-id (auth/get-user-id-from-request request)]
+         (auth/require-organization-admin! user-id organization-id db)
+         (ok {:token (controller.organization/reset-organization-link organization-id user-id db)}))
+       (catch Exception e (exception/api-exception-handler e))))
+
 (defn get-invitation-info [request]
   (try (let [db (:database request)
              token (get-in request [:params :token])]
