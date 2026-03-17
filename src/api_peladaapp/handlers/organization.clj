@@ -1,4 +1,5 @@
 (ns api-peladaapp.handlers.organization
+  (:refer-clojure :exclude [update])
   (:require
    [api-peladaapp.adapters.invitation :as adapter.invitation]
    [api-peladaapp.adapters.organization :as adapter.organization]
@@ -48,6 +49,18 @@
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-member! user-id id db)
          (-> (controller.organization/get-organization id db)
+             adapter.organization/model->response
+             ok))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn update [request]
+  (try (let [db (:database request)
+             id (Integer/parseInt (str (get-in request [:params :id])))
+             body (:body request)
+             org (adapter.organization/update-request->model body)
+             user-id (auth/get-user-id-from-request request)]
+         (auth/require-organization-admin! user-id id db)
+         (-> (controller.organization/update-organization id org db)
              adapter.organization/model->response
              ok))
        (catch Exception e (exception/api-exception-handler e))))
@@ -139,6 +152,14 @@
          (auth/require-organization-admin! user-id organization-id db)
          (controller.organization/revoke-invitation invitation-id organization-id db)
          (deleted))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn test-waha [request]
+  (try (let [db (:database request)
+             id (Integer/parseInt (str (get-in request [:params :id])))
+             user-id (auth/get-user-id-from-request request)]
+         (auth/require-organization-admin! user-id id db)
+         (ok (controller.organization/test-waha-connection id db)))
        (catch Exception e (exception/api-exception-handler e))))
 
 

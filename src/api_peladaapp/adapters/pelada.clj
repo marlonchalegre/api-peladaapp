@@ -56,7 +56,8 @@
          :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id model)
          :timer_started_at (:timer-started-at model)
          :timer_accumulated_ms (:timer-accumulated-ms model)
-         :timer_status (:timer-status model)))))
+         :timer_status (:timer-status model)
+         :vote_ended_message_sent (boolean (:vote-ended-message-sent model))))))
 
 (s/defn db->model :- models.pelada/Pelada
   [pelada]
@@ -77,4 +78,7 @@
                             :closed-at (:closed_at p)
                             :timer-started-at (:timer_started_at p)
                             :timer-accumulated-ms (:timer_accumulated_ms p)
-                            :timer-status (:timer_status p))))
+                            :timer-status (:timer_status p)
+                            :vote-ended-message-sent (if (contains? p :vote_ended_message_sent)
+                                                       (not= 0 (:vote_ended_message_sent p))
+                                                       false))))

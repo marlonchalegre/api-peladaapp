@@ -3,6 +3,7 @@
    [api-peladaapp.helpers.misc :refer [unamespace]]
    [clojure.string :as str]
    [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
@@ -49,6 +50,19 @@
    db]
   (->> (sql/query db ["select * from peladaattendance where pelada_id = ?" pelada-id])
        (map unamespace)))
+
+(s/defn list-pending-attendance-by-pelada [pelada-id db]
+  (let [query "SELECT op.id as player_id, u.name as player_name
+               FROM OrganizationPlayers op
+               JOIN Users u ON op.user_id = u.id
+               JOIN Peladas p ON op.organization_id = p.organization_id
+               WHERE p.id = ?
+               AND NOT EXISTS (
+                 SELECT 1 FROM PeladaAttendance pa 
+                 WHERE pa.pelada_id = p.id AND pa.player_id = op.id
+               )"
+        results (jdbc/execute! db [query pelada-id] {:builder-fn rs/as-unqualified-lower-maps})]
+    (map (fn [r] {:player-id (:player_id r) :player-name (:player_name r)}) results)))
 
 (s/defn delete-attendance :- s/Int
   [pelada-id :- s/Int

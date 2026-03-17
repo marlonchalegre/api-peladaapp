@@ -50,7 +50,9 @@
                                                :closed_at (:closed-at pelada)
                                                :timer_started_at (:timer-started-at pelada)
                                                :timer_accumulated_ms (:timer-accumulated-ms pelada)
-                                               :timer_status (:timer-status pelada))
+                                               :timer_status (:timer-status pelada)
+                                               :vote_ended_message_sent (when (some? (:vote-ended-message-sent pelada))
+                                                                          (if (:vote-ended-message-sent pelada) 1 0)))
                  (contains? pelada :home-fixed-goalkeeper-id) (assoc :home_fixed_goalkeeper_id (:home-fixed-goalkeeper-id pelada))
                  (contains? pelada :away-fixed-goalkeeper-id) (assoc :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id pelada)))]
     (if (empty? db-row)

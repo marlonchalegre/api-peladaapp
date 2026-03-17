@@ -132,3 +132,15 @@
        (map (fn [m]
               (assoc m :is_goalkeeper (not= 0 (:is_goalkeeper m)))))
        vec))
+
+(s/defn list-team-players-with-names-by-pelada [pelada-id db]
+  (->> (sql/query db ["SELECT tp.*, t.name as team_name, u.name as player_name
+                        FROM TeamPlayers tp
+                        JOIN Teams t ON tp.team_id = t.id
+                        JOIN OrganizationPlayers op ON tp.player_id = op.id
+                        JOIN Users u ON op.user_id = u.id
+                        WHERE t.pelada_id = ?" pelada-id])
+       (map unqualify-row)
+       (map (fn [m]
+              (assoc m :is_goalkeeper (not= 0 (:is_goalkeeper m)))))
+       vec))

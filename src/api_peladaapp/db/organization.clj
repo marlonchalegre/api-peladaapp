@@ -2,6 +2,8 @@
   (:require
    [api-peladaapp.adapters.organization :as adapter.organization]
    [api-peladaapp.helpers.misc :as misc]
+   [clojure.string :as str]
+   [next.jdbc :as jdbc]
    [next.jdbc.result-set :as rs]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
@@ -10,17 +12,41 @@
   (-> result vals first))
 
 (s/defn insert-organization :- s/Int
-  [{:keys [name]} db]
-  (-> (sql/insert! db :organizations {:name name})
-      affected-rows-count
-      int))
+  [org db]
+  (let [row (select-keys org [:name])]
+    (-> (sql/insert! db :organizations row)
+        affected-rows-count
+        int)))
 
 (s/defn get-organization [id db]
-  (-> (sql/get-by-id db :organizations id) adapter.organization/db->model))
+  (let [query "SELECT o.*, 
+                      wc.api_url as waha_api_url, wc.instance as waha_instance, wc.group_id as waha_group_id,
+                      wc.enabled as waha_enabled, wc.start_msg_enabled as waha_start_msg_enabled,
+                      wc.end_msg_enabled as waha_end_msg_enabled, wc.attendance_reminder_enabled as waha_attendance_reminder_enabled,
+                      wc.vote_reminder_enabled as waha_vote_reminder_enabled, wc.vote_ended_msg_enabled as waha_vote_ended_msg_enabled
+               FROM Organizations o
+               LEFT JOIN OrganizationWahaConfigs wc ON o.id = wc.organization_id
+               WHERE o.id = ?"
+        result (sql/query db [query id])]
+    (some-> result first adapter.organization/db->model)))
 
 (s/defn update-organization :- s/Int
-  [id {:keys [name]} db]
-  (-> (sql/update! db :organizations {:name name} {:id id}) affected-rows-count))
+  [id org db]
+  (jdbc/with-transaction [tx db]
+    (let [org-row (select-keys org [:name])
+          waha-row (-> org
+                       (select-keys [:waha-api-url :waha-instance :waha-group-id :waha-enabled :waha-start-msg-enabled :waha-end-msg-enabled :waha-attendance-reminder-enabled :waha-vote-reminder-enabled :waha-vote-ended-msg-enabled])
+                       (update-keys (comp keyword #(str/replace % "waha-" "") name))
+                       (update-keys (comp keyword #(str/replace % "-" "_") name)))]
+      (when (seq org-row)
+        (sql/update! tx :organizations org-row {:id id}))
+      (when (seq waha-row)
+        (let [waha-row (assoc waha-row :organization_id id)
+              exists? (first (sql/query tx ["SELECT 1 FROM OrganizationWahaConfigs WHERE organization_id = ?" id]))]
+          (if exists?
+            (sql/update! tx :organizationwahaconfigs waha-row {:organization_id id})
+            (sql/insert! tx :organizationwahaconfigs waha-row))))
+      1)))
 
 (s/defn delete-organization :- s/Int
   [id db]
@@ -29,6 +55,17 @@
 (s/defn list-organizations [db limit offset]
   (->> (sql/query db ["select * from organizations order by id limit ? offset ?" limit offset])
        (map adapter.organization/db->model)))
+
+(s/defn list-all-organizations [db]
+  (let [query "SELECT o.*, 
+                      wc.api_url as waha_api_url, wc.instance as waha_instance, wc.group_id as waha_group_id,
+                      wc.enabled as waha_enabled, wc.start_msg_enabled as waha_start_msg_enabled,
+                      wc.end_msg_enabled as waha_end_msg_enabled, wc.attendance_reminder_enabled as waha_attendance_reminder_enabled,
+                      wc.vote_reminder_enabled as waha_vote_reminder_enabled, wc.vote_ended_msg_enabled as waha_vote_ended_msg_enabled
+               FROM Organizations o
+               LEFT JOIN OrganizationWahaConfigs wc ON o.id = wc.organization_id"]
+    (->> (sql/query db [query])
+         (map adapter.organization/db->model))))
 
 (s/defn list-by-user [user-id db]
   (->> (sql/query db ["SELECT o.id, o.name, 'admin' as role

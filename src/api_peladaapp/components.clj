@@ -1,5 +1,6 @@
 (ns api-peladaapp.components
   (:require
+   [api-peladaapp.components.scheduler :as scheduler]
    [api-peladaapp.server :as server]
    [clojure.string :as str]
    [com.stuartsierra.component :as component]
@@ -33,7 +34,7 @@
       ;; Enable WAL mode for local SQLite
       (when-not (and turso-url turso-token)
         (try
-          (with-open [conn (jdbc/get-connection started-ds)]
+          (with-open [conn (jdbc/get-connection (:connectable started-ds))]
             (jdbc/execute! conn ["PRAGMA journal_mode=WAL;"]))
           (catch Exception e
             (println "Warning: Could not enable WAL mode:" (.getMessage e)))))
@@ -94,6 +95,7 @@
   (component/system-map
    :database (new-database db-spec skip-migrations)
    :app      (new-app server/app)
-   :server   (new-web-server)))
+   :server   (new-web-server)
+   :scheduler (scheduler/new-scheduler)))
 
 

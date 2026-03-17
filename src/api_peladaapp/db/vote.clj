@@ -3,6 +3,7 @@
    [api-peladaapp.adapters.vote :as adapter.vote]
    [api-peladaapp.models.vote :as models.vote]
    [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]
    [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
@@ -66,3 +67,33 @@
       (doseq [p params]
         (jdbc/execute! db (into [query] p)))
       (count votes-data))))
+
+(s/defn list-ranking-by-pelada
+  [pelada-id db]
+  (let [query "SELECT v.target_id, u.name as player_name, AVG(v.stars) as avg_stars, COUNT(v.id) as vote_count
+               FROM Votes v
+               JOIN OrganizationPlayers op ON v.target_id = op.id
+               JOIN Users u ON op.user_id = u.id
+               WHERE v.pelada_id = ?
+               GROUP BY v.target_id
+               ORDER BY avg_stars DESC, vote_count DESC"
+        results (jdbc/execute! db [query pelada-id] {:builder-fn rs/as-unqualified-lower-maps})]
+    (map (fn [r]
+           {:player-id (:target_id r)
+            :player-name (:player_name r)
+            :avg-stars (:avg_stars r)
+            :score (* 2.0 (:avg_stars r))
+            :vote-count (:vote_count r)})
+         results)))
+
+(s/defn list-pending-voters-by-pelada [pelada-id db]
+  (let [query "SELECT pa.player_id, u.name as player_name
+               FROM PeladaAttendance pa
+               JOIN OrganizationPlayers op ON pa.player_id = op.id
+               JOIN Users u ON op.user_id = u.id
+               WHERE pa.pelada_id = ? AND pa.status = 'confirmed'
+               AND NOT EXISTS (
+                 SELECT 1 FROM Votes v WHERE v.pelada_id = pa.pelada_id AND v.voter_id = pa.player_id
+               )"
+        results (jdbc/execute! db [query pelada-id] {:builder-fn rs/as-unqualified-lower-maps})]
+    (map (fn [r] {:player-id (:player_id r) :player-name (:player_name r)}) results)))

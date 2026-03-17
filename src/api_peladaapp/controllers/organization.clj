@@ -6,6 +6,7 @@
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.pagination :as pagination]
+   [api-peladaapp.logic.waha :as waha]
    [api-peladaapp.models.organization :as models.organization]
    [clojure.string :as str]
    [next.jdbc :as jdbc]
@@ -164,6 +165,16 @@
     (if (zero? rows)
       (throw (ex-info nil {:type :not-found :message "Organization not found"}))
       (db.organization/get-organization id db))))
+
+(s/defn test-waha-connection
+  [id :- s/Int db]
+  (let [org (db.organization/get-organization id db)]
+    (if (and org (:waha-enabled org))
+      (let [result (waha/send-message org "PeladaApp: Teste de conexão WAHA realizado com sucesso! ⚽")]
+        (if (:error result)
+          (throw (ex-info "WAHA error" {:type :bad-request :message (str "Erro no WAHA: " (:error result))}))
+          {:status "success" :message "Mensagem de teste enviada!"}))
+      (throw (ex-info "WAHA not enabled" {:type :bad-request :message "WAHA não está habilitado para esta organização."})))))
 
 (s/defn delete-organization
   [id :- s/Int

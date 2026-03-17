@@ -15,6 +15,7 @@
    [api-peladaapp.db.team :as db.team]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.pagination :as pagination]
+   [api-peladaapp.logic.notifications :as notifications]
    [api-peladaapp.logic.pelada :as pelada.logic]
    [api-peladaapp.models.pelada :as models.pelada]
    [api-peladaapp.responses.pelada :as responses.pelada]
@@ -206,6 +207,14 @@
       (persist-match-plan! pelada-id match-plan tx)
       (db.pelada/update-pelada pelada-id {:status "running"} tx)
       (seed-lineups-from-teams! pelada-id tx)
+
+      ;; WAHA Notification
+      (try
+        (let [teams (db.team/list-pelada-teams pelada-id tx)
+              team-players (db.team/list-team-players-with-names-by-pelada pelada-id tx)]
+          (notifications/send-notification! (:organization-id pelada) :start {:teams teams :team-players team-players} tx))
+        (catch Exception _ nil))
+
       {:matches_created (count match-plan)})))
 
 (s/defn start-pelada-timer :- models.pelada/Pelada
@@ -245,7 +254,14 @@
     ;; Ensure timer is paused when closing
     (pause-pelada-timer pelada-id tx)
     (db.pelada/update-pelada pelada-id {:status "closed" :closed-at (str (java.time.Instant/now))} tx)
-    (db.pelada/get-pelada pelada-id tx)))
+
+    (let [pelada (db.pelada/get-pelada pelada-id tx)]
+      ;; WAHA Notification
+      (try
+        (let [stats (db.match-event/list-player-stats-by-pelada pelada-id tx)]
+          (notifications/send-notification! (:organization-id pelada) :end {:stats stats} tx))
+        (catch Exception _ nil))
+      pelada)))
 
 (s/defn get-pelada-dashboard-data :- responses.pelada/PeladaDashboardResponse
   [pelada-id :- s/Int db]
