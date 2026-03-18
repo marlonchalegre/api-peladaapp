@@ -1,6 +1,5 @@
 (ns api-peladaapp.db.attendance
   (:require
-   [api-peladaapp.helpers.misc :refer [unamespace]]
    [clojure.string :as str]
    [next.jdbc :as jdbc]
    [next.jdbc.result-set :as rs]
@@ -48,8 +47,8 @@
 (s/defn list-attendance-by-pelada :- [s/Any]
   [pelada-id :- s/Int
    db]
-  (->> (sql/query db ["select * from peladaattendance where pelada_id = ?" pelada-id])
-       (map unamespace)))
+  (jdbc/execute! db ["select * from peladaattendance where pelada_id = ?" pelada-id]
+                 {:builder-fn rs/as-unqualified-lower-maps}))
 
 (s/defn list-pending-attendance-by-pelada [pelada-id db]
   (let [query "SELECT op.id as player_id, u.name as player_name

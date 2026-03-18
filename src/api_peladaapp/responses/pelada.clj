@@ -37,7 +37,8 @@
    :match_events [s/Any]
    :player_stats (s/maybe [s/Any])
    :team_players_map {s/Int [s/Any]}
-   :match_lineups_map {s/Int TeamLineupSchema}})
+   :match_lineups_map {s/Int TeamLineupSchema}
+   (s/optional-key :attendance) [s/Any]})
 
 (s/defschema PeladaFullDetailsResponse
   {s/Any s/Any}) ;; Keeping loose for now as it aggregates a lot

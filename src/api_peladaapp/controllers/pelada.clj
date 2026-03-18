@@ -1,11 +1,13 @@
 (ns api-peladaapp.controllers.pelada
   (:require
+   [api-peladaapp.adapters.attendance :as adapter.attendance]
    [api-peladaapp.adapters.match :as adapter.match]
    [api-peladaapp.adapters.pelada :as adapter.pelada]
    [api-peladaapp.adapters.player :as adapter.player]
    [api-peladaapp.adapters.team :as adapter.team]
    [api-peladaapp.adapters.vote :as adapter.vote]
    [api-peladaapp.db.admin :as db.admin]
+   [api-peladaapp.db.attendance :as db.attendance]
    [api-peladaapp.db.match :as db.match]
    [api-peladaapp.db.match-event :as db.match-event]
    [api-peladaapp.db.match-lineup :as db.match-lineup]
@@ -290,6 +292,7 @@
         player-stats (try (db.match-event/list-player-stats-by-pelada pelada-id db) (catch Exception _ nil))
         team-players (db.team/list-team-players-by-pelada pelada-id db)
         match-lineups (db.match-lineup/list-match-lineups-by-pelada pelada-id db)
+        attendance (db.attendance/list-attendance-by-pelada pelada-id db)
 
         ;; Transform team-players into a map
         team-players-map (into {} (map (fn [[tid tps]]
@@ -313,7 +316,8 @@
      :match_events (map adapter.match/event->response match-events)
      :player_stats (when player-stats (map adapter.match/stats->response player-stats))
      :team_players_map team-players-map
-     :match_lineups_map match-lineups-map}))
+     :match_lineups_map match-lineups-map
+     :attendance (map adapter.attendance/db->response attendance)}))
 
 (s/defn get-pelada-full-details-controller :- responses.pelada/PeladaFullDetailsResponse
   [pelada-id :- s/Int
