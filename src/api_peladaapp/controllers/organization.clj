@@ -156,7 +156,8 @@
    user-id :- (s/maybe s/Int)
    db]
   (jdbc/with-transaction [tx db]
-    (let [id (db.organization/insert-organization org tx)]
+    (let [org-with-owner (if user-id (assoc org :owner-id user-id) org)
+          id (db.organization/insert-organization org-with-owner tx)]
       ;; Add creator as admin and player (if user-id is provided)
       (when user-id
         (db.admin/insert-organization-admin {:organization-id id :user-id user-id} tx)

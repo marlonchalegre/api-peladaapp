@@ -196,29 +196,36 @@
 (s/defn begin-pelada :- responses.pelada/PeladaBeginResponse
   "Generate matches for a pelada, transition it to running, and seed lineups."
   [pelada-id :- s/Int db & [opts]]
-  (jdbc/with-transaction [tx db]
-    (let [matches-per-team (:matches_per_team (or opts {}))
-          pelada (db.pelada/get-pelada pelada-id tx)
-          saved-plan (db.schedule/list-match-plans-by-pelada pelada-id tx)
-          match-plan (if (seq saved-plan)
-                       (map (fn [p] {:home (:PeladaMatchPlans/home_team_id p)
-                                     :away (:PeladaMatchPlans/away_team_id p)})
-                            saved-plan)
-                       (let [team-ids (->> (fetch-team-ids pelada-id tx)
-                                           (pelada.logic/ensure-startable pelada))]
-                         (pelada.logic/schedule-matches-for-start team-ids matches-per-team)))]
-      (persist-match-plan! pelada-id match-plan tx)
-      (db.pelada/update-pelada pelada-id {:status "running"} tx)
-      (seed-lineups-from-teams! pelada-id tx)
-
-      ;; WAHA Notification
+  (let [result (try
+                 (jdbc/with-transaction [tx db]
+                   (let [matches-per-team (:matches_per_team (or opts {}))
+                         pelada (db.pelada/get-pelada pelada-id tx)
+                         saved-plan (db.schedule/list-match-plans-by-pelada pelada-id tx)
+                         match-plan (if (seq saved-plan)
+                                      (map (fn [p] {:home (:PeladaMatchPlans/home_team_id p)
+                                                    :away (:PeladaMatchPlans/away_team_id p)})
+                                           saved-plan)
+                                      (let [team-ids (->> (fetch-team-ids pelada-id tx)
+                                                          (pelada.logic/ensure-startable pelada))]
+                                        (pelada.logic/schedule-matches-for-start team-ids matches-per-team)))]
+                     (persist-match-plan! pelada-id match-plan tx)
+                     (db.pelada/update-pelada pelada-id {:status "running"} tx)
+                     (seed-lineups-from-teams! pelada-id tx)
+                     {:pelada pelada :matches_created (count match-plan)}))
+                 (catch Exception e
+                   (println "CRITICAL ERROR in begin-pelada transaction:" (.getMessage e))
+                   (throw e)))]
+    
+    ;; WAHA Notification - Async outside transaction
+    (future
       (try
-        (let [teams (db.team/list-pelada-teams pelada-id tx)
-              team-players (db.team/list-team-players-with-names-by-pelada pelada-id tx)]
-          (notifications/send-notification! (:organization-id pelada) :start {:teams teams :team-players team-players} tx))
-        (catch Exception _ nil))
+        (let [pelada (:pelada result)
+              teams (db.team/list-pelada-teams pelada-id db)
+              team-players (db.team/list-team-players-with-names-by-pelada pelada-id db)]
+          (notifications/send-notification! (:organization-id pelada) :start {:teams teams :team-players team-players} db))
+        (catch Exception e (println "Error sending start notification:" (.getMessage e)))))
 
-      {:matches_created (count match-plan)})))
+    {:matches_created (:matches_created result)}))
 
 (s/defn start-pelada-timer :- models.pelada/Pelada
   [pelada-id :- s/Int db]
@@ -252,20 +259,25 @@
 
 (s/defn close-pelada :- models.pelada/Pelada
   [pelada-id :- s/Int db]
-  (jdbc/with-transaction [tx db]
-    (db.match/finish-all-by-pelada pelada-id tx)
-    ;; Ensure timer is paused when closing
-    (pause-pelada-timer pelada-id tx)
-    (db.pelada/update-pelada pelada-id {:status "closed" :closed-at (str (java.time.Instant/now))} tx)
+  (let [pelada (try
+                 (jdbc/with-transaction [tx db]
+                   (db.match/finish-all-by-pelada pelada-id tx)
+                   ;; Ensure timer is paused when closing
+                   (pause-pelada-timer pelada-id tx)
+                   (db.pelada/update-pelada pelada-id {:status "closed" :closed-at (str (java.time.Instant/now))} tx)
+                   (db.pelada/get-pelada pelada-id tx))
+                 (catch Exception e
+                   (println "CRITICAL ERROR in close-pelada transaction:" (.getMessage e))
+                   (throw e)))]
 
-    (let [pelada (db.pelada/get-pelada pelada-id tx)]
-      ;; WAHA Notification
+    ;; WAHA Notification - Async outside transaction
+    (future
       (try
-        (let [matches (db.match/list-matches-by-pelada pelada-id tx)
-              teams (db.team/list-pelada-teams pelada-id tx)
-              events (db.match-event/list-events-by-pelada pelada-id tx)
-              lineups (db.match-lineup/list-match-lineups-by-pelada pelada-id tx)
-              team-players (db.team/list-team-players-with-names-by-pelada pelada-id tx)]
+        (let [matches (db.match/list-matches-by-pelada pelada-id db)
+              teams (db.team/list-pelada-teams pelada-id db)
+              events (db.match-event/list-events-by-pelada pelada-id db)
+              lineups (db.match-lineup/list-match-lineups-by-pelada pelada-id db)
+              team-players (db.team/list-team-players-with-names-by-pelada pelada-id db)]
           (notifications/send-notification! (:organization-id pelada) :end
                                             {:pelada pelada
                                              :matches matches
@@ -273,12 +285,12 @@
                                              :events events
                                              :lineups lineups
                                              :team-players team-players}
-                                            tx))
-        (let [pending (db.vote/list-pending-voters-by-pelada pelada-id tx)]
+                                            db))
+        (let [pending (db.vote/list-pending-voters-by-pelada pelada-id db)]
           (when (seq pending)
-            (notifications/send-notification! (:organization-id pelada) :vote-reminder {:pending-voters pending} tx)))
-        (catch Exception _ nil))
-      pelada)))
+            (notifications/send-notification! (:organization-id pelada) :vote-reminder {:pending-voters pending} db)))
+        (catch Exception e (println "Error sending close/reminder notification:" (.getMessage e)))))
+    pelada))
 
 (s/defn get-pelada-dashboard-data :- responses.pelada/PeladaDashboardResponse
   [pelada-id :- s/Int db]

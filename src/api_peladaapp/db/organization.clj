@@ -13,7 +13,7 @@
 
 (s/defn insert-organization :- s/Int
   [org db]
-  (let [row (select-keys org [:name])]
+  (let [row (adapter.organization/model->db org)]
     (-> (sql/insert! db :organizations row)
         affected-rows-count
         int)))

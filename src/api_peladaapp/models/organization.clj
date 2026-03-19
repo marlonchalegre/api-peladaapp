@@ -5,6 +5,7 @@
 (s/defschema Organization
   {:id s/Int
    :name s/Str
+   (s/optional-key :owner-id) (s/maybe s/Int)
    (s/optional-key :waha-api-url) (s/maybe s/Str)
    (s/optional-key :waha-instance) (s/maybe s/Str)
    (s/optional-key :waha-group-id) (s/maybe s/Str)
