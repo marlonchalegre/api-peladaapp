@@ -165,7 +165,7 @@
                                     (assoc team :players (keep (fn [team-player]
                                                                  (when-let [player (first (filter #(= (:player_id team-player) (:id %)) all-players-in-org))]
                                                                    (let [user (get users-map (:user-id player))]
-                                                                     (assoc player :user user :is_goalkeeper false))))
+                                                                     (assoc player :user user :is_goalkeeper (:is_goalkeeper team-player)))))
                                                                (get team-players-grouped (:id team) []))))
                                   teams)
 

@@ -1,6 +1,7 @@
 (ns api-peladaapp.db.player
   (:require
    [api-peladaapp.adapters.player :as adapter.player]
+   [clojure.string :as str]
    [next.jdbc]
    [next.jdbc.result-set :as rs]
    [next.jdbc.sql :as sql]
@@ -52,7 +53,7 @@
           adapter.player/db->model))
 
 (defn- position-string->id [pos]
-  (case pos
+  (case (some-> pos str/lower-case)
     "goalkeeper" 1
     "defender" 2
     "midfielder" 3

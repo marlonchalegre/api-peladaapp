@@ -299,10 +299,9 @@
                                          [tid (map (fn [tp]
                                                      {:team_id (:team_id tp)
                                                       :player_id (:player_id tp)
-                                                      :is_goalkeeper false})
+                                                      :is_goalkeeper (:is_goalkeeper tp)})
                                                    tps)])
                                        (group-by :team_id team-players)))
-
         ;; Transform match-lineups into a map of match-id -> team-id -> players
         match-lineups-map (reduce (fn [acc {:keys [match_id team_id] :as lineup}]
                                     (assoc-in acc [match_id team_id] (conj (get-in acc [match_id team_id] []) lineup)))
@@ -344,7 +343,7 @@
                             (assoc (adapter.team/model->response team)
                                    :players (map (fn [p] (assoc (adapter.player/model->response p)
                                                                 :user (:user p)
-                                                                :is_goalkeeper false))
+                                                                :is_goalkeeper (:is_goalkeeper p)))
                                                  (:players team))))
                           (:teams pelada-data))
 

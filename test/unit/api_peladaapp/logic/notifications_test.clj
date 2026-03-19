@@ -19,7 +19,15 @@
       (is (re-find #"\*TIME 2\*" msg))
       (is (re-find #"• Jogador C" msg))
       (is (re-find #"A" msg))
-      (is (re-find #"```" msg)))))
+      (is (re-find #"```" msg))))
+
+  (testing "generates correct start message using is_goalkeeper flag"
+    (let [teams [{:id 1 :name "Time 1"}]
+          team-players [{:team_id 1 :player_name "Goleiro" :is_goalkeeper true :position "defender"}
+                        {:team_id 1 :player_name "Zagueiro" :is_goalkeeper false :position "defender"}]
+          msg (notifications/generate-start-message teams team-players)]
+      (is (re-find #"• Goleiro +G" msg))
+      (is (re-find #"• Zagueiro +Z" msg)))))
 
 (deftest generate-end-message-test
   (testing "generates correct end message with full summary"
