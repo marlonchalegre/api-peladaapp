@@ -215,7 +215,7 @@
                  (catch Exception e
                    (println "CRITICAL ERROR in begin-pelada transaction:" (.getMessage e))
                    (throw e)))]
-    
+
     ;; WAHA Notification - Async outside transaction
     (future
       (try
