@@ -143,13 +143,13 @@
   (if-let [pelada (get-pelada pelada-id db)]
     (let [organization-id (:organization-id pelada)
           attendance (db.attendance/list-attendance-by-pelada pelada-id db)
-          attendance-map (into {} (map (juxt :player_id :status)) attendance)
+          attendance-map (into {} (map (fn [a] [(:player_id a) {:status (:status a) :updated_at (:updated_at a)}])) attendance)
 
           ;; If not in attendance mode, we only care about confirmed players
           all-players-in-org (db.player/list-players-by-organization organization-id db)
           all-org-players (if (= "attendance" (:status pelada))
                             all-players-in-org
-                            (filter (fn [p] (= "confirmed" (get attendance-map (:id p))))
+                            (filter (fn [p] (= "confirmed" (:status (get attendance-map (:id p)))))
                                     all-players-in-org))
 
           all-users (map #(adapter.user/model->response % true) (db.user/list-users db 0 100000)) ;; Exclude email for privacy
@@ -178,8 +178,10 @@
 
           ;; Add user info to available players
           available-players-with-users (map (fn [player]
-                                              (assoc player :user (get users-map (:user-id player))
-                                                     :attendance-status (get attendance-map (:id player) "pending")))
+                                              (let [att (get attendance-map (:id player))]
+                                                (assoc player :user (get users-map (:user-id player))
+                                                       :attendance-status (:status att "pending")
+                                                       :attendance-updated-at (:updated_at att))))
                                             available-players)
 
           ;; Calculate normalized scores for all players in org

@@ -9,4 +9,5 @@
   (let [r (misc/unamespace row)]
     (medley.core/assoc-some {}
                             :player_id (or (:player_id r) (:player-id r))
-                            :status (:status r))))
+                            :status (:status r)
+                            :updated_at (:updated_at r))))

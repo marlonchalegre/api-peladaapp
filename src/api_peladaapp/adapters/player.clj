@@ -26,7 +26,7 @@
                           :member-type (:member_type request)))
 
 (s/defn model->response :- responses.player/PlayerResponse
-  [{:keys [id user-id organization-id grade position-id member-type user-name user-username user-email user-position]}]
+  [{:keys [id user-id organization-id grade position-id member-type user-name user-username user-email user-position attendance-status attendance-updated-at]}]
   (medley.core/assoc-some {}
                           :id id
                           :user_id user-id
@@ -37,7 +37,9 @@
                           :user_name user-name
                           :user_username user-username
                           :user_email user-email
-                          :user_position user-position))
+                          :user_position user-position
+                          :attendance_status attendance-status
+                          :attendance_updated_at attendance-updated-at))
 
 (s/defn db->model :- models.player/Player
   [p]

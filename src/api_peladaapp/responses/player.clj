@@ -12,4 +12,6 @@
    (s/optional-key :user_name) s/Str
    (s/optional-key :user_username) s/Str
    (s/optional-key :user_email) s/Str
-   (s/optional-key :user_position) (s/maybe s/Str)})
+   (s/optional-key :user_position) (s/maybe s/Str)
+   (s/optional-key :attendance_status) (s/maybe s/Str)
+   (s/optional-key :attendance_updated_at) (s/maybe s/Any)})
