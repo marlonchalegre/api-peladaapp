@@ -13,7 +13,8 @@
                     (get data key nil))
     :waha-api-key (System/getenv "WAHA_API_KEY")
     :smtp-host (or (System/getenv "SMTP_HOST") (get data key "smtp.gmail.com"))
-    :smtp-port (or (System/getenv "SMTP_PORT") (get data key 587))
+    :smtp-port (let [port (or (System/getenv "SMTP_PORT") (get data key 587))]
+                 (if (string? port) (Integer/parseInt port) port))
     :smtp-user (or (System/getenv "SMTP_USER") (get data key))
     :smtp-pass (or (System/getenv "SMTP_PASS") (get data key))
     (get data key)))
