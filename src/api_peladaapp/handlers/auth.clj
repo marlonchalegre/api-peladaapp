@@ -5,6 +5,7 @@
    [api-peladaapp.controllers.auth :as controllers.auth]
    [api-peladaapp.helpers.exception :as exception]
    [api-peladaapp.helpers.responses :refer [ok]]
+   [api-peladaapp.logic.password-reset :as logic.password-reset]
    [buddy.auth :refer [authenticated?]]
    [buddy.auth.accessrules :refer [error]]
    [buddy.auth.backends.token :refer [jws-backend]]))
@@ -44,6 +45,32 @@
            (catch Exception e
              (record-failure email)
              (exception/api-exception-handler e))))))
+
+(defn forgot-password-handler
+  [request]
+  (let [body (-> request :body)
+        email (:email body)
+        db (-> request :database)]
+    (try
+      (logic.password-reset/request-password-reset! email db)
+      (ok {:message "If an account with that email exists, we've sent a password reset link."})
+      (catch Exception e
+        (exception/api-exception-handler e)))))
+
+(defn reset-password-handler
+  [request]
+  (let [body (-> request :body)
+        token (:token body)
+        password (:password body)
+        db (-> request :database)]
+    (try
+      (if (logic.password-reset/reset-password! token password db)
+        (ok {:message "Password reset successfully."})
+        (exception/api-exception-handler (ex-info "Invalid or expired token."
+                                                  {:type :bad-request
+                                                   :message "Invalid or expired token."})))
+      (catch Exception e
+        (exception/api-exception-handler e)))))
 
 (defn first-access-handler
   [request]

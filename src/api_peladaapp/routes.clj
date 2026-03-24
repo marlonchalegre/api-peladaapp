@@ -105,6 +105,8 @@
 (defroutes auth-routes
   (context "/auth" []
     (POST "/login" [] auth/auth-handler)
+    (POST "/forgot-password" [] auth/forgot-password-handler)
+    (POST "/reset-password" [] auth/reset-password-handler)
     (POST "/first-access" [] auth/first-access-handler)
     (POST "/register" [] handler.user/create)
     (GET "/invitations/:token" [_] handler.organization/get-invitation-info)))
