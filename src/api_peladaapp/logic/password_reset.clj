@@ -26,7 +26,7 @@
         smtp-config (get-smtp-config)]
     (try
       (postal/send-message smtp-config
-                           {:from (config/get-key :smtp-user)
+                           {:from (config/get-key :smtp-from)
                             :to email
                             :subject "Password Reset - PeladaApp"
                             :body [{:type "text/plain"

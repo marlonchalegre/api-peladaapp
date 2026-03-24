@@ -17,4 +17,5 @@
                  (if (string? port) (Integer/parseInt port) port))
     :smtp-user (or (System/getenv "SMTP_USER") (get data key))
     :smtp-pass (or (System/getenv "SMTP_PASS") (get data key))
+    :smtp-from (or (System/getenv "SMTP_FROM") (System/getenv "SMTP_USER") (get data key))
     (get data key)))
