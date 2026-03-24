@@ -75,7 +75,7 @@
     ;; Add Votes
     (jdbc/execute! ds ["INSERT INTO Votes (pelada_id, voter_id, target_id, stars) VALUES (?, ?, ?, 5)" pelada-id player-id player-id])
 
-    (let [token2 (th/register-and-login! app {:name "User 2" :email "user2@test.com" :password "pass123"})
+    (let [_ (th/register-and-login! app {:name "User 2" :email "user2@test.com" :password "pass123"})
           user2-id (th/user-id-by-email ds "user2@test.com")
           _ (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, grade) VALUES (?, ?, 5.0)" org-id user2-id])
           player2-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)]

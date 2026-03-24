@@ -141,23 +141,22 @@
         (is (some (fn [p] (and (= (:id p) p3-id) (= (:attendance_status p) "confirmed"))) available))
         (is (some (fn [p] (and (= (:id p) p1-id) (= (:attendance_status p) "pending"))) available))))))
 
-(deftest diarista-waitlist-test
+(deftest convidado-waitlist-test
   (let [app (-> th/*test-system* :app :handler)
         db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
-    ;; 1. Register admin and 1 diarista user
+    ;; 1. Register admin and 1 convidado user
     (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Admin" :email "admin@ex.com" :password "p"})))
-    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Diarista" :email "diarista@ex.com" :password "p"})))
+    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Convidado" :email "convidado@ex.com" :password "p"})))
 
     (let [admin-login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "admin@ex.com" :password "p"})))
           admin-token (:token (decode-body admin-login))
           admin-auth (fn [req] (mock/header req "authorization" (str "Token " admin-token)))
-          admin-id (th/user-id-by-email ds "admin@ex.com")
 
-          diarista-login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "diarista@ex.com" :password "p"})))
-          diarista-token (:token (decode-body diarista-login))
-          diarista-auth (fn [req] (mock/header req "authorization" (str "Token " diarista-token)))
-          diarista-id (th/user-id-by-email ds "diarista@ex.com")
+          convidado-login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "convidado@ex.com" :password "p"})))
+          convidado-token (:token (decode-body convidado-login))
+          convidado-auth (fn [req] (mock/header req "authorization" (str "Token " convidado-token)))
+          convidado-id (th/user-id-by-email ds "convidado@ex.com")
 
           ;; 2. Create organization
           org-resp (app (-> (mock/request :post "/api/organizations")
@@ -165,9 +164,9 @@
                             admin-auth))
           org-id (:id (decode-body org-resp))
 
-          ;; 3. Create player for diarista
+          ;; 3. Create player for convidado (defaults to convidado)
           p-resp (app (-> (mock/request :post "/api/players")
-                          (mock/json-body {:organization_id org-id :user_id diarista-id :member_type "diarista"})
+                          (mock/json-body {:organization_id org-id :user_id convidado-id})
                           admin-auth))
           p-id (:id (decode-body p-resp))
 
@@ -177,24 +176,30 @@
                                admin-auth))
           pelada-id (:id (decode-body pelada-resp))]
 
-      ;; 5. Diarista tries to confirm attendance
+      ;; 5. Verify member_type is convidado
+      (let [players-resp (app (-> (mock/request :get (str "/api/organizations/" org-id "/players")) admin-auth))
+            players (decode-body players-resp)]
+        (is (some (fn [p] (and (= (:id p) p-id) (= (:member_type p) "convidado"))) players)))
+
+      ;; 6. Convidado tries to confirm attendance
       (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance"))
                (mock/json-body {:status "confirmed"})
-               diarista-auth))
+               convidado-auth))
 
-      ;; 6. Verify diarista is in waitlist
+      ;; 7. Verify convidado is in waitlist
       (let [details-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) admin-auth))
             available (:available_players (decode-body details-resp))]
         (is (some (fn [p] (and (= (:id p) p-id) (= (:attendance_status p) "waitlist"))) available)))
 
-      ;; 7. Admin moves diarista to confirmed
+      ;; 8. Admin moves convidado to confirmed
       (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance"))
                (mock/json-body {:player_id p-id :status "confirmed"})
                admin-auth))
 
-      ;; 8. Verify diarista is now confirmed
+      ;; 9. Verify convidado is now confirmed
       (let [details-resp2 (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) admin-auth))
             available2 (:available_players (decode-body details-resp2))]
         (is (some (fn [p] (and (= (:id p) p-id) (= (:attendance_status p) "confirmed"))) available2))))))
+
 
 

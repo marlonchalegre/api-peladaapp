@@ -132,7 +132,7 @@
 
         (jdbc/with-transaction [tx db]
           (when-not is-in-org?
-            (jdbc/execute! tx ["INSERT INTO OrganizationPlayers (user_id, organization_id, grade) VALUES (?, ?, 5.0)"
+            (jdbc/execute! tx ["INSERT INTO OrganizationPlayers (user_id, organization_id, grade, member_type) VALUES (?, ?, 5.0, 'convidado')"
                                user-id org-id]))
 
           ;; Clean up all pending invitations for this user in this organization
@@ -161,7 +161,7 @@
       ;; Add creator as admin and player (if user-id is provided)
       (when user-id
         (db.admin/insert-organization-admin {:organization-id id :user-id user-id} tx)
-        (db.player/insert-player {:user-id user-id :organization-id id :grade 5.0} tx))
+        (db.player/insert-player {:user-id user-id :organization-id id :grade 5.0 :member-type "mensalista"} tx))
       (db.organization/get-organization id tx))))
 
 (s/defn get-organization :- models.organization/Organization

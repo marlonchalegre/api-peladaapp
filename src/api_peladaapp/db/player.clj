@@ -15,11 +15,11 @@
 (s/defn insert-player :- s/Int
   [{:keys [user-id organization-id grade position-id member-type]}
    db]
-  (-> (sql/insert! db :organizationplayers (cond-> {:user_id user-id
-                                                    :organization_id organization-id
-                                                    :grade grade
-                                                    :position_id position-id}
-                                             member-type (assoc :member_type member-type)))
+  (-> (sql/insert! db :organizationplayers {:user_id user-id
+                                            :organization_id organization-id
+                                            :grade grade
+                                            :position_id position-id
+                                            :member_type (or member-type "convidado")})
       affected-rows-count))
 
 (s/defn update-player :- s/Int

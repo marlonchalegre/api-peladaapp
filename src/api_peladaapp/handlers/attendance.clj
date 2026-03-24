@@ -31,7 +31,7 @@
                                current-player)
                final-status (if (and (= status "confirmed")
                                      (not target-player-id)
-                                     (= "diarista" (:member-type target-player)))
+                                     (not= "mensalista" (:member-type target-player)))
                               "waitlist"
                               status)]
            (updated (controller.attendance/update-attendance pelada-id player-id final-status db))))
