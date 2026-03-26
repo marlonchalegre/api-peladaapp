@@ -19,7 +19,8 @@
    (s/optional-key :position) (s/maybe s/Str)
    (s/optional-key :goals) s/Int
    (s/optional-key :assists) s/Int
-   (s/optional-key :own_goals) s/Int})
+   (s/optional-key :own-goals) s/Int
+   (s/optional-key :voting-enabled) s/Bool})
 
 (s/defschema VoterStatus
   {:player-id s/Int

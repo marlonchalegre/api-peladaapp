@@ -1,5 +1,6 @@
 (ns api-peladaapp.controllers.vote
   (:require
+   [api-peladaapp.db.admin :as db.admin]
    [api-peladaapp.db.attendance :as db.attendance]
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.player :as db.player]
@@ -62,9 +63,11 @@
     (try
       (vote.logic/validate-voting-eligibility pelada)
       (let [org-id (:organization-id pelada)
+            is-admin (db.admin/is-user-admin-of-organization? user-id org-id db)
             voter-player (db.player/get-org-player-by-user-id user-id org-id db)
             voter-player-id (:id voter-player)]
-        (when-not voter-player-id
+        
+        (when (and (not is-admin) (not voter-player-id))
           (throw (ex-info "User is not a player in this organization"
                           {:type :forbidden :message "User is not a player in this organization"})))
 
@@ -72,8 +75,10 @@
         (let [participation-query "SELECT 1 FROM TeamPlayers tp
                                    JOIN Teams t ON t.id = tp.team_id
                                    WHERE t.pelada_id = ? AND tp.player_id = ?"
-              participated (seq (sql/query db [participation-query pelada-id voter-player-id]))]
-          (when-not participated
+              participated (boolean (and voter-player-id
+                                         (seq (sql/query db [participation-query pelada-id voter-player-id]))))]
+          
+          (when (and (not participated) (not is-admin))
             (throw (ex-info "Player did not participate in this pelada"
                             {:type :forbidden :message "Only players who participated can vote"})))
 
@@ -93,7 +98,7 @@
                          WHERE t.pelada_id = ?
                        )
                        AND op.id != ?"
-                eligible-players-raw (sql/query db [query pelada-id pelada-id pelada-id voter-player-id])
+                eligible-players-raw (sql/query db [query pelada-id pelada-id pelada-id (or voter-player-id -1)])
                 eligible-players (mapv (fn [p]
                                          (let [up (misc/unamespace p)]
                                            {:player-id (:player_id up)
@@ -104,11 +109,11 @@
                                             :assists (int (or (:assists up) 0))
                                             :own-goals (int (or (:own_goals up) 0))}))
                                        eligible-players-raw)
-                has-voted (db.vote/has-voter-voted? pelada-id voter-player-id db)
-                current-votes (if has-voted
+                has-voted (and voter-player-id (db.vote/has-voter-voted? pelada-id voter-player-id db))
+                current-votes (if (and voter-player-id has-voted)
                                 (db.vote/list-votes-by-voter pelada-id voter-player-id db)
                                 [])]
-            {:can-vote true
+            {:can-vote participated
              :has-voted has-voted
              :eligible-players eligible-players
              :current-votes current-votes
