@@ -2,6 +2,8 @@
   (:require
    [api-peladaapp.db.attendance :as db.attendance]
    [api-peladaapp.db.pelada :as db.pelada]
+   [api-peladaapp.db.vote :as db.vote]
+   [next.jdbc :as jdbc]
    [schema.core :as s]))
 
 (s/defn update-attendance :- s/Int
@@ -35,3 +37,14 @@
    db]
   (let [attendance (db.attendance/list-attendance-by-pelada pelada-id db)]
     (first (filter #(= player-id (:player_id %)) attendance))))
+
+(s/defn update-voting-enabled :- s/Any
+  [pelada-id :- s/Int
+   player-id :- s/Int
+   enabled? :- s/Bool
+   db]
+  (jdbc/with-transaction [tx db]
+    (let [res (db.attendance/update-voting-enabled pelada-id player-id enabled? tx)]
+      (when-not enabled?
+        (db.vote/delete-votes-for-target pelada-id player-id tx))
+      {:updated res})))

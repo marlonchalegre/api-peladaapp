@@ -28,17 +28,17 @@
                              :connectionTestQuery "SELECT 1"})
                           (do
                             (println "Using local SQLite database")
-                            (merge {:dbtype "sqlite" :dbname "peladaapp.db"} db-spec)))
-          ds-component (connection/component HikariDataSource final-db-spec)
-          started-ds (component/start ds-component)]
-      ;; Enable WAL mode for local SQLite
+                            (merge {:dbtype "sqlite" :dbname "peladaapp.db"} db-spec)))]
+      ;; Enable WAL mode for local SQLite before starting the pool
       (when-not (and turso-url turso-token)
         (try
-          (with-open [conn (jdbc/get-connection (:connectable started-ds))]
+          (with-open [conn (jdbc/get-connection final-db-spec)]
             (jdbc/execute! conn ["PRAGMA journal_mode=WAL;"]))
           (catch Exception e
             (println "Warning: Could not enable WAL mode:" (.getMessage e)))))
-      (assoc this :database started-ds)))
+      (let [ds-component (connection/component HikariDataSource final-db-spec)
+            started-ds (component/start ds-component)]
+        (assoc this :database started-ds))))
   (stop [this]
     (println "Stopping Database component...")
     (when-let [ds (:database this)]

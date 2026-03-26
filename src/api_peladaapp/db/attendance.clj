@@ -69,3 +69,13 @@
    db]
   (-> (sql/delete! db :peladaattendance {:pelada_id pelada-id :player_id player-id})
       affected-rows-count))
+
+(s/defn update-voting-enabled :- s/Int
+  [pelada-id :- s/Int
+   player-id :- s/Int
+   enabled? :- s/Bool
+   db]
+  (jdbc/execute! db ["PRAGMA busy_timeout = 5000"])
+  (-> (sql/update! db :peladaattendance {:voting_enabled (if enabled? 1 0)}
+                   {:pelada_id pelada-id :player_id player-id})
+      affected-rows-count))

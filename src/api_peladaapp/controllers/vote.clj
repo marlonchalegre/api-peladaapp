@@ -1,5 +1,6 @@
 (ns api-peladaapp.controllers.vote
   (:require
+   [api-peladaapp.db.attendance :as db.attendance]
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.vote :as db.vote]
@@ -26,6 +27,16 @@
   ;; Validate pelada voting eligibility
   (let [pelada (db.pelada/get-pelada pelada-id db)]
     (vote.logic/validate-voting-eligibility pelada))
+
+  ;; Validate that all target players have voting enabled
+  (let [attendance (db.attendance/list-attendance-by-pelada pelada-id db)
+        disabled-ids (set (map :player_id (filter #(= 0 (int (or (:voting_enabled %) 1))) attendance)))]
+    (doseq [v votes]
+      (when (contains? disabled-ids (:target-id v))
+        (throw (ex-info "Target player has voting disabled"
+                        {:type :bad-request
+                         :message "Cannot vote for a player who has voting disabled for this pelada"})))))
+
   ;; Delete existing votes by this voter
   (db.vote/delete-votes-by-voter pelada-id voter-id db)
   ;; Insert new votes in batch
@@ -68,11 +79,13 @@
 
           ;; Get all players who participated (were in teams) with their names and stats
           (let [query "SELECT op.id as player_id, u.name, u.position,
+                              COALESCE(pa.voting_enabled, 1) as voting_enabled,
                               COALESCE(s.goals, 0) as goals, 
                               COALESCE(s.assists, 0) as assists, 
                               COALESCE(s.own_goals, 0) as own_goals
                        FROM OrganizationPlayers op
                        JOIN Users u ON u.id = op.user_id
+                       LEFT JOIN PeladaAttendance pa ON pa.player_id = op.id AND pa.pelada_id = ?
                        LEFT JOIN PeladaPlayerStats s ON s.player_id = op.id AND s.pelada_id = ?
                        WHERE op.id IN (
                          SELECT player_id FROM TeamPlayers tp
@@ -80,12 +93,13 @@
                          WHERE t.pelada_id = ?
                        )
                        AND op.id != ?"
-                eligible-players-raw (sql/query db [query pelada-id pelada-id voter-player-id])
+                eligible-players-raw (sql/query db [query pelada-id pelada-id pelada-id voter-player-id])
                 eligible-players (mapv (fn [p]
                                          (let [up (misc/unamespace p)]
                                            {:player-id (:player_id up)
                                             :name (:name up)
                                             :position (:position up)
+                                            :voting-enabled (= 1 (:voting_enabled up))
                                             :goals (int (or (:goals up) 0))
                                             :assists (int (or (:assists up) 0))
                                             :own-goals (int (or (:own_goals up) 0))}))

@@ -44,4 +44,11 @@ ehthumbs.db
 out/
 tmp/
 /.cljs_node_repl
+# SQLite database files
 *.db
+*.db-wal
+*.db-shm
+*.db.corrupted
+*.wal
+*.shm
+

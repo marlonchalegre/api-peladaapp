@@ -35,7 +35,8 @@
                                    :name (:name p)
                                    :goals (:goals p)
                                    :assists (:assists p)
-                                   :own_goals (:own-goals p)}
+                                   :own_goals (:own-goals p)
+                                   :voting_enabled (:voting-enabled p)}
                                   :position (:position p)))
                                (:eligible-players model))
         current-votes (mapv model->response (:current-votes model))]

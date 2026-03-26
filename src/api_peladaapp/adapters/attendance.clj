@@ -10,4 +10,7 @@
     (medley.core/assoc-some {}
                             :player_id (or (:player_id r) (:player-id r))
                             :status (:status r)
-                            :updated_at (:updated_at r))))
+                            :updated_at (:updated_at r)
+                            :voting_enabled (if (contains? r :voting_enabled)
+                                              (= 1 (:voting_enabled r))
+                                              true))))

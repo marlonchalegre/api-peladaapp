@@ -53,6 +53,12 @@
   (-> (sql/delete! db :votes {:pelada_id pelada-id :voter_id voter-id})
       affected-rows-count))
 
+(s/defn delete-votes-for-target :- s/Int
+  "Delete all votes cast for a target player in a pelada."
+  [pelada-id target-id db]
+  (-> (sql/delete! db :votes {:pelada_id pelada-id :target_id target-id})
+      affected-rows-count))
+
 (s/defn insert-votes-batch :- s/Int
   "Insert multiple votes at once."
   [votes-data db]
@@ -75,7 +81,8 @@
                FROM Votes v
                JOIN OrganizationPlayers op ON v.target_id = op.id
                JOIN Users u ON op.user_id = u.id
-               WHERE v.pelada_id = ?
+               JOIN PeladaAttendance pa ON pa.player_id = op.id AND pa.pelada_id = v.pelada_id
+               WHERE v.pelada_id = ? AND COALESCE(pa.voting_enabled, 1) = 1
                GROUP BY v.target_id
                ORDER BY avg_stars DESC, vote_count DESC"
         results (jdbc/execute! db [query pelada-id] {:builder-fn rs/as-unqualified-lower-maps})]

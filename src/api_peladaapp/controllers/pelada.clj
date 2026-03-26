@@ -66,14 +66,20 @@
                              (catch Exception _ []))]
         (if format
           (let [format-data (json/read-str (:OrganizationScheduleFormats/format_data format))
-                template-plan (map (fn [[h-idx a-idx]]
-                                     {:home (nth team-ids h-idx)
-                                      :away (nth team-ids a-idx)})
-                                   format-data)]
-            {:matches template-plan
-             :template_matches template-plan
-             :random_matches random-plan
-             :is_from_format true})
+                template-plan (try
+                                (mapv (fn [[h-idx a-idx]]
+                                        {:home (nth team-ids h-idx)
+                                         :away (nth team-ids a-idx)})
+                                      format-data)
+                                (catch Exception _ nil))]
+            (if template-plan
+              {:matches template-plan
+               :template_matches template-plan
+               :random_matches random-plan
+               :is_from_format true}
+              {:matches random-plan
+               :random_matches random-plan
+               :is_from_format false}))
           {:matches random-plan
            :random_matches random-plan
            :is_from_format false})))))
@@ -85,7 +91,16 @@
           org-id (:organization-id pelada)
           teams (db.team/list-pelada-teams pelada-id tx)
           team-ids (mapv :id teams)
+          team-set (set team-ids)
           team-count (count team-ids)]
+
+      ;; Validate that all teams in matches belong to this pelada
+      (doseq [match matches]
+        (when-not (and (contains? team-set (:home match))
+                       (contains? team-set (:away match)))
+          (throw (ex-info "One or more teams in the schedule do not belong to this pelada"
+                          {:type :bad-request
+                           :message "Invalid teams in schedule plan. Please refresh and try again."}))))
 
       ;; Delete old plan
       (db.schedule/delete-match-plans-by-pelada pelada-id tx)
@@ -99,15 +114,18 @@
                                        tx))
 
       ;; Save/Update format for organization
-      (let [format-data (map (fn [match]
-                               [(.indexOf team-ids (:home match))
-                                (.indexOf team-ids (:away match))])
-                             matches)]
-        (db.schedule/upsert-format {:organization-id org-id
-                                    :team-count team-count
-                                    :matches-per-team matches-per-team
-                                    :format-data (json/write-str format-data)}
-                                   tx))
+      ;; Only save format if all indices are valid
+      (let [indices (map (fn [match]
+                           [(.indexOf team-ids (:home match))
+                            (.indexOf team-ids (:away match))])
+                         matches)
+            all-valid? (every? (fn [[h a]] (and (>= h 0) (>= a 0))) indices)]
+        (when all-valid?
+          (db.schedule/upsert-format {:organization-id org-id
+                                      :team-count team-count
+                                      :matches-per-team matches-per-team
+                                      :format-data (json/write-str indices)}
+                                     tx)))
       {:status "success"})))
 
 (s/defn get-schedule-plan

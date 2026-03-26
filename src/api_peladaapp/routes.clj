@@ -42,6 +42,7 @@
     (POST "/peladas/:id/timer/reset" [] handler.pelada/reset-timer)
     (POST "/peladas/:id/attendance/batch" [] handler.attendance/batch-update-attendance)
     (POST "/peladas/:id/attendance" [] handler.attendance/update-attendance)
+    (POST "/peladas/:id/attendance/voting-enabled" [] handler.attendance/update-voting-enabled)
     (POST "/peladas/:id/close-attendance" [] handler.attendance/close-attendance)
 
     (GET "/peladas/:id/dashboard-data" [] handler.pelada/get-dashboard-data)

@@ -60,3 +60,16 @@
          (auth/require-organization-admin! user-id org-id db)
          (ok (controller.attendance/close-attendance pelada-id db)))
        (catch Exception e (exception/api-exception-handler e))))
+
+(defn update-voting-enabled [request]
+  (try (let [db (:database request)
+             pelada-id (Integer/parseInt (str (get-in request [:params :id])))
+             body (:body request)
+             enabled? (:enabled body)
+             player-id (:player_id body)
+             user-id (auth/get-user-id-from-request request)
+             pelada (db.pelada/get-pelada pelada-id db)
+             org-id (:organization-id pelada)]
+         (auth/require-organization-admin! user-id org-id db)
+         (ok (controller.attendance/update-voting-enabled pelada-id player-id enabled? db)))
+       (catch Exception e (exception/api-exception-handler e))))

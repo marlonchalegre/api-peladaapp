@@ -143,8 +143,12 @@
   (if-let [pelada (get-pelada pelada-id db)]
     (let [organization-id (:organization-id pelada)
           attendance (db.attendance/list-attendance-by-pelada pelada-id db)
-          attendance-map (into {} (map (fn [a] [(:player_id a) {:status (:status a) :updated_at (:updated_at a)}])) attendance)
-
+          attendance-map (into {} (map (fn [a] [(:player_id a) {:status (:status a) 
+                                                                :updated_at (:updated_at a)
+                                                                :voting_enabled (if (contains? a :voting_enabled)
+                                                                                  (= 1 (:voting_enabled a))
+                                                                                  true)}])) 
+                               attendance)
           ;; If not in attendance mode, we only care about confirmed players
           all-players-in-org (db.player/list-players-by-organization organization-id db)
           all-org-players (if (= "attendance" (:status pelada))
