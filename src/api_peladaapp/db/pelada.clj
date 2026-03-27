@@ -56,7 +56,8 @@
                                                :vote_reminder_12h_sent (when (some? (:vote-reminder-12h-sent pelada))
                                                                          (if (:vote-reminder-12h-sent pelada) 1 0))
                                                :vote_reminder_23h_sent (when (some? (:vote-reminder-23h-sent pelada))
-                                                                         (if (:vote-reminder-23h-sent pelada) 1 0)))
+                                                                         (if (:vote-reminder-23h-sent pelada) 1 0))
+                                               :last_attendance_reminder_at (:last-attendance-reminder-at pelada))
                  (contains? pelada :home-fixed-goalkeeper-id) (assoc :home_fixed_goalkeeper_id (:home-fixed-goalkeeper-id pelada))
                  (contains? pelada :away-fixed-goalkeeper-id) (assoc :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id pelada)))]
     (if (empty? db-row)
@@ -143,11 +144,11 @@
   (if-let [pelada (get-pelada pelada-id db)]
     (let [organization-id (:organization-id pelada)
           attendance (db.attendance/list-attendance-by-pelada pelada-id db)
-          attendance-map (into {} (map (fn [a] [(:player_id a) {:status (:status a) 
+          attendance-map (into {} (map (fn [a] [(:player_id a) {:status (:status a)
                                                                 :updated_at (:updated_at a)
                                                                 :voting_enabled (if (contains? a :voting_enabled)
                                                                                   (= 1 (:voting_enabled a))
-                                                                                  true)}])) 
+                                                                                  true)}]))
                                attendance)
           ;; If not in attendance mode, we only care about confirmed players
           all-players-in-org (db.player/list-players-by-organization organization-id db)

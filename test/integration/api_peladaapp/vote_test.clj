@@ -8,8 +8,9 @@
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [next.jdbc.sql :as sql]
-   [api-peladaapp.helpers.misc :as misc]))
+   [next.jdbc :as jdbc])
+  (:import
+   [java.time Duration Instant]))
 
 (use-fixtures :each th/test-system-fixture)
 
@@ -28,28 +29,29 @@
     ;; 1. Create users
     (db.user/insert-user {:name "Admin" :username "admin" :email admin-email :password "pass"} ds)
     (db.user/insert-user {:name "Player" :username "player" :email player-email :password "pass"} ds)
-    
+
     (let [admin-user-id (get-id (db.user/find-user-by-identifier admin-email ds))
           player-user-id (get-id (db.user/find-user-by-identifier player-email ds))
-          
+
           ;; 2. Create organization
           org-id (db.org/insert-organization {:name "Org"} ds)
-          
+
           ;; 3. Make user an admin
           _ (db.admin/insert-organization-admin {:organization-id org-id :user-id admin-user-id} ds)
-          
+
           ;; 4. Add BOTH to organization as players
           admin-player-id (db.player/insert-player {:organization-id org-id :user-id admin-user-id} ds)
           player-id (db.player/insert-player {:organization-id org-id :user-id player-user-id} ds)
-          
+
           ;; 5. Create pelada and close it
-          pelada-id (db.pelada/insert-pelada {:organization-id org-id :name "Pelada" :scheduled-at "2026-03-26T10:00:00Z"} ds)]
-      
-      (db.pelada/update-pelada pelada-id {:status "closed" :closed-at "2026-03-26T12:00:00Z"} ds)
-      
-      ;; 6. Add ONLY THE PLAYER to a team in the pelada (Admin did not participate)
-      (let [team-id (get-id (sql/insert! ds :teams {:pelada_id pelada-id :name "Team A"}))]
-        (sql/insert! ds :teamplayers {:team_id team-id :player_id player-id}))
+          now (Instant/now)
+          closed-at (str (.minus now (Duration/ofHours 2)))
+          pelada-id (db.pelada/insert-pelada {:organization-id org-id :name "Pelada" :scheduled-at (str (.minus now (Duration/ofHours 4)))} ds)]
+
+      (db.pelada/update-pelada pelada-id {:status "closed" :closed-at closed-at} ds)
+
+      (let [team-id (get-id (jdbc/execute-one! ds ["INSERT INTO \"Teams\" (pelada_id, name) VALUES (?, ?) RETURNING id" pelada-id "Team A"]))]
+        (jdbc/execute! ds ["INSERT INTO \"TeamPlayers\" (team_id, player_id) VALUES (?, ?)" team-id player-id]))
 
       (testing "Admin (non-participant) should be able to get voting info"
         (let [info (controller.vote/get-voting-info pelada-id admin-user-id ds)]

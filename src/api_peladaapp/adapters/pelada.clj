@@ -89,4 +89,5 @@
                                                       false)
                             :vote-reminder-23h-sent (if (contains? p :vote_reminder_23h_sent)
                                                       (= 1 (:vote_reminder_23h_sent p))
-                                                      false))))
+                                                      false)
+                            :last-attendance-reminder-at (:last_attendance_reminder_at p))))

@@ -66,7 +66,7 @@
             is-admin (db.admin/is-user-admin-of-organization? user-id org-id db)
             voter-player (db.player/get-org-player-by-user-id user-id org-id db)
             voter-player-id (:id voter-player)]
-        
+
         (when (and (not is-admin) (not voter-player-id))
           (throw (ex-info "User is not a player in this organization"
                           {:type :forbidden :message "User is not a player in this organization"})))
@@ -77,7 +77,7 @@
                                    WHERE t.pelada_id = ? AND tp.player_id = ?"
               participated (boolean (and voter-player-id
                                          (seq (sql/query db [participation-query pelada-id voter-player-id]))))]
-          
+
           (when (and (not participated) (not is-admin))
             (throw (ex-info "Player did not participate in this pelada"
                             {:type :forbidden :message "Only players who participated can vote"})))

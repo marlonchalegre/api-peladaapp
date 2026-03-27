@@ -1,9 +1,9 @@
 (ns api-peladaapp.schedule-regression-test
   (:require
+   [api-peladaapp.db.schedule :as db.schedule]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [ring.mock.request :as mock]
-   [api-peladaapp.db.schedule :as db.schedule]))
+   [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 
@@ -21,7 +21,7 @@
           ;; Create Pelada 1
           p1-resp (app (-> (mock/request :post "/api/peladas") (auth) (mock/json-body {"organization_id" org-id "num_teams" 3})))
           p1-id (:id (th/decode-body p1-resp))
-          
+
           ;; Create Pelada 2 (to get other team IDs)
           p2-resp (app (-> (mock/request :post "/api/peladas") (auth) (mock/json-body {"organization_id" org-id "num_teams" 2})))
           p2-id (:id (th/decode-body p2-resp))
@@ -40,11 +40,11 @@
         ;; Manually inject corruption
         (let [db-raw (-> th/*test-system* :database :database)
               db (if (fn? db-raw) (db-raw) db-raw)]
-          (db.schedule/upsert-format 
+          (db.schedule/upsert-format
            {:organization-id org-id
             :team-count 3
             :matches-per-team 2
-            :format-data "[[-1, 0]]"} 
+            :format-data "[[-1, 0]]"}
            db)
 
           (let [preview-resp (app (-> (mock/request :get (str "/api/peladas/" p1-id "/schedule/preview") {"matches_per_team" "2"}) (auth)))
