@@ -55,7 +55,7 @@
                             :category (:category model)
                             :description (:description model)
                             :status (or (:status model) "paid")
-                            :payment-date (or (:payment-date model) (:payment_date model))
+                            :payment_date (or (:payment-date model) (:payment_date model))
                             :created_by (or (:created-by model) (:created_by model)))))
 
 (defn db->monthly-payment [row]
