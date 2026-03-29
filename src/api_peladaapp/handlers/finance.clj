@@ -90,12 +90,16 @@
                  payment-date (:payment-date body)
 
                  ;; Find existing payment record to see if there's a transaction to reverse
+                 existing-payments (db.finance/get-monthly-payments org-id year month tx)
+                 _ (println "DEBUG MARK-MONTHLY: existing-payments count=" (count existing-payments))
                  existing (first (filter (fn [p] (and (= (:player-id p) player-id)
                                                       (= (:year p) year)
                                                       (= (:month p) month)))
-                                         (db.finance/get-monthly-payments org-id year month tx)))
+                                         existing-payments))
+                 _ (println "DEBUG MARK-MONTHLY: existing=" (pr-str existing))
 
                  existing-tx-id (:transaction-id existing)
+                 _ (println "DEBUG MARK-MONTHLY: existing-tx-id=" existing-tx-id)
 
                  transaction-id (if paid?
                                   ;; Mark as paid: create income transaction
@@ -113,6 +117,7 @@
                                   ;; Mark as unpaid: reverse existing transaction if any
                                   (do
                                     (when existing-tx-id
+                                      (println "DEBUG MARK-MONTHLY: reversing tx" existing-tx-id)
                                       (db.finance/reverse-transaction existing-tx-id tx))
                                     nil))
 

@@ -21,8 +21,8 @@
   (when model
     (medley.core/assoc-some {}
                             :organization_id (or (:organization-id model) (:organization_id model))
-                            :mensalista_price (or (:mensalista-price model) (:mensalista_price model))
-                            :diarista_price (or (:diarista-price model) (:diarista_price model))
+                            :mensalista_price (or (:mensalista-price model) (:mensalista-price model))
+                            :diarista_price (or (:diarista-price model) (:diarista-price model))
                             :currency (:currency model))))
 
 (defn db->transaction [row]
@@ -56,7 +56,7 @@
                             :description (:description model)
                             :status (or (:status model) "paid")
                             :payment_date (or (:payment-date model) (:payment_date model))
-                            :created_by (or (:created-by model) (:created_by model)))))
+                            :created_by (or (:created-by model) (:created-by model)))))
 
 (defn db->monthly-payment [row]
   (when row
@@ -82,7 +82,7 @@
                             :player_id (or (:player-id model) (:player_id model))
                             :year (:year model)
                             :month (:month model)
-                            :transaction-id (or (:transaction_id model) (:transaction_id model))
+                            :transaction_id (or (:transaction-id model) (:transaction_id model))
                             :paid (if (contains? model :paid)
                                     (if (:paid model) 1 0)
                                     nil))))
