@@ -3,6 +3,7 @@
    [api-peladaapp.handlers.admin :as handler.admin]
    [api-peladaapp.handlers.attendance :as handler.attendance]
    [api-peladaapp.handlers.auth :as auth]
+   [api-peladaapp.handlers.finance :as handler.finance]
    [api-peladaapp.handlers.health :as handler.health]
    [api-peladaapp.handlers.manual-stats :as handler.manual-stats]
    [api-peladaapp.handlers.match :as handler.match]
@@ -70,6 +71,10 @@
     (DELETE "/players/:id" [] handler.player/delete)
     (GET "/organizations/:organization_id/players" [] handler.player/list-by-org)
 
+    ;; Users
+    (GET "/users/me" [] auth/get-me-handler)
+    (GET "/users/:user_id/organizations" [] handler.organization/list-by-user)
+
     ;; Organizations
     (POST "/organizations" [] handler.organization/create)
     (GET "/organizations/:id" [] handler.organization/get-by-id)
@@ -79,6 +84,17 @@
     (GET "/organizations/:id/statistics" [] handler.organization/get-statistics)
     (GET "/organizations/:id/manual-stats" [] handler.manual-stats/list-manual-stats)
     (POST "/organizations/:id/manual-stats" [] handler.manual-stats/upsert-manual-stats)
+
+    ;; Finance
+    (GET "/organizations/:id/finance" [] handler.finance/get-finance)
+    (PUT "/organizations/:id/finance" [] handler.finance/update-finance)
+    (GET "/organizations/:id/finance/summary" [] handler.finance/get-summary)
+    (GET "/organizations/:id/finance/transactions" [] handler.finance/list-transactions)
+    (POST "/organizations/:id/finance/transactions" [] handler.finance/add-transaction)
+    (POST "/organizations/:id/finance/transactions/:tx_id/reverse" [] handler.finance/reverse-transaction)
+    (GET "/organizations/:id/finance/monthly-payments" [] handler.finance/get-monthly-payments)
+    (POST "/organizations/:id/finance/monthly-payments" [] handler.finance/mark-monthly-payment)
+
     (POST "/organizations/:id/invite" [] handler.organization/invite)
     (POST "/organizations/:id/invite-link/reset" [] handler.organization/reset-invite-link)
     (POST "/organizations/:id/waha/test" [] handler.organization/test-waha)
@@ -86,6 +102,7 @@
     (GET "/organizations/:id/invitations" [] handler.organization/list-invitations)
     (DELETE "/organizations/:id/invitations/:invitation_id" [] handler.organization/revoke-invitation)
     (GET "/users/:user_id/organizations" [] handler.organization/list-by-user)
+    (GET "/users/me" [] auth/get-me-handler)
     (GET "/invitations/pending" [] handler.organization/list-pending-invitations)
     (POST "/invitations/:token/accept" [_] handler.organization/accept-invitation)
 

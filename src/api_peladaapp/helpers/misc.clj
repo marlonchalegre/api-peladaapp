@@ -5,4 +5,4 @@
   [data]
   (if (empty? data)
     data
-    (update-keys data (comp keyword name))))
+    (update-keys data (fn [k] (if (instance? clojure.lang.Named k) (keyword (name k)) k)))))

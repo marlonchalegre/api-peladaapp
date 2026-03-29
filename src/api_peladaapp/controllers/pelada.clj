@@ -1,6 +1,7 @@
 (ns api-peladaapp.controllers.pelada
   (:require
    [api-peladaapp.adapters.attendance :as adapter.attendance]
+   [api-peladaapp.adapters.finance :as adapter.finance]
    [api-peladaapp.adapters.match :as adapter.match]
    [api-peladaapp.adapters.pelada :as adapter.pelada]
    [api-peladaapp.adapters.player :as adapter.player]
@@ -15,6 +16,7 @@
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.schedule :as db.schedule]
    [api-peladaapp.db.team :as db.team]
+   [api-peladaapp.db.transaction :as db.transaction]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.db.vote :as db.vote]
    [api-peladaapp.helpers.pagination :as pagination]
@@ -311,7 +313,9 @@
     pelada))
 
 (s/defn get-pelada-dashboard-data :- responses.pelada/PeladaDashboardResponse
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Int
+   user-id :- s/Int
+   db]
   (let [pelada (db.pelada/get-pelada pelada-id db)
         organization-id (:organization-id pelada)
         matches (db.match/list-matches-by-pelada pelada-id db)
@@ -323,6 +327,9 @@
         team-players (db.team/list-team-players-by-pelada pelada-id db)
         match-lineups (db.match-lineup/list-match-lineups-by-pelada pelada-id db)
         attendance (db.attendance/list-attendance-by-pelada pelada-id db)
+
+        is-admin (db.admin/is-user-admin-of-organization? user-id (:organization-id pelada) db)
+        transactions (if is-admin (db.transaction/list-transactions-by-pelada pelada-id db) [])
 
         ;; Transform team-players into a map
         team-players-map (into {} (map (fn [[tid tps]]
@@ -337,7 +344,7 @@
                                     (assoc-in acc [match_id team_id] (conj (get-in acc [match_id team_id] []) lineup)))
                                   {}
                                   match-lineups)]
-    {:pelada (adapter.pelada/model->response pelada)
+    {:pelada (assoc (adapter.pelada/model->response pelada) :is_admin is-admin)
      :matches (map adapter.match/model->response matches)
      :teams (map adapter.team/model->response teams)
      :users users
@@ -346,8 +353,8 @@
      :player_stats (when player-stats (map adapter.match/stats->response player-stats))
      :team_players_map team-players-map
      :match_lineups_map match-lineups-map
+     :pelada_transactions (map adapter.finance/model->transaction-response transactions)
      :attendance (map adapter.attendance/db->response attendance)}))
-
 (s/defn get-pelada-full-details-controller :- responses.pelada/PeladaFullDetailsResponse
   [pelada-id :- s/Int
    user-id :- s/Int
@@ -385,10 +392,12 @@
         mapped-attendance (map (fn [a]
                                  (assoc a :player (assoc (adapter.player/model->response (:player a))
                                                          :user (get-in a [:player :user]))))
-                               (:attendance pelada-data))]
+                               (:attendance pelada-data))
+        transactions (if is-admin (db.transaction/list-transactions-by-pelada pelada-id db) [])]
     (-> pelada-data
         (assoc :pelada mapped-pelada
                :teams mapped-teams
                :available_players mapped-available
                :attendance mapped-attendance
+               :pelada_transactions (map adapter.finance/model->transaction-response transactions)
                :voting_info voting-info))))

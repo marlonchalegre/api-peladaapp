@@ -182,7 +182,7 @@
              org-id (:organization-id pelada)]
          ;; Members can view peladas
          (auth/require-organization-member! user-id org-id db)
-         (ok (controller.pelada/get-pelada-dashboard-data id db)))
+         (ok (controller.pelada/get-pelada-dashboard-data id user-id db)))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn update [request]

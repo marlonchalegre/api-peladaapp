@@ -38,6 +38,7 @@
    :player_stats (s/maybe [s/Any])
    :team_players_map {s/Int [s/Any]}
    :match_lineups_map {s/Int TeamLineupSchema}
+   (s/optional-key :pelada_transactions) [s/Any]
    (s/optional-key :attendance) [s/Any]})
 
 (s/defschema PeladaFullDetailsResponse

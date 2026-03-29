@@ -1,0 +1,1 @@
+ALTER TABLE "Transactions" ADD COLUMN "created_by" INTEGER REFERENCES "Users"("id") ON DELETE SET NULL;

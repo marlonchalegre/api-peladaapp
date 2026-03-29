@@ -1,10 +1,13 @@
 (ns api-peladaapp.handlers.auth
   (:require
    [api-peladaapp.adapters.credential :as adapters.credential]
+   [api-peladaapp.adapters.user :as adapters.user]
    [api-peladaapp.config :as config]
    [api-peladaapp.controllers.auth :as controllers.auth]
+   [api-peladaapp.controllers.user :as controllers.user]
    [api-peladaapp.helpers.exception :as exception]
    [api-peladaapp.helpers.responses :refer [ok]]
+   [api-peladaapp.logic.authorization :as auth.logic]
    [api-peladaapp.logic.password-reset :as logic.password-reset]
    [buddy.auth :refer [authenticated?]]
    [buddy.auth.accessrules :refer [error]]
@@ -45,6 +48,13 @@
            (catch Exception e
              (record-failure email)
              (exception/api-exception-handler e))))))
+
+(defn get-me-handler
+  [request]
+  (try (let [db (:database request)
+             user-id (auth.logic/get-user-id-from-request request)]
+         (ok (adapters.user/model->response (controllers.user/get-user user-id db))))
+       (catch Exception e (exception/api-exception-handler e))))
 
 (defn forgot-password-handler
   [request]
