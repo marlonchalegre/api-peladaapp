@@ -38,7 +38,9 @@
 
 (s/defn reverse-transaction
   [transaction-id db]
-  (jdbc/execute! db ["UPDATE \"Transactions\" SET \"status\" = 'reversed' WHERE id = ?" transaction-id]))
+  (jdbc/with-transaction [tx db]
+    (jdbc/execute! tx ["UPDATE \"Transactions\" SET \"status\" = 'reversed' WHERE id = ?" transaction-id])
+    (jdbc/execute! tx ["UPDATE \"MonthlyPayments\" SET \"paid\" = 0, \"transaction_id\" = NULL WHERE \"transaction_id\" = ?" transaction-id])))
 
 (s/defn count-transactions
   [org-id db]

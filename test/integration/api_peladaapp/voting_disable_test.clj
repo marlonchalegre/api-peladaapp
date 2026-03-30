@@ -18,8 +18,7 @@
         auth1 (th/auth-header token1)
         token2 (th/register-and-login! app {:name "Player 1" :email "p1@test.com" :password "pass"})
         auth2 (th/auth-header token2)
-        token3 (th/register-and-login! app {:name "Player 2" :email "p2@test.com" :password "pass"})
-        auth3 (th/auth-header token3)
+        _ (th/register-and-login! app {:name "Player 2" :email "p2@test.com" :password "pass"})
 
         ;; Admin creates org
         org-id (:id (th/decode-body (app (-> (mock/request :post "/api/organizations")

@@ -1,7 +1,7 @@
 (ns api-peladaapp.finance-test
   (:require
    [api-peladaapp.test-helpers :as th]
-   [clojure.test :refer :all]
+   [clojure.test :refer [deftest is testing use-fixtures]]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
@@ -16,8 +16,6 @@
 
         member-token (th/register-and-login! app {:name "Member User" :email "member@test.com" :password "test1234"})
         member-id (th/user-id-by-email ds "member@test.com")
-
-        non-member-token (th/register-and-login! app {:name "Non Member" :email "nonmember@test.com" :password "test1234"})
 
         ;; Create Organization via admin
         org-resp (app (-> (mock/request :post "/api/organizations")
@@ -85,4 +83,55 @@
         (is (= 200 (:status resp)))
         (is (= 50.0 (double (:total_income body))))
         (is (= 0.0 (double (:total_expense body))))
-        (is (= 50.0 (double (:total_balance body))))))))
+        (is (= 50.0 (double (:total_balance body))))))
+
+    (testing "Monthly Payments and Reversal - Regression Test"
+      (let [year 2026
+            month 3
+            ;; Creator is already a mensalista, let's use them
+            player-id (th/player-id-by-user-id ds admin-id org-id)]
+
+        ;; Initially unpaid
+        (let [resp (app (-> (mock/request :get (str "/api/organizations/" org-id "/finance/monthly-payments"))
+                            (mock/query-string {:year year :month month})
+                            ((th/auth-header admin-token))))
+              payments (th/decode-body resp)
+              payment (first (filter #(= (:player_id %) player-id) payments))]
+          (is (= 200 (:status resp)))
+          (is (false? (:paid payment))))
+
+        ;; Mark as paid
+        (let [resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/finance/monthly-payments"))
+                            (mock/json-body {:player_id player-id
+                                             :year year
+                                             :month month
+                                             :paid true
+                                             :amount 100.0})
+                            ((th/auth-header admin-token))))
+              body (th/decode-body resp)
+              tx-id (:transaction_id body)]
+          (is (= 200 (:status resp)))
+          (is (some? tx-id))
+
+          ;; Verify it is now paid
+          (let [p-resp (app (-> (mock/request :get (str "/api/organizations/" org-id "/finance/monthly-payments"))
+                                (mock/query-string {:year year :month month})
+                                ((th/auth-header admin-token))))
+                payments (th/decode-body p-resp)
+                payment (first (filter #(= (:player_id %) player-id) payments))]
+            (is (true? (:paid payment)))
+            (is (= tx-id (:transaction_id payment)))
+
+            ;; Reverse the transaction directly
+            (let [rev-resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/finance/transactions/" tx-id "/reverse"))
+                                    ((th/auth-header admin-token))))]
+              (is (= 200 (:status rev-resp))))
+
+            ;; Verify if it is now unpaid
+            (let [final-resp (app (-> (mock/request :get (str "/api/organizations/" org-id "/finance/monthly-payments"))
+                                      (mock/query-string {:year year :month month})
+                                      ((th/auth-header admin-token))))
+                  final-payments (th/decode-body final-resp)
+                  final-payment (first (filter #(= (:player_id %) player-id) final-payments))]
+              (is (false? (:paid final-payment)) "Monthly payment should be unpaid after transaction reversal")
+              (is (nil? (:transaction_id final-payment)) "Monthly payment should not have transaction_id after reversal"))))))))

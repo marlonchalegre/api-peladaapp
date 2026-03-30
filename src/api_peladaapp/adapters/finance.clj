@@ -55,8 +55,8 @@
                             :category (:category model)
                             :description (:description model)
                             :status (or (:status model) "paid")
-                            :payment_date (or (:payment-date model) (:payment_date model))
-                            :created_by (or (:created-by model) (:created-by model)))))
+                            :payment-date (or (:payment-date model) (:payment_date model))
+                            :created-by (or (:created-by model) (:created-by model)))))
 
 (defn db->monthly-payment [row]
   (when row
@@ -79,10 +79,10 @@
   (when model
     (medley.core/assoc-some {}
                             :organization_id (or (:organization-id model) (:organization_id model))
-                            :player_id (or (:player-id model) (:player_id model))
+                            :player_id (or (:player-id model) (:player-id model))
                             :year (:year model)
                             :month (:month model)
-                            :transaction_id (or (:transaction-id model) (:transaction_id model))
+                            :transaction_id (or (:transaction-id model) (:transaction-id model))
                             :paid (if (contains? model :paid)
                                     (if (:paid model) 1 0)
                                     nil))))
@@ -122,5 +122,5 @@
                             :player_name (:player-name model)
                             :year (:year model)
                             :month (:month model)
-                            :transaction-id (:transaction-id model)
+                            :transaction_id (:transaction-id model)
                             :paid (:paid model))))

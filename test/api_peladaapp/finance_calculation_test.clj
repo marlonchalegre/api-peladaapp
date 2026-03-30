@@ -1,16 +1,13 @@
 (ns api-peladaapp.finance-calculation-test
   (:require
    [api-peladaapp.test-helpers :as th]
-   [clojure.test :refer :all]
+   [clojure.test :refer [deftest is testing use-fixtures]]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 
 (deftest test-finance-reversal-scenarios
   (let [app (-> th/*test-system* :app :handler)
-        db-comp (:database th/*test-system*)
-        db-val (:database db-comp)
-        ds (if (fn? db-val) (db-val) db-val)
         admin-token (th/register-and-login! app {:name "Admin User" :email "admin@test.com" :password "test1234"})
 
         ;; Create Organization via admin

@@ -40,7 +40,7 @@
           _ (db.admin/insert-organization-admin {:organization-id org-id :user-id admin-user-id} ds)
 
           ;; 4. Add BOTH to organization as players
-          admin-player-id (db.player/insert-player {:organization-id org-id :user-id admin-user-id} ds)
+          _ (db.player/insert-player {:organization-id org-id :user-id admin-user-id} ds)
           player-id (db.player/insert-player {:organization-id org-id :user-id player-user-id} ds)
 
           ;; 5. Create pelada and close it
