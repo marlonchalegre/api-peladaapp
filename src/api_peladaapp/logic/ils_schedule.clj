@@ -22,8 +22,6 @@
              v2 (if (>= (:played away-stats 0) matches-per-team) 1 0)
              v3 (if (and (> n 2) (>= (:consecutive-plays home-stats 0) 2)) 1 0)
              v4 (if (and (> n 2) (>= (:consecutive-plays away-stats 0) 2)) 1 0)
-             v5 (if (and (pos? (:consecutive-plays home-stats 0)) (= (:last-role home-stats) :home)) 1 0)
-             v6 (if (and (pos? (:consecutive-plays away-stats 0)) (= (:last-role away-stats) :away)) 1 0)
              
              ;; Home/Away balance
              new-home-count (inc (:home home-stats 0))
@@ -63,7 +61,7 @@
                                 (set/difference (set team-ids) (set [home away])))]
          
          {:stats next-stats
-          :violations (+ violations v1 v2 v3 v4 v5 v6 v7 v8 other-violations)}))
+          :violations (+ violations v1 v2 v3 v4 v7 v8 other-violations)}))
      {:stats initial-stats :violations 0}
      matches)))
 
@@ -75,7 +73,7 @@
         doubles-violation (if (> (- max-doubles min-doubles) 1) (- max-doubles min-doubles) 0)]
     (+ (:violations res) doubles-violation)))
 
-;; --- Berger Table Algorithm (Circle/Rotation Method) ---
+;; --- Fixed Algorithm (Strict Tables) ---
 
 (defn- rotation-rounds [n]
   (let [head 0
@@ -88,19 +86,14 @@
             half (/ n 2)
             top (subvec current 0 half)
             bottom (->> (subvec current half n) reverse vec)]
-        (map-indexed (fn [idx t1]
-                       (let [t2 (nth bottom idx)]
-                         (if (even? (+ i idx))
-                           {:home t1 :away t2}
-                           {:home t2 :away t1})))
-                     top)))))
+        (map-indexed (fn [idx t1] {:home t1 :away (nth bottom idx)}) top)))))
 
 (defn berger-schedule [team-ids matches-per-team]
   (let [n (count team-ids)
         ids (vec (sort team-ids))
         eff-n (if (even? n) n (inc n))
         
-        ;; Manual tables from PDF
+        ;; Manual tables from PDF and User requests
         rounds (cond
                  (= n 3) 
                  (let [[t1 t2 t3] ids]
@@ -124,7 +117,6 @@
                          [{:home t6 :away t1} {:home t5 :away t2} {:home t4 :away t3}]]))
 
                  :else
-                 ;; General Rotation formula for N > 6
                  (let [rounds-raw (rotation-rounds eff-n)
                        get-id (fn [idx] (if (and (odd? n) (= idx (dec eff-n))) :bye (nth ids idx)))]
                    (map (fn [round]
@@ -132,17 +124,14 @@
                                        (map (fn [{:keys [home away]}] 
                                               {:home (get-id home) :away (get-id away)})
                                             round))))
-                        rounds-raw)))
-        
-        leg1 rounds
-        leg2 (map (fn [round] (mapv (fn [{:keys [home away]}] {:home away :away home}) round)) leg1)]
+                        rounds-raw)))]
     
-    (->> (cycle (concat leg1 leg2))
+    (->> (cycle rounds)
          (mapcat identity)
          (take (quot (* n matches-per-team) 2))
          (vec))))
 
-;; --- ILS Metaheuristic (Fallback/Optimization) ---
+;; --- ILS Metaheuristic (Fallback for Large N) ---
 
 (defn- swap-teams-in-schedule [matches t1 t2]
   (mapv (fn [{:keys [home away]}]
@@ -192,20 +181,20 @@
   (let [n (count team-ids)]
     (if (< n 2)
       []
-      (let [initial (berger-schedule team-ids matches-per-team)
-            initial-cost (cost initial team-ids matches-per-team)]
-        (if (or (and (<= n 4) (<= initial-cost 4))
-                (and (<= n 8) (<= initial-cost 2))
-                (zero? initial-cost))
+      (let [initial (berger-schedule team-ids matches-per-team)]
+        (if (<= n 6)
           initial
-          (loop [best initial
-                 best-cost initial-cost
-                 iter 0]
-            (if (or (zero? best-cost) (> iter 40))
-              best
-              (let [perturbed (perturb best)
-                    optimized (local-search perturbed team-ids matches-per-team)
-                    opt-cost (cost optimized team-ids matches-per-team)]
-                (if (< opt-cost best-cost)
-                  (recur optimized opt-cost (inc iter))
-                  (recur best best-cost (inc iter)))))))))))
+          (let [initial-cost (cost initial team-ids matches-per-team)]
+            (if (zero? initial-cost)
+              initial
+              (loop [best initial
+                     best-cost initial-cost
+                     iter 0]
+                (if (or (zero? best-cost) (> iter 40))
+                  best
+                  (let [perturbed (perturb best)
+                        optimized (local-search perturbed team-ids matches-per-team)
+                        opt-cost (cost optimized team-ids matches-per-team)]
+                    (if (< opt-cost best-cost)
+                      (recur optimized opt-cost (inc iter))
+                      (recur best best-cost (inc iter)))))))))))))
