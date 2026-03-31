@@ -31,7 +31,7 @@
              v7 (if (> home-balance 2) 1 0)
              v8 (if (> away-balance 2) 1 0)
              
-             ;; Rest violations (check all other teams)
+             ;; Rest violations
              other-violations (->> (dissoc stats home away)
                                    (map (fn [[_ s]] (if (>= (:consecutive-rests s 0) rest-limit) 1 0)))
                                    (reduce + 0))
@@ -75,23 +75,9 @@
 
 ;; --- Fixed Algorithm (Strict Tables) ---
 
-(defn- rotation-rounds [n]
-  (let [head 0
-        tail (vec (range 1 n))]
-    (for [i (range (dec n))]
-      (let [step (mod i (count tail))
-            rotated-tail (vec (concat (subvec tail (- (count tail) step))
-                                      (subvec tail 0 (- (count tail) step))))
-            current (vec (concat [head] rotated-tail))
-            half (/ n 2)
-            top (subvec current 0 half)
-            bottom (->> (subvec current half n) reverse vec)]
-        (map-indexed (fn [idx t1] {:home t1 :away (nth bottom idx)}) top)))))
-
 (defn berger-schedule [team-ids matches-per-team]
   (let [n (count team-ids)
         ids (vec (sort team-ids))
-        eff-n (if (even? n) n (inc n))
         
         ;; Manual tables from PDF and User requests
         rounds (cond
@@ -103,9 +89,13 @@
                  
                  (= n 4)
                  (let [[t1 t2 t3 t4] ids]
+                   ;; Sequence exactly as requested by user for 4 teams
                    [[{:home t1 :away t2} {:home t3 :away t4}]
                     [{:home t1 :away t3} {:home t4 :away t2}]
-                    [{:home t4 :away t1} {:home t3 :away t2}]])
+                    [{:home t2 :away t3} {:home t4 :away t1}]
+                    [{:home t3 :away t4} {:home t1 :away t2}]
+                    [{:home t3 :away t1} {:home t2 :away t4}]
+                    [{:home t3 :away t2} {:home t1 :away t4}]])
                  
                  (or (= n 5) (= n 6))
                  (let [[t1 t2 t3 t4 t5 t6] (if (= n 5) (conj ids :bye) ids)]
@@ -116,15 +106,7 @@
                          [{:home t1 :away t5} {:home t2 :away t4} {:home t3 :away t6}]
                          [{:home t6 :away t1} {:home t5 :away t2} {:home t4 :away t3}]]))
 
-                 :else
-                 (let [rounds-raw (rotation-rounds eff-n)
-                       get-id (fn [idx] (if (and (odd? n) (= idx (dec eff-n))) :bye (nth ids idx)))]
-                   (map (fn [round]
-                          (vec (remove #(or (= (:home %) :bye) (= (:away %) :bye))
-                                       (map (fn [{:keys [home away]}] 
-                                              {:home (get-id home) :away (get-id away)})
-                                            round))))
-                        rounds-raw)))]
+                 :else [])]
     
     (->> (cycle rounds)
          (mapcat identity)
