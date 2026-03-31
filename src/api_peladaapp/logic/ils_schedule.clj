@@ -81,11 +81,14 @@
 
         ;; Manual tables from PDF and User requests
         rounds (cond
+                 (= n 2)
+                 (let [[t1 t2] ids]
+                   [[{:home t1 :away t2}]])
+
                  (= n 3)
-                 (let [[t1 t2 t3] ids]
-                   [[{:home t1 :away t2}]
-                    [{:home t3 :away t1}]
-                    [{:home t2 :away t3}]])
+                 (let [[t1 t2 t3] ids]                   [[{:home t1 :away t2}]
+                                                          [{:home t3 :away t1}]
+                                                          [{:home t2 :away t3}]])
 
                  (= n 4)
                  (let [[t1 t2 t3 t4] ids]
