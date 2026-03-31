@@ -16,13 +16,13 @@
      (fn [{:keys [stats violations]} {:keys [home away]}]
        (let [home-stats (get stats home)
              away-stats (get stats away)
-             
+
              ;; Rule violations
              v1 (if (>= (:played home-stats 0) matches-per-team) 1 0)
              v2 (if (>= (:played away-stats 0) matches-per-team) 1 0)
              v3 (if (and (> n 2) (>= (:consecutive-plays home-stats 0) 2)) 1 0)
              v4 (if (and (> n 2) (>= (:consecutive-plays away-stats 0) 2)) 1 0)
-             
+
              ;; Home/Away balance
              new-home-count (inc (:home home-stats 0))
              new-away-count (inc (:away away-stats 0))
@@ -30,12 +30,12 @@
              away-balance (Math/abs (- new-away-count (:home away-stats 0)))
              v7 (if (> home-balance 2) 1 0)
              v8 (if (> away-balance 2) 1 0)
-             
+
              ;; Rest violations
              other-violations (->> (dissoc stats home away)
                                    (map (fn [[_ s]] (if (>= (:consecutive-rests s 0) rest-limit) 1 0)))
                                    (reduce + 0))
-             
+
              ;; Update stats
              next-stats (-> stats
                             (update-in [home :played] (fnil inc 0))
@@ -44,14 +44,14 @@
                             (update-in [home :consecutive-plays] (fnil inc 0))
                             (assoc-in [home :last-role] :home)
                             (update-in [home :home] (fnil inc 0))
-                            
+
                             (update-in [away :played] (fnil inc 0))
                             (assoc-in [away :consecutive-rests] 0)
                             (update-in [away :doubles-count] (if (pos? (:consecutive-plays away-stats 0)) inc identity))
                             (update-in [away :consecutive-plays] (fnil inc 0))
                             (assoc-in [away :last-role] :away)
                             (update-in [away :away] (fnil inc 0)))
-             
+
              next-stats (reduce (fn [s tid]
                                   (-> s
                                       (assoc-in [tid :consecutive-plays] 0)
@@ -59,7 +59,7 @@
                                       (assoc-in [tid :last-role] nil)))
                                 next-stats
                                 (set/difference (set team-ids) (set [home away])))]
-         
+
          {:stats next-stats
           :violations (+ violations v1 v2 v3 v4 v7 v8 other-violations)}))
      {:stats initial-stats :violations 0}
@@ -78,15 +78,15 @@
 (defn berger-schedule [team-ids matches-per-team]
   (let [n (count team-ids)
         ids (vec (sort team-ids))
-        
+
         ;; Manual tables from PDF and User requests
         rounds (cond
-                 (= n 3) 
+                 (= n 3)
                  (let [[t1 t2 t3] ids]
                    [[{:home t1 :away t2}]
                     [{:home t3 :away t1}]
                     [{:home t2 :away t3}]])
-                 
+
                  (= n 4)
                  (let [[t1 t2 t3 t4] ids]
                    ;; Sequence exactly as requested by user for 4 teams
@@ -96,7 +96,7 @@
                     [{:home t3 :away t4} {:home t1 :away t2}]
                     [{:home t3 :away t1} {:home t2 :away t4}]
                     [{:home t3 :away t2} {:home t1 :away t4}]])
-                 
+
                  (or (= n 5) (= n 6))
                  (let [[t1 t2 t3 t4 t5 t6] (if (= n 5) (conj ids :bye) ids)]
                    (map (fn [r] (vec (remove #(or (= (:home %) :bye) (= (:away %) :bye)) r)))
@@ -107,7 +107,7 @@
                          [{:home t6 :away t1} {:home t5 :away t2} {:home t4 :away t3}]]))
 
                  :else [])]
-    
+
     (->> (cycle rounds)
          (mapcat identity)
          (take (quot (* n matches-per-team) 2))
@@ -139,7 +139,7 @@
                    (map (fn [[t1 t2]] #(swap-teams-in-schedule % t1 t2)) (combo/combinations team-ids 2))
                    (map (fn [i] #(flip-match % i)) (range (count current)))
                    (map (fn [_] (let [i (rand-int (count current)) j (rand-int (count current))] #(swap-matches % i j))) (range 60)))
-            
+
             best-move (->> (shuffle moves)
                            (take 60)
                            (map (fn [f] (let [next (f current)] [next (cost next team-ids matches-per-team)])))
