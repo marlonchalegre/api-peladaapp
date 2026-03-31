@@ -142,8 +142,9 @@
 (defn get-schedule-preview [request]
   (try (let [db (:database request)
              id (Integer/parseInt (str (get-in request [:params :id])))
-             query-params (:query-params request)
-             matches-per-team (Integer/parseInt (or (get query-params "matches_per_team") "2"))
+             matches-per-team (Integer/parseInt (str (or (get-in request [:params :matches_per_team])
+                                                         (get-in request [:params "matches_per_team"])
+                                                         "2")))
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
              org-id (:organization-id pelada)]
