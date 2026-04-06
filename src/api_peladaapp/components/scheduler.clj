@@ -119,7 +119,8 @@
   component/Lifecycle
   (start [this]
     (log/info "Starting Scheduler component...")
-    (let [db (-> this :database :database)]
+    (let [db-val (-> this :database :database)
+          db (if (fn? db-val) (db-val) db-val)]
       (assoc this
              :chime (chime/chime-at (chime/periodic-seq (Instant/now) (Duration/ofMinutes 5))
                                     (fn [_] (tick! db))))))
