@@ -38,24 +38,32 @@
           (is (= 1 (count results)))
           (is (= 1 (:id (first results)))))))
 
-    (testing "Should return peladas for 12h and 23h reminders"
+    (testing "Should return peladas for 30m, 12h and 23h reminders"
       (let [now (java.time.Instant/now)
+            date-31m (sqlite-date (.minus now (java.time.Duration/ofMinutes 31)))
             date-13h (sqlite-date (.minus now (java.time.Duration/ofHours 13)))
             date-23-5h (sqlite-date (.minus now (java.time.Duration/ofMinutes (+ (* 23 60) 30)))) ;; 23.5h ago
             org-id 1]
 
         ;; Pelada 4: Closed 13h ago, 12h reminder NOT sent -> SHOULD be returned as :12h
         (db.pelada/insert-pelada {:organization-id org-id :status "closed"} db)
-        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ?, vote_reminder_12h_sent = 0 WHERE id = 4" date-13h])
+        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ?, vote_reminder_30m_sent = 1, vote_reminder_12h_sent = 0 WHERE id = 4" date-13h])
 
         ;; Pelada 5: Closed 23.5h ago, 23h reminder NOT sent -> SHOULD be returned as :23h (and also :12h if not sent)
         (db.pelada/insert-pelada {:organization-id org-id :status "closed"} db)
-        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ?, vote_reminder_12h_sent = 1, vote_reminder_23h_sent = 0 WHERE id = 5" date-23-5h])
+        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ?, vote_reminder_30m_sent = 1, vote_reminder_12h_sent = 1, vote_reminder_23h_sent = 0 WHERE id = 5" date-23-5h])
+
+        ;; Pelada 6: Closed 31m ago, 30m reminder NOT sent -> SHOULD be returned as :30m
+        (db.pelada/insert-pelada {:organization-id org-id :status "closed"} db)
+        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ?, vote_reminder_30m_sent = 0 WHERE id = 6" date-31m])
 
         (let [results (db.pelada/list-peladas-for-vote-reminders db)
-              p4-rem (first (filter #(= 4 (:id (:pelada %))) results))
-              p5-rem (first (filter #(and (= 5 (:id (:pelada %))) (= :23h (:type %))) results))]
+              p4-rem (first (filter #(and (= 4 (:id (:pelada %))) (= :12h (:type %))) results))
+              p5-rem (first (filter #(and (= 5 (:id (:pelada %))) (= :23h (:type %))) results))
+              p6-rem (first (filter #(and (= 6 (:id (:pelada %))) (= :30m (:type %))) results))]
           (is (some? p4-rem))
           (is (= :12h (:type p4-rem)))
           (is (some? p5-rem))
-          (is (= :23h (:type p5-rem))))))))
+          (is (= :23h (:type p5-rem)))
+          (is (some? p6-rem))
+          (is (= :30m (:type p6-rem))))))))

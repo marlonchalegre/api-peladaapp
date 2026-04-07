@@ -43,7 +43,7 @@
           (let [active-peladas (filter #(= "attendance" (:status %)) (db.pelada/list-peladas org-id 10 0 db))]
             (doseq [p active-peladas]
               (if (should-send-attendance-reminder? p now)
-                (let [pending (db.attendance/list-pending-attendance-by-pelada (:id p) db)]
+                (let [pending (db.attendance/list-pending-mensalistas-by-pelada (:id p) db)]
                   (if (seq pending)
                     (do
                       (log/info "Sending automated attendance reminder for pelada" (:id p) "in organization" (:name org))
@@ -99,9 +99,10 @@
                 (notifications/send-notification! org-id :vote-reminder {:pending-voters pending} db))
               (log/debug "No pending voters for pelada" (:id pelada) "- skipping" type "reminder"))
             (db.pelada/update-pelada (:id pelada)
-                                     (if (= type :12h)
-                                       {:vote-reminder-12h-sent true}
-                                       {:vote-reminder-23h-sent true})
+                                     (case type
+                                       :30m {:vote-reminder-30m-sent true}
+                                       :12h {:vote-reminder-12h-sent true}
+                                       :23h {:vote-reminder-23h-sent true})
                                      db))
           (log/debug "Vote reminder" type "due for pelada" (:id pelada) "but disabled for organization" (or (:name org) org-id)))))))
 

@@ -61,3 +61,20 @@
                       (mock/header "Authorization" (str "Token " token))))]
     (is (= 204 (:status resp)))
     (is (nil? (th/user-id-by-email ds "delete@example.com")))))
+
+(deftest update-user-profile-duplicate-email
+  (let [app (-> th/*test-system* :app :handler)
+        db-file (:db-file th/*test-system*)
+        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+        ;; Register first user
+        _ (th/register-and-login! app {:name "User 1" :username "user1" :email "user1@example.com" :password "pass"})
+        ;; Register second user
+        token2 (th/register-and-login! app {:name "User 2" :username "user2" :email "user2@example.com" :password "pass"})
+        user2-id (th/user-id-by-email ds "user2@example.com")
+        ;; Try to update second user's email to first user's email
+        resp (app (-> (mock/request :put (str "/api/user/" user2-id "/profile"))
+                      (mock/header "Authorization" (str "Token " token2))
+                      (mock/json-body {:email "user1@example.com"})))
+        body (decode-body resp)]
+    (is (= 400 (:status resp)))
+    (is (= "Email already exists" (:message body)))))

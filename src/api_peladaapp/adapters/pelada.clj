@@ -58,6 +58,7 @@
          :timer_accumulated_ms (:timer-accumulated-ms model)
          :timer_status (:timer-status model)
          :vote_ended_message_sent (boolean (:vote-ended-message-sent model))
+         :vote_reminder_30m_sent (boolean (:vote-reminder-30m-sent model))
          :vote_reminder_12h_sent (boolean (:vote-reminder-12h-sent model))
          :vote_reminder_23h_sent (boolean (:vote-reminder-23h-sent model))))))
 
@@ -84,6 +85,9 @@
                             :vote-ended-message-sent (if (contains? p :vote_ended_message_sent)
                                                        (= 1 (:vote_ended_message_sent p))
                                                        false)
+                            :vote-reminder-30m-sent (if (contains? p :vote_reminder_30m_sent)
+                                                      (= 1 (:vote_reminder_30m_sent p))
+                                                      false)
                             :vote-reminder-12h-sent (if (contains? p :vote_reminder_12h_sent)
                                                       (= 1 (:vote_reminder_12h_sent p))
                                                       false)

@@ -1,5 +1,9 @@
 (ns api-peladaapp.attendance-test
   (:require
+   [api-peladaapp.db.attendance :as db.attendance]
+   [api-peladaapp.db.organization :as db.organization]
+   [api-peladaapp.db.pelada :as db.pelada]
+   [api-peladaapp.db.user :as db.user]
    [api-peladaapp.test-helpers :as th]
    [clojure.data.json :as json]
    [clojure.string :as str]
@@ -200,6 +204,58 @@
       (let [details-resp2 (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) admin-auth))
             available2 (:available_players (decode-body details-resp2))]
         (is (some (fn [p] (and (= (:id p) p-id) (= (:attendance_status p) "confirmed"))) available2))))))
+
+(deftest list-pending-attendance-test
+  (let [db-file (:db-file th/*test-system*)
+        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
+
+    ;; 1. Setup organization
+    (let [user-id (db.user/insert-user {:name "Admin" :email "admin-notification@test.com" :password "pass"} ds)
+          org-id (db.organization/insert-organization {:name "Notification Org" :owner-id user-id} ds)
+
+          ;; 2. Setup players: 1 mensalista, 1 diarista
+          p1-id (jdbc/execute-one! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, member_type) VALUES (?, ?, ?) RETURNING id"
+                                       org-id user-id "mensalista"]
+                                   {:return-keys true :builder-fn next.jdbc.result-set/as-unqualified-lower-maps})
+          p1-id (:id p1-id)
+
+          user2-id (db.user/insert-user {:name "Diarista" :email "diarista-notification@test.com" :password "pass"} ds)
+          p2-id (jdbc/execute-one! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, member_type) VALUES (?, ?, ?) RETURNING id"
+                                       org-id user2-id "diarista"]
+                                   {:return-keys true :builder-fn next.jdbc.result-set/as-unqualified-lower-maps})
+          p2-id (:id p2-id)
+
+          ;; 3. Create pelada
+          pelada-id (db.pelada/insert-pelada {:organization-id org-id :status "attendance"} ds)]
+
+      ;; Initial state: only mensalista should be listed
+      (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
+        (is (= 1 (count pending)))
+        (is (some #(= (:player-name %) "Admin") pending))
+        (is (not (some #(= (:player-name %) "Diarista") pending))))
+
+      ;; 4. If mensalista confirms, they should be removed from pending
+      (db.attendance/upsert-attendance pelada-id p1-id "confirmed" ds)
+      (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
+        (is (= 0 (count pending))))
+
+      ;; 5. If mensalista declines, they should also be removed from pending
+      (db.attendance/upsert-attendance pelada-id p1-id "declined" ds)
+      (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
+        (is (= 0 (count pending))))
+
+      ;; 6. If mensalista is 'pending', they should still be listed
+      (db.attendance/upsert-attendance pelada-id p1-id "pending" ds)
+      (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
+        (is (= 1 (count pending)))
+        (is (some #(= (:player-name %) "Admin") pending)))
+
+      ;; 7. If all mensalistas have responded (confirmed/declined/waitlist) but diaristas haven't
+      ;; p1 is currently 'pending', let's make them 'confirmed'
+      (db.attendance/upsert-attendance pelada-id p1-id "confirmed" ds)
+      ;; p2 is a 'diarista' and has NOT responded yet (no record in PeladaAttendance)
+      (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
+        (is (= 0 (count pending)))))))
 
 
 

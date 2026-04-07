@@ -98,6 +98,21 @@
       (throw (ex-info nil {:type :not-found :message "User not found"}))
       (let [;; Start with existing user
             base-user existing-user
+
+            ;; Check for username uniqueness if provided and different from existing
+            new-username (:username profile-data)
+            _ (when (and new-username
+                         (not= new-username (:username base-user))
+                         (db.user/find-user-by-username new-username db))
+                (throw (ex-info "Username already exists" {:type :already-exist :message "Username already exists"})))
+
+            ;; Check for email uniqueness if provided and different from existing
+            new-email (:email profile-data)
+            _ (when (and new-email
+                         (not= new-email (:email base-user))
+                         (db.user/find-user-by-email new-email db))
+                (throw (ex-info "Email already exists" {:type :already-exist :message "Email already exists"})))
+
             ;; Update with new data, only if provided
             updated-user (cond-> base-user
                            (:name profile-data) (assoc :name (:name profile-data))

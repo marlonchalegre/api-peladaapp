@@ -18,7 +18,6 @@
    [api-peladaapp.db.team :as db.team]
    [api-peladaapp.db.transaction :as db.transaction]
    [api-peladaapp.db.user :as db.user]
-   [api-peladaapp.db.vote :as db.vote]
    [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.logic.notifications :as notifications]
    [api-peladaapp.logic.pelada :as pelada.logic]
@@ -307,9 +306,6 @@
                                              :lineups lineups
                                              :team-players team-players}
                                             db))
-        (let [pending (db.vote/list-pending-voters-by-pelada pelada-id db)]
-          (when (seq pending)
-            (notifications/send-notification! (:organization-id pelada) :vote-reminder {:pending-voters pending} db)))
         (catch Exception e (println "Error sending close/reminder notification:" (.getMessage e)))))
     pelada))
 

@@ -175,14 +175,14 @@
     (str title ranking-str)))
 
 (defn generate-attendance-reminder [pending-players]
-  (let [title "⏰ *Lembrete de Presença!* ⏰\n\nAinda temos jogadores com presença pendente para a próxima pelada:\n\n"
+  (let [title "⏰ *Lembrete de Presença!* @all ⏰\n\nAinda temos jogadores com presença pendente para a próxima pelada:\n\n"
         players-str (->> pending-players
                          (map #(str "• " (:player-name %)))
                          (str/join "\n"))]
     (str title players-str "\n\nPor favor, confirmem no app o quanto antes!")))
 
 (defn generate-vote-reminder [pending-voters]
-  (let [title "🗳️ *Lembrete de Votação!* 🗳️\n\nAinda faltam alguns jogadores votarem nos melhores da pelada:\n\n"
+  (let [title "🗳️ *Lembrete de Votação!* @all 🗳️\n\nAinda faltam alguns jogadores votarem nos melhores da pelada:\n\n"
         players-str (->> pending-voters
                          (map #(str "• " (:player-name %)))
                          (str/join "\n"))]
@@ -206,5 +206,6 @@
                           :end (generate-end-message data)
                           :vote-ended (generate-vote-ended-message (:ranking data))
                           :attendance-reminder (generate-attendance-reminder (:pending-players data))
-                          :vote-reminder (generate-vote-reminder (:pending-voters data)))]
-            (waha/send-message org message)))))))
+                          :vote-reminder (generate-vote-reminder (:pending-voters data)))
+                mentions (when (contains? #{:attendance-reminder :vote-reminder} type) ["all"])]
+            (waha/send-message org message mentions)))))))

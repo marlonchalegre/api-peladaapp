@@ -1,0 +1,1 @@
+ALTER TABLE Peladas ADD COLUMN vote_reminder_30m_sent BOOLEAN DEFAULT 0;

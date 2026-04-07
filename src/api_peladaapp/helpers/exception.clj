@@ -4,14 +4,9 @@
                                             server-error too-many-requests
                                             unauthorized]]))
 
-(defn- exception->map [^Throwable e]
-  (let [sw (java.io.StringWriter.)
-        pw (java.io.PrintWriter. sw)]
-    (.printStackTrace e pw)
-    {:error "exception"
-     :message (.getMessage e)
-     :data (ex-data e)
-     :stacktrace (.toString sw)}))
+(defn- exception->map []
+  {:error "server-error"
+   :message "An unexpected error occurred. Please try again later."})
 
 (defn api-exception-handler [e]
   (let [data (ex-data e)]
@@ -29,7 +24,7 @@
       (do
         (println "[SERVER ERROR]" (.getMessage e))
         (.printStackTrace e)
-        (server-error (exception->map e))))))
+        (server-error (exception->map))))))
 ; NOTE: Full exception details are returned for easier debugging in dev.
 ; Do NOT keep this behavior in production.
 

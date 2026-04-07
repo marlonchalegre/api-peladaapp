@@ -53,6 +53,8 @@
                                                :timer_status (:timer-status pelada)
                                                :vote_ended_message_sent (when (some? (:vote-ended-message-sent pelada))
                                                                           (if (:vote-ended-message-sent pelada) 1 0))
+                                               :vote_reminder_30m_sent (when (some? (:vote-reminder-30m-sent pelada))
+                                                                         (if (:vote-reminder-30m-sent pelada) 1 0))
                                                :vote_reminder_12h_sent (when (some? (:vote-reminder-12h-sent pelada))
                                                                          (if (:vote-reminder-12h-sent pelada) 1 0))
                                                :vote_reminder_23h_sent (when (some? (:vote-reminder-23h-sent pelada))
@@ -126,7 +128,12 @@
 
 (s/defn list-peladas-for-vote-reminders :- [{:pelada s/Any :type s/Keyword}]
   [db]
-  (let [rem-12h (->> (sql/query db ["SELECT * FROM Peladas 
+  (let [rem-30m (->> (sql/query db ["SELECT * FROM Peladas 
+                                     WHERE status = 'closed' 
+                                     AND vote_reminder_30m_sent = 0 
+                                     AND closed_at < datetime('now', '-30 minutes')"])
+                     (map (fn [p] {:pelada (adapter.pelada/db->model p) :type :30m})))
+        rem-12h (->> (sql/query db ["SELECT * FROM Peladas 
                                      WHERE status = 'closed' 
                                      AND vote_reminder_12h_sent = 0 
                                      AND closed_at < datetime('now', '-12 hours')"])
@@ -136,7 +143,7 @@
                                      AND vote_reminder_23h_sent = 0 
                                      AND closed_at < datetime('now', '-23 hours')"])
                      (map (fn [p] {:pelada (adapter.pelada/db->model p) :type :23h})))]
-    (concat rem-12h rem-23h)))
+    (concat rem-30m rem-12h rem-23h)))
 
 (s/defn get-pelada-full-details :- s/Any
   [pelada-id :- s/Int
