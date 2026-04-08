@@ -32,7 +32,11 @@
 (s/defn get-pelada :- s/Any
   [id :- s/Int
    db]
-  (-> (sql/get-by-id db :peladas id)
+  (-> (sql/query db ["SELECT p.*, o.name as organization_name
+                       FROM Peladas p
+                       JOIN Organizations o ON o.id = p.organization_id
+                       WHERE p.id = ?" id])
+      first
       adapter.pelada/db->model))
 
 (s/defn update-pelada :- s/Int
@@ -78,7 +82,12 @@
    limit :- s/Int
    offset :- s/Int
    db]
-  (->> (sql/query db ["select * from peladas where organization_id = ? order by id desc limit ? offset ?" organization-id limit offset])
+  (->> (sql/query db ["SELECT p.*, o.name as organization_name 
+                       FROM Peladas p 
+                       JOIN Organizations o ON o.id = p.organization_id 
+                       WHERE p.organization_id = ? 
+                       ORDER BY p.id DESC 
+                       LIMIT ? OFFSET ?" organization-id limit offset])
        (map adapter.pelada/db->model)))
 
 (s/defn count-peladas :- s/Int
@@ -120,28 +129,36 @@
 
 (s/defn list-peladas-for-vote-notification :- [s/Any]
   [db]
-  (->> (sql/query db ["SELECT * FROM Peladas 
-                       WHERE status = 'closed' 
-                       AND vote_ended_message_sent = 0 
-                       AND closed_at < datetime('now', '-24 hours')"])
+  (->> (sql/query db ["SELECT p.*, o.name as organization_name 
+                       FROM Peladas p 
+                       JOIN Organizations o ON o.id = p.organization_id 
+                       WHERE p.status = 'closed' 
+                       AND p.vote_ended_message_sent = 0 
+                       AND p.closed_at < datetime('now', '-24 hours')"])
        (map adapter.pelada/db->model)))
 
 (s/defn list-peladas-for-vote-reminders :- [{:pelada s/Any :type s/Keyword}]
   [db]
-  (let [rem-30m (->> (sql/query db ["SELECT * FROM Peladas 
-                                     WHERE status = 'closed' 
-                                     AND vote_reminder_30m_sent = 0 
-                                     AND closed_at < datetime('now', '-30 minutes')"])
+  (let [rem-30m (->> (sql/query db ["SELECT p.*, o.name as organization_name 
+                                     FROM Peladas p 
+                                     JOIN Organizations o ON o.id = p.organization_id 
+                                     WHERE p.status = 'closed' 
+                                     AND p.vote_reminder_30m_sent = 0 
+                                     AND p.closed_at < datetime('now', '-30 minutes')"])
                      (map (fn [p] {:pelada (adapter.pelada/db->model p) :type :30m})))
-        rem-12h (->> (sql/query db ["SELECT * FROM Peladas 
-                                     WHERE status = 'closed' 
-                                     AND vote_reminder_12h_sent = 0 
-                                     AND closed_at < datetime('now', '-12 hours')"])
+        rem-12h (->> (sql/query db ["SELECT p.*, o.name as organization_name 
+                                     FROM Peladas p 
+                                     JOIN Organizations o ON o.id = p.organization_id 
+                                     WHERE p.status = 'closed' 
+                                     AND p.vote_reminder_12h_sent = 0 
+                                     AND p.closed_at < datetime('now', '-12 hours')"])
                      (map (fn [p] {:pelada (adapter.pelada/db->model p) :type :12h})))
-        rem-23h (->> (sql/query db ["SELECT * FROM Peladas 
-                                     WHERE status = 'closed' 
-                                     AND vote_reminder_23h_sent = 0 
-                                     AND closed_at < datetime('now', '-23 hours')"])
+        rem-23h (->> (sql/query db ["SELECT p.*, o.name as organization_name 
+                                     FROM Peladas p 
+                                     JOIN Organizations o ON o.id = p.organization_id 
+                                     WHERE p.status = 'closed' 
+                                     AND p.vote_reminder_23h_sent = 0 
+                                     AND p.closed_at < datetime('now', '-23 hours')"])
                      (map (fn [p] {:pelada (adapter.pelada/db->model p) :type :23h})))]
     (concat rem-30m rem-12h rem-23h)))
 
