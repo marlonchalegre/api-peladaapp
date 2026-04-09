@@ -25,6 +25,12 @@
     s
     (str s (str/join (repeat (- length (count s)) " ")))))
 
+(defn- get-base-url []
+  (or (System/getenv "FRONTEND_URL") "http://localhost:5173"))
+
+(defn- generate-voting-link [pelada-id]
+  (str (get-base-url) "/peladas/" pelada-id "/voting"))
+
 (defn generate-start-message [teams team-players]
   (let [title "*ESCALAÇÃO DA PELADA*\n\n"
         teams-grouped (group-by :team_id team-players)
@@ -156,7 +162,8 @@
                     (map (fn [[pid c]] (str (pad-end (get player-names pid "Unknown") name-width) " " c)))
                     (str/join "\n"))
 
-        footer "\n\nNão esqueçam de votar nos melhores da pelada no app!"]
+        footer (str "\n\nNão esqueçam de votar nos melhores da pelada no app!\n"
+                    (generate-voting-link (:id pelada)))]
     (str "```\n"
          title standings-str "\n"
          (if (seq top-scorers) (str "\nGols:\n" top-scorers "\n") "")
@@ -181,12 +188,12 @@
                          (str/join "\n"))]
     (str title players-str "\n\nPor favor, confirmem no app o quanto antes!")))
 
-(defn generate-vote-reminder [pending-voters]
+(defn generate-vote-reminder [pelada-id pending-voters]
   (let [title "🗳️ *Lembrete de Votação!* @all 🗳️\n\nAinda faltam alguns jogadores votarem nos melhores da pelada:\n\n"
         players-str (->> pending-voters
                          (map #(str "• " (:player-name %)))
                          (str/join "\n"))]
-    (str title players-str "\n\nAcesse o app e deixe seu voto!")))
+    (str title players-str "\n\nAcesse o app e deixe seu voto!\n" (generate-voting-link pelada-id))))
 
 (defn send-notification!
   "Sends a notification if enabled for the organization."
@@ -206,6 +213,6 @@
                           :end (generate-end-message data)
                           :vote-ended (generate-vote-ended-message (:ranking data))
                           :attendance-reminder (generate-attendance-reminder (:pending-players data))
-                          :vote-reminder (generate-vote-reminder (:pending-voters data)))
+                          :vote-reminder (generate-vote-reminder (:pelada-id data) (:pending-voters data)))
                 mentions (when (contains? #{:attendance-reminder :vote-reminder} type) ["all"])]
             (waha/send-message org message mentions)))))))

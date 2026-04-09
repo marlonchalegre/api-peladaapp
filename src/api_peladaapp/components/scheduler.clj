@@ -96,7 +96,7 @@
             (if (seq pending)
               (do
                 (log/info "Sending" type "vote reminder for pelada" (:id pelada) "in organization" (:name org))
-                (notifications/send-notification! org-id :vote-reminder {:pending-voters pending} db))
+                (notifications/send-notification! org-id :vote-reminder {:pending-voters pending :pelada-id (:id pelada)} db))
               (log/debug "No pending voters for pelada" (:id pelada) "- skipping" type "reminder"))
             (db.pelada/update-pelada (:id pelada)
                                      (case type
