@@ -22,8 +22,9 @@
              body (:body request)
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id org-id db)
-         (db.finance/upsert-organization-finance org-id (adapter.finance/db->finance body) db)
-         (ok {:message "Finance settings updated"}))
+         (let [model (adapter.finance/payload->finance body)]
+           (db.finance/upsert-organization-finance org-id model db)
+           (ok {:message "Finance settings updated"})))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn list-transactions [request]
@@ -45,11 +46,10 @@
              body (:body request)
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id org-id db)
-         (let [transaction (assoc body
+         (let [transaction (assoc (adapter.finance/payload->transaction body)
                                   :organization-id org-id
                                   :created-by user-id)
-               db-transaction (adapter.finance/transaction->db transaction)
-               stored-tx (db.finance/add-transaction db-transaction db)
+               stored-tx (db.finance/add-transaction transaction db)
                model-tx (adapter.finance/db->transaction stored-tx)]
            (created (adapter.finance/model->transaction-response model-tx))))
        (catch Exception e (exception/api-exception-handler e))))
@@ -81,13 +81,13 @@
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id org-id db)
          (jdbc/with-transaction [tx db]
-           (let [payment-req (adapter.finance/db->monthly-payment body)
+           (let [payment-req (adapter.finance/payload->monthly-payment body)
                  paid? (:paid payment-req)
                  player-id (:player-id payment-req)
                  year (:year payment-req)
                  month (:month payment-req)
                  amount (:amount body)
-                 payment-date (:payment-date body)
+                 payment-date (:payment_date body)
 
                  ;; Find existing payment record to see if there's a transaction to reverse
                  existing-payments (db.finance/get-monthly-payments org-id year month tx)
@@ -107,7 +107,7 @@
                                             :type "income"
                                             :category "monthly_fee"
                                             :description (str "Mensalidade " month "/" year)
-                                            :payment_date (or payment-date (str (java.time.LocalDate/now)))
+                                            :payment-date (or payment-date (str (java.time.LocalDate/now)))
                                             :created-by user-id}
                                            tx)]
                                     (:id t))
