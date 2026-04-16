@@ -165,8 +165,10 @@ PlayerRatings AS (
 )
 SELECT 
     ap.player_id, 
+    u.id as user_id,
     u.name as player_name, 
     u.position as player_position,
+    u.avatar_filename,
     COALESCE(pp.peladas_count, 0) as peladas_count,
     COALESCE(pr.avg_rating, 0.0) as avg_rating,
     pe.event_type,
@@ -177,6 +179,6 @@ JOIN Users u ON op.user_id = u.id
 LEFT JOIN PlayerParticipation pp ON ap.player_id = pp.player_id
 LEFT JOIN PlayerEvents pe ON ap.player_id = pe.player_id
 LEFT JOIN PlayerRatings pr ON ap.player_id = pr.player_id
-GROUP BY ap.player_id, u.name, u.position, pp.peladas_count, pr.avg_rating, pe.event_type
+GROUP BY ap.player_id, u.id, u.name, u.position, u.avatar_filename, pp.peladas_count, pr.avg_rating, pe.event_type
 ")]
     (sql/query db (into [sql] params) {:builder-fn rs/as-unqualified-lower-maps})))

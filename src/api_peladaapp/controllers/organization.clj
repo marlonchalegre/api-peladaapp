@@ -222,8 +222,10 @@
          (map (fn [[_ player-rows]]
                 (let [first-row (first player-rows)
                       base {:player_id (:player_id first-row)
+                            :user_id (:user_id first-row)
                             :player_name (:player_name first-row)
                             :player_position (:player_position first-row)
+                            :avatar_filename (:avatar_filename first-row)
                             :peladas_played (:peladas_count first-row)
                             :avg_rating (:avg_rating first-row)
                             :goal 0
