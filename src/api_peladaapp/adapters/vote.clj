@@ -32,7 +32,9 @@
   (let [eligible-players (mapv (fn [p]
                                  (medley.core/assoc-some
                                   {:player_id (:player-id p)
+                                   :user_id (:user-id p)
                                    :name (:name p)
+                                   :avatar_filename (:avatar-filename p)
                                    :goals (:goals p)
                                    :assists (:assists p)
                                    :own_goals (:own-goals p)
@@ -53,7 +55,9 @@
   (let [map-player (fn [p]
                      (medley.core/assoc-some
                       {:player_id (:player-id p)
+                       :user_id (:user-id p)
                        :name (:name p)
+                       :avatar_filename (:avatar-filename p)
                        :average_stars (:average-stars p)
                        :goals (:goals p)
                        :assists (:assists p)
@@ -65,7 +69,9 @@
       :garcom (mapv map-player (:garcom model))
       :voters (mapv (fn [v]
                       {:player_id (:player-id v)
+                       :user_id (:user-id v)
                        :name (:name v)
+                       :avatar_filename (:avatar-filename v)
                        :has_voted (:has-voted v)})
                     (:voters model))
       :total_eligible (:total-eligible model)

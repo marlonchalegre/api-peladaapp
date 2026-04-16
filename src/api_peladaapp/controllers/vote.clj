@@ -83,7 +83,7 @@
                             {:type :forbidden :message "Only players who participated can vote"})))
 
           ;; Get all players who participated (were in teams) with their names and stats
-          (let [query "SELECT op.id as player_id, u.name, u.position,
+          (let [query "SELECT op.id as player_id, u.id as user_id, u.name, u.position, u.avatar_filename,
                               COALESCE(pa.voting_enabled, 1) as voting_enabled,
                               COALESCE(s.goals, 0) as goals, 
                               COALESCE(s.assists, 0) as assists, 
@@ -102,7 +102,9 @@
                 eligible-players (mapv (fn [p]
                                          (let [up (misc/unamespace p)]
                                            {:player-id (:player_id up)
+                                            :user-id (:user_id up)
                                             :name (:name up)
+                                            :avatar-filename (:avatar_filename up)
                                             :position (:position up)
                                             :voting-enabled (= 1 (:voting_enabled up))
                                             :goals (int (or (:goals up) 0))
@@ -129,7 +131,7 @@
   [pelada-id :- s/Int db]
   (let [votes (db.vote/list-votes-by-pelada pelada-id db)
         ;; Get all participants (potential voters)
-        participants-query "SELECT op.id as player_id, u.name, u.position
+        participants-query "SELECT op.id as player_id, u.id as user_id, u.name, u.position, u.avatar_filename
                             FROM OrganizationPlayers op
                             JOIN Users u ON u.id = op.user_id
                             WHERE op.id IN (
@@ -141,13 +143,17 @@
         participants (mapv (fn [p]
                              (let [up (misc/unamespace p)]
                                {:player-id (:player_id up)
+                                :user-id (:user_id up)
                                 :name (:name up)
+                                :avatar-filename (:avatar_filename up)
                                 :position (:position up)}))
                            participants-raw)
         voted-ids (set (map :voter-id votes))
         voter-status (map (fn [p]
                             {:player-id (:player-id p)
+                             :user-id (:user-id p)
                              :name (:name p)
+                             :avatar-filename (:avatar-filename p)
                              :has-voted (boolean (voted-ids (:player-id p)))})
                           participants)]
     {:voters voter-status
@@ -164,7 +170,7 @@
     (let [status (get-voting-status pelada-id db)
           votes (db.vote/list-votes-by-pelada pelada-id db)
           ;; Get stats for all players
-          stats-query "SELECT op.id as player_id, u.name, u.position,
+          stats-query "SELECT op.id as player_id, u.id as user_id, u.name, u.position, u.avatar_filename,
                               COALESCE(s.goals, 0) as goals, 
                               COALESCE(s.assists, 0) as assists, 
                               COALESCE(s.own_goals, 0) as own_goals
@@ -180,7 +186,9 @@
           participants (mapv (fn [p]
                                (let [up (misc/unamespace p)]
                                  {:player-id (:player_id up)
+                                  :user-id (:user_id up)
                                   :name (:name up)
+                                  :avatar-filename (:avatar_filename up)
                                   :position (:position up)
                                   :goals (int (or (:goals up) 0))
                                   :assists (int (or (:assists up) 0))

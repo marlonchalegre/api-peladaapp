@@ -78,7 +78,8 @@
                                            :username (:username user)
                                            :email (:email user)
                                            :password (:password user)
-                                           :position (:position user))
+                                           :position (:position user)
+                                           :avatar_filename (:avatar-filename user))
                    {:id id})
       affected-rows-count))
 
@@ -117,11 +118,11 @@
         :count)))
 
 (s/defn update-user-profile :- s/Int
-  "Update user profile (name, username, email, password, position only) in the database"
+  "Update user profile (name, username, email, password, position, avatar_filename only) in the database"
   [id :- s/Int
    user :- models.user/User
    db]
-  ;; Only update allowed fields: name, username, email, password, position
+  ;; Only update allowed fields: name, username, email, password, position, avatar_filename
   (jdbc/execute! db ["PRAGMA busy_timeout = 5000"])
   (-> (sql/update! db
                    :users
@@ -130,7 +131,8 @@
                                            :username (:username user)
                                            :email (:email user)
                                            :password (:password user)
-                                           :position (:position user))
+                                           :position (:position user)
+                                           :avatar_filename (:avatar-filename user))
                    {:id id})
       affected-rows-count))
 

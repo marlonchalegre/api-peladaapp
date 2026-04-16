@@ -77,7 +77,7 @@
 
 (s/defn list-ranking-by-pelada
   [pelada-id db]
-  (let [query "SELECT v.target_id, u.name as player_name, AVG(v.stars) as avg_stars, COUNT(v.id) as vote_count
+  (let [query "SELECT v.target_id, u.id as user_id, u.name as player_name, u.avatar_filename, AVG(v.stars) as avg_stars, COUNT(v.id) as vote_count
                FROM Votes v
                JOIN OrganizationPlayers op ON v.target_id = op.id
                JOIN Users u ON op.user_id = u.id
@@ -88,7 +88,9 @@
         results (jdbc/execute! db [query pelada-id] {:builder-fn rs/as-unqualified-lower-maps})]
     (map (fn [r]
            {:player-id (:target_id r)
+            :user-id (:user_id r)
             :player-name (:player_name r)
+            :avatar-filename (:avatar_filename r)
             :avg-stars (:avg_stars r)
             :score (logic.grade/performance-from-stars (:avg_stars r))
             :vote-count (:vote_count r)})

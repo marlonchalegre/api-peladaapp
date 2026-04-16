@@ -119,7 +119,8 @@
                            (:username profile-data) (assoc :username (:username profile-data))
                            (:email profile-data) (assoc :email (:email profile-data))
                            (:password profile-data) (assoc :password (:password profile-data))
-                           (:position profile-data) (assoc :position (:position profile-data)))
+                           (:position profile-data) (assoc :position (:position profile-data))
+                           (contains? profile-data :avatar-filename) (assoc :avatar-filename (:avatar-filename profile-data)))
             ;; Encrypt password if it was updated
             final-user (if (:password profile-data)
                          (logic.user/encrypt-password updated-user)

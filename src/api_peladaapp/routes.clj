@@ -3,6 +3,7 @@
    [api-peladaapp.handlers.admin :as handler.admin]
    [api-peladaapp.handlers.attendance :as handler.attendance]
    [api-peladaapp.handlers.auth :as auth]
+   [api-peladaapp.handlers.avatar :as handler.avatar]
    [api-peladaapp.handlers.finance :as handler.finance]
    [api-peladaapp.handlers.health :as handler.health]
    [api-peladaapp.handlers.manual-stats :as handler.manual-stats]
@@ -25,6 +26,11 @@
     (GET "/user/:id" [] handler.user/get-by-id)
     (PUT "/user/:id/profile" [] handler.user/update-profile)
     (DELETE "/user/:id" [] handler.user/delete)
+
+    ;; Avatars
+    (POST "/user/:id/avatar" [] handler.avatar/upload)
+    (GET "/user/:id/avatar" [] handler.avatar/serve)
+    (DELETE "/user/:id/avatar" [] handler.avatar/delete)
 
     ;; Peladas
     (POST "/peladas" [] handler.pelada/create)

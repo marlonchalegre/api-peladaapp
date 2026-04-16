@@ -16,7 +16,8 @@
    (s/optional-key :email) s/Str
    (s/optional-key :password) s/Str
    (s/optional-key :position) (s/enum "Striker" "Midfielder" "Defender" "Goalkeeper")
-   (s/optional-key :admin-orgs) [s/Int]})
+   (s/optional-key :admin-orgs) [s/Int]
+   (s/optional-key :avatar-filename) (s/maybe s/Str)})
 
 (s/defschema UserProfileUpdate
   "Schema for user profile updates - excludes score and other protected fields"
@@ -24,7 +25,8 @@
    (s/optional-key :username) s/Str
    (s/optional-key :email) s/Str
    (s/optional-key :password) s/Str
-   (s/optional-key :position) (s/enum "Striker" "Midfielder" "Defender" "Goalkeeper")})
+   (s/optional-key :position) (s/enum "Striker" "Midfielder" "Defender" "Goalkeeper")
+   (s/optional-key :avatar-filename) (s/maybe s/Str)})
 
 (s/defschema PublicUser
   "Schema for user when sensitive fields like password are excluded"
@@ -32,4 +34,5 @@
    :name s/Str
    (s/optional-key :username) s/Str
    (s/optional-key :email) s/Str
-   (s/optional-key :position) (s/enum "Striker" "Midfielder" "Defender" "Goalkeeper")})
+   (s/optional-key :position) (s/enum "Striker" "Midfielder" "Defender" "Goalkeeper")
+   (s/optional-key :avatar-filename) (s/maybe s/Str)})

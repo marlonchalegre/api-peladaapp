@@ -7,6 +7,7 @@
    [clojure.string           :as str]
    [next.jdbc                :as jdbc]
    [ring.middleware.json     :refer [wrap-json-body wrap-json-response]]
+   [ring.middleware.multipart-params :refer [wrap-multipart-params]]
    [ring.middleware.params   :refer [wrap-params]])
   (:gen-class))
 
@@ -73,6 +74,7 @@
 
 (def app (as-> #'routes/app-handler $
            (wrap-exception-log $)
+           (wrap-multipart-params $)
            (wrap-params $)
            (wrap-json-body $ {:keywords? true :bigdecimals? true})
            ;; Provide the DataSource directly

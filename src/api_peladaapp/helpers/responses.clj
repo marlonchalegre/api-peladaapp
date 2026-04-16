@@ -54,3 +54,8 @@
            (nil? d) {}
            (map? d) d
            :else {:result d})})
+
+(defn file-response [file content-type]
+  {:status 200
+   :headers {"Content-Type" content-type}
+   :body file})

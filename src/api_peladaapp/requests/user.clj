@@ -14,11 +14,13 @@
    (s/optional-key :username) s/Str
    (s/optional-key :email) s/Str
    (s/optional-key :password) s/Str
-   (s/optional-key :position) s/Str})
+   (s/optional-key :position) s/Str
+   (s/optional-key :avatar_filename) (s/maybe s/Str)})
 
 (s/defschema UpdateProfileRequest
   {(s/optional-key :name) s/Str
    (s/optional-key :username) s/Str
    (s/optional-key :email) s/Str
    (s/optional-key :password) s/Str
-   (s/optional-key :position) s/Str})
+   (s/optional-key :position) s/Str
+   (s/optional-key :avatar_filename) (s/maybe s/Str)})
