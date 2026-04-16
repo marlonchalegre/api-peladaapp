@@ -35,7 +35,7 @@
           content-type (:content-type file-params)
           size (:size file-params)
           db (:database request)]
-      
+
       (cond
         (nil? file-params)
         (responses/bad-request "No file uploaded")
@@ -53,19 +53,19 @@
               ;; Find existing avatar to delete later
               existing-user (controller.user/get-user user-id db)
               old-filename (:avatar-filename existing-user)]
-          
+
           ;; Copy new file
           (io/copy temp-file dest-file)
-          
+
           ;; Update DB
           (controller.user/update-user-profile {:avatar-filename filename} user-id db)
-          
+
           ;; Delete old file if exists
           (when (and old-filename (not= old-filename filename))
             (let [old-file (io/file avatars-dir old-filename)]
               (when (.exists old-file)
                 (io/delete-file old-file true))))
-          
+
           (responses/ok {:avatar_filename filename}))))
     (catch Exception e
       (exception/api-exception-handler e))))
@@ -76,7 +76,7 @@
           db (:database request)
           user (controller.user/get-user user-id db)
           filename (:avatar-filename user)]
-      
+
       (if (and filename (not (str/blank? filename)))
         (let [file (io/file avatars-dir filename)]
           (if (.exists file)
@@ -101,13 +101,13 @@
           db (:database request)
           user (controller.user/get-user user-id db)
           filename (:avatar-filename user)]
-      
+
       (when filename
         (let [file (io/file avatars-dir filename)]
           (when (.exists file)
             (io/delete-file file true)))
         (controller.user/update-user-profile {:avatar-filename nil} user-id db))
-      
+
       (responses/no-content))
     (catch Exception e
       (exception/api-exception-handler e))))
