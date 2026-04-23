@@ -73,13 +73,13 @@
    db]
   (-> (sql/update! db
                    :users
-                   (medley.core/assoc-some {} :name (:name user)
-                                           :username (:username user)
-                                           :email (:email user)
-                                           :password (:password user)
-                                           :position (:position user)
-                                           :phone (:phone user)
-                                           :avatar_filename (:avatar-filename user))
+                   {:name (:name user)
+                    :username (:username user)
+                    :email (:email user)
+                    :password (:password user)
+                    :position (:position user)
+                    :phone (:phone user)
+                    :avatar_filename (:avatar-filename user)}
                    {:id id})
       affected-rows-count))
 
@@ -126,14 +126,13 @@
   (jdbc/execute! db ["PRAGMA busy_timeout = 5000"])
   (-> (sql/update! db
                    :users
-                   (medley.core/assoc-some {}
-                                           :name (:name user)
-                                           :username (:username user)
-                                           :email (:email user)
-                                           :password (:password user)
-                                           :position (:position user)
-                                           :phone (:phone user)
-                                           :avatar_filename (:avatar-filename user))
+                   {:name (:name user)
+                    :username (:username user)
+                    :email (:email user)
+                    :password (:password user)
+                    :position (:position user)
+                    :phone (:phone user)
+                    :avatar_filename (:avatar-filename user)}
                    {:id id})
       affected-rows-count))
 
