@@ -27,7 +27,7 @@
 
 (s/defn first-access :- {:token s/Str :user models.user/User}
   "Complete registration for an invited user (who has no password set)."
-  [{:keys [email username name password position]} :- models.user/NewUser
+  [{:keys [email username name password position phone]} :- models.user/NewUser
    db]
   (let [user-db (db.user/find-user-by-identifier (or email username) db)]
     (cond
@@ -40,7 +40,7 @@
                       {:type :already-exist :message "User already registered"}))
 
       :else
-      (let [updated-user (as-> {:email email :username username :name name :password password :position position} $
+      (let [updated-user (as-> {:email email :username username :name name :password password :position position :phone phone} $
                            (logic.user/encrypt-password $)
                            (do (db.user/update-user (:id user-db) $ db)
                                (db.user/find-user-by-id (:id user-db) db)))

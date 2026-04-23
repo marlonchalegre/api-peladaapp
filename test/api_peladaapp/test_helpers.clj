@@ -68,9 +68,9 @@
 (defn auth-header [token]
   (fn [req] (mock/header req "Authorization" (str "Token " token))))
 
-(defn register-and-login! [app {:keys [name email password]}]
-  (app (-> (mock/request :post "/auth/register") (mock/json-body {:name name :email email :password password})))
-  (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email email :password password})))
+(defn register-and-login! [app {:keys [name email password username phone] :or {username (str "user" (rand-int 1000))}}]
+  (app (-> (mock/request :post "/auth/register") (mock/json-body {:name name :email email :username username :password password :phone phone})))
+  (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email (or email username) :password password})))
         token (:token (decode-body login))]
     token))
 

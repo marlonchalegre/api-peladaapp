@@ -44,10 +44,9 @@
 
 (s/defn insert-user :- s/Int
   "Insert a user and return its generated id"
-  [{:keys [name username email password position]} :- models.user/NewUser
+  [{:keys [name username email password position phone]} :- models.user/NewUser
    db]
-  (jdbc/execute! db ["PRAGMA busy_timeout = 5000"])
-  (-> (sql/insert! db :users (medley.core/assoc-some {} :name name :username username :email email :password password :position position))
+  (-> (sql/insert! db :users (medley.core/assoc-some {} :name name :username username :email email :password password :position position :phone phone))
       affected-rows-count
       int))
 
@@ -79,6 +78,7 @@
                                            :email (:email user)
                                            :password (:password user)
                                            :position (:position user)
+                                           :phone (:phone user)
                                            :avatar_filename (:avatar-filename user))
                    {:id id})
       affected-rows-count))
@@ -118,11 +118,11 @@
         :count)))
 
 (s/defn update-user-profile :- s/Int
-  "Update user profile (name, username, email, password, position, avatar_filename only) in the database"
+  "Update user profile (name, username, email, password, position, phone, avatar_filename only) in the database"
   [id :- s/Int
    user :- models.user/User
    db]
-  ;; Only update allowed fields: name, username, email, password, position, avatar_filename
+  ;; Only update allowed fields: name, username, email, password, position, phone, avatar_filename
   (jdbc/execute! db ["PRAGMA busy_timeout = 5000"])
   (-> (sql/update! db
                    :users
@@ -132,6 +132,7 @@
                                            :email (:email user)
                                            :password (:password user)
                                            :position (:position user)
+                                           :phone (:phone user)
                                            :avatar_filename (:avatar-filename user))
                    {:id id})
       affected-rows-count))

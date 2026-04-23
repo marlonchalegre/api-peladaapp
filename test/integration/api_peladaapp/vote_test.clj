@@ -16,7 +16,7 @@
 
 (defn- get-id [res]
   (if (map? res)
-    (-> res vals first)
+    (or (:id res) (-> res vals first))
     res))
 
 (deftest get-voting-info-admin-test

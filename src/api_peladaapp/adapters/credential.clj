@@ -14,4 +14,4 @@
   [token :- s/Str
    user :- models.user/User]
   {:token token
-   :user (select-keys user [:id :name :username :email :admin-orgs])})
+   :user (select-keys user [:id :name :username :email :phone :admin-orgs])})

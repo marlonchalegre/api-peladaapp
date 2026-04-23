@@ -8,23 +8,23 @@
 
 (s/defn create-request->model :- models.user/NewUser
   [request :- requests.user/CreateUserRequest]
-  (select-keys request [:name :username :email :password :position]))
+  (select-keys request [:name :username :email :password :position :phone]))
 
 (s/defn update-request->model :- models.user/UserProfileUpdate
   [request :- requests.user/UpdateUserRequest]
-  (select-keys request [:name :username :email :password :position :avatar_filename]))
+  (select-keys request [:name :username :email :password :position :avatar_filename :phone]))
 
 (s/defn update-profile-request->model :- models.user/UserProfileUpdate
   [request :- requests.user/UpdateProfileRequest]
-  (select-keys request [:name :username :email :password :position :avatar_filename]))
+  (select-keys request [:name :username :email :password :position :avatar_filename :phone]))
 
 (s/defn model->response :- responses.user/UserResponse
   ([user :- models.user/User]
    (model->response user false))
   ([user :- models.user/User exclude-email? :- s/Bool]
    (let [fields (if exclude-email?
-                  [:id :name :username :position :avatar-filename]
-                  [:id :name :username :email :position :avatar-filename])]
+                  [:id :name :username :position :avatar-filename :phone]
+                  [:id :name :username :email :position :avatar-filename :phone])]
      (-> (select-keys user fields)
          (assoc :admin_orgs (or (:admin-orgs user) []))
          (misc/rename-key :avatar-filename :avatar_filename)))))
@@ -33,5 +33,5 @@
   [user]
   (some-> user
           misc/unamespace
-          (select-keys [:id :name :username :email :password :position :avatar_filename])
+          (select-keys [:id :name :username :email :password :position :avatar_filename :phone])
           (misc/rename-key :avatar_filename :avatar-filename)))
