@@ -7,7 +7,7 @@
   (testing "With phone number"
     (let [player {:player-name "Test" :phone "5511999999999"}]
       (is (= "@5511999999999" (#'notifications/format-mention player)))))
-  
+
   (testing "Without phone number"
     (let [player {:player-name "Test Name" :phone nil}]
       (is (= "Test Name" (#'notifications/format-mention player))))))

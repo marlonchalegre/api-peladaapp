@@ -12,7 +12,8 @@
    (s/optional-key :waha_end_msg_enabled) (s/maybe s/Bool)
    (s/optional-key :waha_attendance_reminder_enabled) (s/maybe s/Bool)
    (s/optional-key :waha_vote_reminder_enabled) (s/maybe s/Bool)
-   (s/optional-key :waha_vote_ended_msg_enabled) (s/maybe s/Bool)})
+   (s/optional-key :waha_vote_ended_msg_enabled) (s/maybe s/Bool)
+   (s/optional-key :waha_use_all_mention_fallback) (s/maybe s/Bool)})
 
 (s/defschema UpdateOrganizationRequest
   {:name s/Str
@@ -24,4 +25,5 @@
    (s/optional-key :waha_end_msg_enabled) (s/maybe s/Bool)
    (s/optional-key :waha_attendance_reminder_enabled) (s/maybe s/Bool)
    (s/optional-key :waha_vote_reminder_enabled) (s/maybe s/Bool)
-   (s/optional-key :waha_vote_ended_msg_enabled) (s/maybe s/Bool)})
+   (s/optional-key :waha_vote_ended_msg_enabled) (s/maybe s/Bool)
+   (s/optional-key :waha_use_all_mention_fallback) (s/maybe s/Bool)})

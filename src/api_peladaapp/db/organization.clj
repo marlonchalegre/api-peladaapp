@@ -23,7 +23,8 @@
                       wc.api_url as waha_api_url, wc.instance as waha_instance, wc.group_id as waha_group_id,
                       wc.enabled as waha_enabled, wc.start_msg_enabled as waha_start_msg_enabled,
                       wc.end_msg_enabled as waha_end_msg_enabled, wc.attendance_reminder_enabled as waha_attendance_reminder_enabled,
-                      wc.vote_reminder_enabled as waha_vote_reminder_enabled, wc.vote_ended_msg_enabled as waha_vote_ended_msg_enabled
+                      wc.vote_reminder_enabled as waha_vote_reminder_enabled, wc.vote_ended_msg_enabled as waha_vote_ended_msg_enabled,
+                      wc.use_all_mention_fallback as waha_use_all_mention_fallback
                FROM Organizations o
                LEFT JOIN OrganizationWahaConfigs wc ON o.id = wc.organization_id
                WHERE o.id = ?"
@@ -35,7 +36,7 @@
   (jdbc/with-transaction [tx db]
     (let [org-row (select-keys org [:name])
           waha-row (-> org
-                       (select-keys [:waha-api-url :waha-instance :waha-group-id :waha-enabled :waha-start-msg-enabled :waha-end-msg-enabled :waha-attendance-reminder-enabled :waha-vote-reminder-enabled :waha-vote-ended-msg-enabled])
+                       (select-keys [:waha-api-url :waha-instance :waha-group-id :waha-enabled :waha-start-msg-enabled :waha-end-msg-enabled :waha-attendance-reminder-enabled :waha-vote-reminder-enabled :waha-vote-ended-msg-enabled :waha-use-all-mention-fallback])
                        (update-keys (comp keyword #(str/replace % "waha-" "") name))
                        (update-keys (comp keyword #(str/replace % "-" "_") name)))]
       (when (seq org-row)
@@ -61,7 +62,8 @@
                       wc.api_url as waha_api_url, wc.instance as waha_instance, wc.group_id as waha_group_id,
                       wc.enabled as waha_enabled, wc.start_msg_enabled as waha_start_msg_enabled,
                       wc.end_msg_enabled as waha_end_msg_enabled, wc.attendance_reminder_enabled as waha_attendance_reminder_enabled,
-                      wc.vote_reminder_enabled as waha_vote_reminder_enabled, wc.vote_ended_msg_enabled as waha_vote_ended_msg_enabled
+                      wc.vote_reminder_enabled as waha_vote_reminder_enabled, wc.vote_ended_msg_enabled as waha_vote_ended_msg_enabled,
+                      wc.use_all_mention_fallback as waha_use_all_mention_fallback
                FROM Organizations o
                LEFT JOIN OrganizationWahaConfigs wc ON o.id = wc.organization_id"]
     (->> (sql/query db [query])

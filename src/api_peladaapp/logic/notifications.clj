@@ -225,13 +225,14 @@
                                                      (keep #(some-> (:phone %) waha/normalize-phone)))
                            :vote-reminder (->> (:pending-voters data)
                                                (keep #(some-> (:phone %) waha/normalize-phone)))
-                           nil)]
-            ;; Fallback to @all if no specific mentions found but it's a reminder
-            (let [final-mentions (if (and (contains? #{:attendance-reminder :vote-reminder} type)
-                                          (empty? mentions))
-                                   ["all"]
-                                   mentions)
-                  final-message (if (= final-mentions ["all"])
-                                  (str/replace message #"!\*" "! @all*")
-                                  message)]
-              (waha/send-message org final-message final-mentions))))))))
+                           nil)
+                use-all-fallback? (:waha-use-all-mention-fallback org)
+                final-mentions (if (and (contains? #{:attendance-reminder :vote-reminder} type)
+                                        (empty? mentions)
+                                        use-all-fallback?)
+                                 ["all"]
+                                 mentions)
+                final-message (if (= final-mentions ["all"])
+                                (str/replace message #"!\*" "! @all*")
+                                message)]
+            (waha/send-message org final-message final-mentions)))))))
