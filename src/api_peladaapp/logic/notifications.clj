@@ -232,6 +232,6 @@
                                    ["all"]
                                    mentions)
                   final-message (if (= final-mentions ["all"])
-                                  (str/replace message #":\n\n" ": @all\n\n")
+                                  (str/replace message #"!\*" "! @all*")
                                   message)]
               (waha/send-message org final-message final-mentions))))))))
