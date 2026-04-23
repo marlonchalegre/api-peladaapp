@@ -181,17 +181,23 @@
                          (str/join "\n"))]
     (str title ranking-str)))
 
+(defn- format-mention [player]
+  (if-let [phone (:phone player)]
+    (let [digits (str/replace phone #"\D" "")]
+      (str "@" digits))
+    (:player-name player)))
+
 (defn generate-attendance-reminder [pending-players]
-  (let [title "⏰ *Lembrete de Presença!* @all ⏰\n\nAinda temos jogadores com presença pendente para a próxima pelada:\n\n"
+  (let [title "⏰ *Lembrete de Presença!* ⏰\n\nAinda temos jogadores com presença pendente para a próxima pelada:\n\n"
         players-str (->> pending-players
-                         (map #(str "• " (:player-name %)))
+                         (map #(str "• " (format-mention %)))
                          (str/join "\n"))]
     (str title players-str "\n\nPor favor, confirmem no app o quanto antes!")))
 
 (defn generate-vote-reminder [pelada-id pending-voters]
-  (let [title "🗳️ *Lembrete de Votação!* @all 🗳️\n\nAinda faltam alguns jogadores votarem nos melhores da pelada:\n\n"
+  (let [title "🗳️ *Lembrete de Votação!* 🗳️\n\nAinda faltam alguns jogadores votarem nos melhores da pelada:\n\n"
         players-str (->> pending-voters
-                         (map #(str "• " (:player-name %)))
+                         (map #(str "• " (format-mention %)))
                          (str/join "\n"))]
     (str title players-str "\n\nAcesse o app e deixe seu voto!\n" (generate-voting-link pelada-id))))
 
@@ -214,5 +220,18 @@
                           :vote-ended (generate-vote-ended-message (:ranking data))
                           :attendance-reminder (generate-attendance-reminder (:pending-players data))
                           :vote-reminder (generate-vote-reminder (:pelada-id data) (:pending-voters data)))
-                mentions (when (contains? #{:attendance-reminder :vote-reminder} type) ["all"])]
-            (waha/send-message org message mentions)))))))
+                mentions (case type
+                           :attendance-reminder (->> (:pending-players data)
+                                                     (keep #(some-> (:phone %) waha/normalize-phone)))
+                           :vote-reminder (->> (:pending-voters data)
+                                               (keep #(some-> (:phone %) waha/normalize-phone)))
+                           nil)]
+            ;; Fallback to @all if no specific mentions found but it's a reminder
+            (let [final-mentions (if (and (contains? #{:attendance-reminder :vote-reminder} type)
+                                          (empty? mentions))
+                                   ["all"]
+                                   mentions)
+                  final-message (if (= final-mentions ["all"])
+                                  (str/replace message #":\n\n" ": @all\n\n")
+                                  message)]
+              (waha/send-message org final-message final-mentions))))))))

@@ -97,7 +97,7 @@
          results)))
 
 (s/defn list-pending-voters-by-pelada [pelada-id db]
-  (let [query "SELECT pa.player_id, u.name as player_name
+  (let [query "SELECT pa.player_id, u.name as player_name, u.phone
                FROM PeladaAttendance pa
                JOIN OrganizationPlayers op ON pa.player_id = op.id
                JOIN Users u ON op.user_id = u.id
@@ -106,4 +106,4 @@
                  SELECT 1 FROM Votes v WHERE v.pelada_id = pa.pelada_id AND v.voter_id = pa.player_id
                )"
         results (jdbc/execute! db [query pelada-id] {:builder-fn rs/as-unqualified-lower-maps})]
-    (map (fn [r] {:player-id (:player_id r) :player-name (:player_name r)}) results)))
+    (map (fn [r] {:player-id (:player_id r) :player-name (:player_name r) :phone (:phone r)}) results)))

@@ -3,7 +3,27 @@
    [api-peladaapp.config :as config]
    [clj-http.client :as http]
    [clojure.data.json :as json]
+   [clojure.string :as str]
    [clojure.tools.logging :as log]))
+
+(defn normalize-phone
+  "Normalizes a phone number for WhatsApp JID.
+   For Brazilian numbers (starting with 55):
+   - If DDD is 11-28, keep the 9th digit.
+   - If DDD is > 28, remove the 9th digit (if present).
+   Always returns digits only + @c.us"
+  [phone]
+  (let [digits (str/replace (or phone "") #"\D" "")]
+    (if (str/starts-with? digits "55")
+      (let [ddd (subs digits 2 4)
+            number (subs digits 4)
+            ddd-int (try (Integer/parseInt ddd) (catch Exception _ 0))]
+        (if (and (> ddd-int 28) (= (count number) 9) (str/starts-with? number "9"))
+          (str "55" ddd (subs number 1) "@c.us")
+          (str digits "@c.us")))
+      (if (seq digits)
+        (str digits "@c.us")
+        nil))))
 
 (defn send-message
   "Sends a text message via WAHA API.
