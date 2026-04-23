@@ -1,1 +1,1 @@
-ALTER TABLE OrganizationWahaConfigs ADD COLUMN use_all_mention_fallback BOOLEAN DEFAULT 1;
+ALTER TABLE OrganizationWahaConfigs ADD COLUMN use_all_mention BOOLEAN DEFAULT 1;

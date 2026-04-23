@@ -226,13 +226,13 @@
                            :vote-reminder (->> (:pending-voters data)
                                                (keep #(some-> (:phone %) waha/normalize-phone)))
                            nil)
-                use-all-fallback? (:waha-use-all-mention-fallback org)
+                use-all? (:waha-use-all-mention org)
                 final-mentions (if (and (contains? #{:attendance-reminder :vote-reminder} type)
-                                        (empty? mentions)
-                                        use-all-fallback?)
-                                 ["all"]
+                                        use-all?)
+                                 (conj (vec mentions) "all")
                                  mentions)
-                final-message (if (= final-mentions ["all"])
+                final-message (if (and (contains? #{:attendance-reminder :vote-reminder} type)
+                                       use-all?)
                                 (str/replace message #"!\*" "! @all*")
                                 message)]
             (waha/send-message org final-message final-mentions)))))))

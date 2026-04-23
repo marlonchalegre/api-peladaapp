@@ -15,4 +15,4 @@
    (s/optional-key :waha-attendance-reminder-enabled) (s/maybe s/Bool)
    (s/optional-key :waha-vote-reminder-enabled) (s/maybe s/Bool)
    (s/optional-key :waha-vote-ended-msg-enabled) (s/maybe s/Bool)
-   (s/optional-key :waha-use-all-mention-fallback) (s/maybe s/Bool)})
+   (s/optional-key :waha-use-all-mention) (s/maybe s/Bool)})
