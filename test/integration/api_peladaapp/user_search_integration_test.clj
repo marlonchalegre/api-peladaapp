@@ -15,12 +15,22 @@
 (deftest user-search-api-test
   (let [app (-> th/*test-system* :app :handler)
         ds (get-ds)
-        admin-token (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "admin123"})]
+        admin-token (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "admin123"})
+        admin-user-id (th/user-id-by-email ds "admin@test.com")]
 
-    ;; Seed data
-    (db.user/insert-user {:name "Cristiano Ronaldo" :email "cr7@test.com" :password "pass"} ds)
-    (db.user/insert-user {:name "Lionel Messi" :email "leo@test.com" :password "pass"} ds)
-    (db.user/insert-user {:name "Neymar Jr" :email "ney@gmail.com" :password "pass"} ds)
+    ;; Setup: Create organization and add all users to it
+    (let [org-id (-> (jdbc/execute! ds ["INSERT INTO Organizations (name) VALUES (?)" "Test Org"])
+                     first
+                     ((fn [row] (or (:id row) (get row "id") (first (vals row))))))]
+      ;; Add admin to org
+      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, grade) VALUES (?, ?, ?)" org-id admin-user-id 5.0])
+      
+      ;; Seed data and add to org
+      (doseq [user [{:name "Cristiano Ronaldo" :email "cr7@test.com"}
+                    {:name "Lionel Messi" :email "leo@test.com"}
+                    {:name "Neymar Jr" :email "ney@gmail.com"}]]
+        (let [user-id (db.user/insert-user (assoc user :password "pass") ds)]
+          (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, grade) VALUES (?, ?, ?)" org-id user-id 5.0]))))
 
     (testing "GET /api/users/search - search by name"
       (let [resp (app (-> (mock/request :get "/api/users/search")

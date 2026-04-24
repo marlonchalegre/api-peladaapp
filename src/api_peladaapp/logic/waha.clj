@@ -33,7 +33,14 @@
   ([config text] (send-message config text nil))
   ([{:keys [waha-api-url waha-instance waha-group-id]} text mentions]
    (let [url (str waha-api-url "/api/sendText")
+         default-waha-url (System/getenv "WAHA_API_URL") ;; Assuming this is how it's configured in prod
          api-key (config/get-key :waha-api-key)
+         ;; SECURITY: Only send global API key if the URL matches the trusted internal/default URL.
+         ;; In dev, we might allow localhost/backend.
+         is-trusted? (or (str/blank? waha-api-url)
+                         (= waha-api-url default-waha-url)
+                         (str/starts-with? waha-api-url "http://backend:")
+                         (str/starts-with? waha-api-url "http://waha:"))
          payload (cond-> {:session waha-instance
                           :chatId waha-group-id
                           :text text}
@@ -45,7 +52,7 @@
                   {:body body
                    :content-type :json
                    :accept :json
-                   :headers (when api-key {"X-Api-Key" api-key})})
+                   :headers (when (and api-key is-trusted?) {"X-Api-Key" api-key})})
        (catch Exception e
          (log/error e "Failed to send WAHA message")
          {:error (.getMessage e)})))))

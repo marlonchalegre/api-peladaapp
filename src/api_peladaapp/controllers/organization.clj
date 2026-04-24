@@ -124,9 +124,13 @@
         ;; Security check: if invitation has email, user email or username must match
         (let [identifier (:email inv)]
           (when (and identifier
-                     (not (str/starts-with? identifier "guest-"))
-                     (not= identifier (:email user))
-                     (not= identifier (:username user)))
+                     (if (str/starts-with? identifier "guest-")
+                       ;; For guest invitations, ensure the current user ID matches the guest user ID
+                       (let [guest-user-id (try (Integer/parseInt (subs identifier 6)) (catch Exception _ -1))]
+                         (not= guest-user-id user-id))
+                       ;; For email invitations, ensure email or username matches
+                       (and (not= identifier (:email user))
+                            (not= identifier (:username user)))))
             (throw (ex-info "Invitation does not belong to this user"
                             {:type :forbidden :message "This invitation was sent to another identifier."}))))
 

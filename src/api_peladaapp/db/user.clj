@@ -127,6 +127,40 @@
         first
         :count)))
 
+(s/defn search-users-in-shared-orgs :- [models.user/User]
+  "Search users that share at least one organization with the current user"
+  [db current-user-id query offset limit]
+  (let [q (str "%" (str/lower-case query) "%")]
+    (->> (sql/query db ["SELECT DISTINCT u.* FROM Users u
+                         LEFT JOIN OrganizationPlayers op ON u.id = op.user_id
+                         LEFT JOIN OrganizationAdmins oa ON u.id = oa.user_id
+                         WHERE (LOWER(u.name) LIKE ? OR LOWER(u.username) LIKE ? OR LOWER(u.email) LIKE ?)
+                         AND (
+                           op.organization_id IN (SELECT organization_id FROM OrganizationPlayers WHERE user_id = ?)
+                           OR op.organization_id IN (SELECT organization_id FROM OrganizationAdmins WHERE user_id = ?)
+                           OR oa.organization_id IN (SELECT organization_id FROM OrganizationPlayers WHERE user_id = ?)
+                           OR oa.organization_id IN (SELECT organization_id FROM OrganizationAdmins WHERE user_id = ?)
+                         )
+                         ORDER BY u.name LIMIT ? OFFSET ?" q q q current-user-id current-user-id current-user-id current-user-id limit offset])
+         (map adapter.user/db->model))))
+
+(s/defn count-searched-users-in-shared-orgs :- s/Int
+  "Count users matching the search query within shared organizations"
+  [db current-user-id query]
+  (let [q (str "%" (str/lower-case query) "%")]
+    (-> (sql/query db ["SELECT COUNT(DISTINCT u.id) as count FROM Users u
+                        LEFT JOIN OrganizationPlayers op ON u.id = op.user_id
+                        LEFT JOIN OrganizationAdmins oa ON u.id = oa.user_id
+                        WHERE (LOWER(u.name) LIKE ? OR LOWER(u.username) LIKE ? OR LOWER(u.email) LIKE ?)
+                        AND (
+                          op.organization_id IN (SELECT organization_id FROM OrganizationPlayers WHERE user_id = ?)
+                          OR op.organization_id IN (SELECT organization_id FROM OrganizationAdmins WHERE user_id = ?)
+                          OR oa.organization_id IN (SELECT organization_id FROM OrganizationPlayers WHERE user_id = ?)
+                          OR oa.organization_id IN (SELECT organization_id FROM OrganizationAdmins WHERE user_id = ?)
+                        )" q q q current-user-id current-user-id current-user-id current-user-id])
+        first
+        :count)))
+
 (s/defn update-user-profile :- s/Int
   "Update user profile (name, username, email, password, position, phone, avatar_filename only) in the database"
   [id :- s/Int

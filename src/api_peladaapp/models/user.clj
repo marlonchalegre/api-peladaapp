@@ -5,6 +5,7 @@
 (s/defschema NewUser
   {:name s/Str
    :username s/Str
+   :token s/Str
    (s/optional-key :email) s/Str
    (s/optional-key :password) s/Str
    (s/optional-key :phone) (s/maybe s/Str)

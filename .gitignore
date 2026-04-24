@@ -8,6 +8,8 @@ pom.xml
 pom.xml.asc
 *.jar
 *.class
+.lein-*
+leiningen.log
 /.lein-*
 /.nrepl-port
 /.prepl-port

@@ -25,11 +25,12 @@
 (defn list-all [request]
   (try
     (let [db (-> request :database)
+          identity (:identity request)
+          _ (when-not (:is-admin? identity)
+              (throw (ex-info "Forbidden: Global admin access required"
+                              {:type :forbidden :message "You don't have permission to list all users."})))
           query-params (:query-params request)
           pagination (pagination/parse-pagination-params query-params)
-          ;; Controller should return models. We will handle transformation here.
-          ;; Assuming controller.user/list-users logic is updated or we handle existing.
-          ;; Currently controller returns a map with :data (users) and pagination headers.
           users-data (controller.user/list-users db pagination)
           users-models (:data users-data)
           users-responses (map adapter.user/model->response users-models)]
@@ -40,10 +41,16 @@
 (defn search [request]
   (try
     (let [db (-> request :database)
+          identity (:identity request)
+          current-user-id (:id identity)
+          is-global-admin? (:is-admin? identity)
           query-params (:query-params request)
           query (get query-params "q" "")
           pagination (pagination/parse-pagination-params query-params)
-          users-data (controller.user/search-users db query pagination)
+          ;; If not global admin, only search users within shared organizations
+          users-data (if is-global-admin?
+                       (controller.user/search-users db query pagination)
+                       (controller.user/search-users-in-shared-orgs db current-user-id query pagination))
           users-models (:data users-data)
           users-responses (map adapter.user/model->response users-models)]
       (responses/ok users-responses (:headers users-data)))

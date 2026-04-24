@@ -68,7 +68,12 @@
   (let [db-val (get-in helpers/*test-system* [:database :database])
         db (if (fn? db-val) (db-val) db-val)
         email "invited@example.com"
-        _ (jdbc/execute! db ["INSERT INTO Users (email) VALUES (?)" email] opts)
+        org-id (-> (jdbc/execute! db ["INSERT INTO Organizations (name) VALUES (?)" "First Access Org"])
+                   first
+                   ((fn [row] (or (:id row) (get row "id") (first (vals row))))))
+        ;; Use controller to create invite (which also creates partial user)
+        invite-result (controller.organization/invite-player-improved org-id email nil 99 db)
+        token (:token (first (controller.organization/list-organization-invitations org-id db)))
         user (first (jdbc/execute! db ["SELECT id FROM Users WHERE email = ?" email] opts))
         user-id (:id user)]
 
@@ -77,7 +82,8 @@
                      :username "inviteduser"
                      :name "New User"
                      :password "securepassword"
-                     :position "Striker"}
+                     :position "Striker"
+                     :token token}
             result (controller.auth/first-access payload db)]
         (is (some? (:token result)))
         (is (= "New User" (get-in result [:user :name])))
@@ -87,13 +93,23 @@
         ;; Verify data is stored
         (let [db-user (first (jdbc/execute! db ["SELECT * FROM Users WHERE id = ?" user-id] opts))]
           (is (= "inviteduser" (:username db-user)))
-          (is (some? (:password db-user))))))
+          (is (some? (:password db-user))))
+        
+        ;; Verify player added to org
+        (let [player (first (jdbc/execute! db ["SELECT * FROM OrganizationPlayers WHERE user_id = ? AND organization_id = ?" user-id org-id] opts))]
+          (is (some? player)))))
 
     (testing "Cannot use first access for already registered user"
-      (let [payload {:email email
+      (let [org-id-2 (-> (jdbc/execute! db ["INSERT INTO Organizations (name) VALUES (?)" "First Access Org 2"])
+                         first
+                         ((fn [row] (or (:id row) (get row "id") (first (vals row))))))
+            _ (controller.organization/invite-player-improved org-id-2 email nil 99 db)
+            token-2 (:token (first (controller.organization/list-organization-invitations org-id-2 db)))
+            payload {:email email
                      :username "otheruser"
                      :name "Other Name"
-                     :password "another-pass"}]
+                     :password "another-pass"
+                     :token token-2}]
         ;; It should throw because password was set in previous test if it was same DB, 
         ;; but fixture is :each, so it resets. Wait, I should ensure it HAS a password.
         (jdbc/execute! db ["UPDATE Users SET password = 'already-set' WHERE email = ?" email] opts)

@@ -19,34 +19,35 @@
 
 ;; Simple brute-force protection
 (def login-attempts (atom {}))
+(def password-reset-attempts (atom {}))
 
-(defn- too-many-attempts? [email]
-  (let [attempts (get @login-attempts email 0)]
+(defn- too-many-attempts? [attempts-atom identifier]
+  (let [attempts (get @attempts-atom identifier 0)]
     (>= attempts 5)))
 
-(defn- record-failure [email]
-  (swap! login-attempts update email (fnil inc 0)))
+(defn- record-failure [attempts-atom identifier]
+  (swap! attempts-atom update identifier (fnil inc 0)))
 
-(defn- clear-attempts [email]
-  (swap! login-attempts dissoc email))
+(defn- clear-attempts [attempts-atom identifier]
+  (swap! attempts-atom dissoc identifier))
 
 (defn auth-handler
   [request]
   (let [body (-> request :body)
         email (:email body)
         db (-> request :database)]
-    (if (too-many-attempts? email)
+    (if (too-many-attempts? login-attempts email)
       (exception/api-exception-handler (ex-info "Too many login attempts. Please try again later."
                                                 {:type :too-many-requests
                                                  :message "Too many login attempts. Please try again later."}))
       (try (let [{:keys [token user]} (-> body
                                           adapters.credential/login-request->model
                                           (controllers.auth/authenticate db))]
-             (clear-attempts email)
+             (clear-attempts login-attempts email)
              (-> (adapters.credential/model->response token user)
                  ok))
            (catch Exception e
-             (record-failure email)
+             (record-failure login-attempts email)
              (exception/api-exception-handler e))))))
 
 (defn get-me-handler
@@ -61,11 +62,16 @@
   (let [body (-> request :body)
         email (:email body)
         db (-> request :database)]
-    (try
-      (logic.password-reset/request-password-reset! email db)
-      (ok {:message "If an account with that email exists, we've sent a password reset link."})
-      (catch Exception e
-        (exception/api-exception-handler e)))))
+    (if (too-many-attempts? password-reset-attempts email)
+      (exception/api-exception-handler (ex-info "Too many password reset attempts. Please try again later."
+                                                {:type :too-many-requests
+                                                 :message "Too many password reset attempts. Please try again later."}))
+      (try
+        (logic.password-reset/request-password-reset! email db)
+        (record-failure password-reset-attempts email)
+        (ok {:message "If an account with that email exists, we've sent a password reset link."})
+        (catch Exception e
+          (exception/api-exception-handler e))))))
 
 (defn reset-password-handler
   [request]
