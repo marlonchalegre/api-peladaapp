@@ -16,6 +16,7 @@
    [api-peladaapp.handlers.team :as handler.team]
    [api-peladaapp.handlers.user :as handler.user]
    [api-peladaapp.handlers.vote :as handler.vote]
+   [clojure.string :as str]
    [compojure.core     :refer [context defroutes DELETE GET POST PUT routes]]
    [compojure.route    :refer [not-found]]))
 
@@ -150,8 +151,8 @@
     (or (= remote-addr "127.0.0.1")
         (= remote-addr "localhost")
         (= remote-addr "0:0:0:0:0:0:0:1")
-        (clojure.string/starts-with? remote-addr "172.")
-        (clojure.string/starts-with? remote-addr "192.168."))))
+        (str/starts-with? remote-addr "172.")
+        (str/starts-with? remote-addr "192.168."))))
 
 (def access-rules [{:pattern #"^/internal/.*"
                     :handler internal-access}
