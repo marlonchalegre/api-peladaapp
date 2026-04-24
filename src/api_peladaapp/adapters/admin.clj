@@ -14,16 +14,16 @@
 
 (s/defn model->response :- responses.admin/AdminResponse
   [{:keys [id organization-id user-id created-at user-name user-username user-email user-position user-avatar-filename organization-name]}]
-  (cond-> {:id id
-           :organization_id organization-id
-           :user_id user-id}
-    created-at (assoc :created_at created-at)
-    user-name (assoc :user_name user-name)
-    user-username (assoc :user_username user-username)
-    user-email (assoc :user_email user-email)
-    user-position (assoc :user_position user-position)
-    user-avatar-filename (assoc :user_avatar_filename user-avatar-filename)
-    organization-name (assoc :organization_name organization-name)))
+  (let [base (cond-> {:id id
+                      :organization_id organization-id
+                      :user_id user-id}
+                 created-at (assoc :created_at created-at)
+                 user-name (assoc :user_name user-name)
+                 user-username (assoc :user_username user-username)
+                 user-email (assoc :user_email user-email)
+                 user-position (assoc :user_position user-position)
+                 organization-name (assoc :organization_name organization-name))]
+    (assoc base :user_avatar_filename user-avatar-filename)))
 
 (s/defn db->model [db-admin]
   (when-let [p (some-> db-admin misc/unamespace)]

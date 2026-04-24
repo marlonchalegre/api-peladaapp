@@ -80,10 +80,11 @@
     match-time-ms (assoc :match_time_ms match-time-ms)))
 
 (s/defn stats->response :- responses.match/PlayerStatsResponse
-  [{:keys [player-id user-id name goals assists own-goals]}]
+  [{:keys [player-id user-id name goals assists own-goals avatar-filename]}]
   {:player_id player-id
    :user_id user-id
    :name name
+   :avatar_filename avatar-filename
    :goals goals
    :assists assists
    :own_goals own-goals})

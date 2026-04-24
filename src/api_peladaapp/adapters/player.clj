@@ -27,7 +27,7 @@
 
 (s/defn model->response :- responses.player/PlayerResponse
   [{:keys [id user-id organization-id grade position-id member-type user-name user-username user-email user-position user-avatar-filename attendance-status attendance-updated-at]}]
-  (medley.core/assoc-some {}
+  (let [m (medley.core/assoc-some {}
                           :id id
                           :user_id user-id
                           :organization_id organization-id
@@ -38,9 +38,9 @@
                           :user_username user-username
                           :user_email user-email
                           :user_position user-position
-                          :user_avatar_filename user-avatar-filename
                           :attendance_status attendance-status
-                          :attendance_updated_at attendance-updated-at))
+                          :attendance_updated_at attendance-updated-at)]
+    (assoc m :user_avatar_filename user-avatar-filename)))
 
 (s/defn db->model :- models.player/Player
   [p]

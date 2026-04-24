@@ -57,7 +57,7 @@
 (s/defn list-player-stats-by-pelada :- [models.match/PlayerStats]
   [pelada-id :- s/Int db]
   (->> (jdbc/execute! db
-                      ["select s.player_id, p.user_id, u.name, s.goals, s.assists, s.own_goals
+                      ["select s.player_id, p.user_id, u.name, u.avatar_filename, s.goals, s.assists, s.own_goals
                            from PeladaPlayerStats s
                            join OrganizationPlayers p on p.id = s.player_id
                            join Users u on u.id = p.user_id
@@ -68,6 +68,7 @@
               {:player-id (:player_id row)
                :user-id (:user_id row)
                :name (:name row)
+               :avatar-filename (:avatar_filename row)
                :goals (:goals row)
                :assists (:assists row)
                :own-goals (:own_goals row)}))
