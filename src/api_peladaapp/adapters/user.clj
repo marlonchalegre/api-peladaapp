@@ -12,19 +12,21 @@
 
 (s/defn update-request->model :- models.user/UserProfileUpdate
   [request :- requests.user/UpdateUserRequest]
-  (select-keys request [:name :username :email :password :position :avatar_filename :phone]))
+  (-> (select-keys request [:name :username :email :password :position :avatar_filename :phone])
+      (misc/rename-key :avatar_filename :avatar-filename)))
 
 (s/defn update-profile-request->model :- models.user/UserProfileUpdate
   [request :- requests.user/UpdateProfileRequest]
-  (select-keys request [:name :username :email :password :position :avatar_filename :phone]))
+  (-> (select-keys request [:name :username :email :password :position :avatar_filename :phone])
+      (misc/rename-key :avatar_filename :avatar-filename)))
 
 (s/defn model->response :- responses.user/UserResponse
   ([user :- models.user/User]
    (model->response user false))
   ([user :- models.user/User exclude-email? :- s/Bool]
    (let [fields (if exclude-email?
-                  [:id :name :username :position :avatar-filename :phone]
-                  [:id :name :username :email :position :avatar-filename :phone])]
+                  [:id :name :username :position :avatar-filename :avatar_filename :phone]
+                  [:id :name :username :email :position :avatar-filename :avatar_filename :phone])]
      (-> (select-keys user fields)
          (assoc :admin_orgs (or (:admin-orgs user) []))
          (misc/rename-key :avatar-filename :avatar_filename)))))

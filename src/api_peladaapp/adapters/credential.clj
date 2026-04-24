@@ -1,5 +1,6 @@
 (ns api-peladaapp.adapters.credential
   (:require
+   [api-peladaapp.adapters.user :as adapters.user]
    [api-peladaapp.models.credential :as models.credential]
    [api-peladaapp.models.user :as models.user]
    [api-peladaapp.requests.auth :as requests.auth]
@@ -14,4 +15,4 @@
   [token :- s/Str
    user :- models.user/User]
   {:token token
-   :user (select-keys user [:id :name :username :email :phone :admin-orgs])})
+   :user (adapters.user/model->response user)})
