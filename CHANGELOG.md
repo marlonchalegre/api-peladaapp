@@ -16,6 +16,10 @@ All notable changes to this project will be documented in this file. This change
   - Scripts `npm run test:e2e` e `npm run test` com suporte a execução de testes específicos e gravação de vídeo.
 
 ### Changed
+- **Otimização de Segurança e Performance (Dashboard)**
+  - O endpoint `GET /api/peladas/:id/dashboard-data` agora retorna estritamente os usuários referenciados no contexto (por comparecimento, organizações, eventos, etc.).
+  - Remoção de campos com dados sensíveis (PII, como email e telefone) da resposta do dashboard, prevenindo vazamentos e aplicando o princípio do menor privilégio.
+  - Otimização do front-end com lazy-loading dos dados financeiros da organização utilizando novo hook `useOrganizationFinance`, eliminando chamadas desnecessárias na página de partidas.
 - **Otimização de Docker**
   - builds otimizados com BuildKit e cache de dependências npm.
   - Redução do tempo de build e verificação de dependências em runtime.

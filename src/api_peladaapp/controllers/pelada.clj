@@ -317,7 +317,6 @@
         organization-id (:organization-id pelada)
         matches (db.match/list-matches-by-pelada pelada-id db)
         teams (db.team/list-pelada-teams pelada-id db)
-        users (map #(dissoc % :password :email) (db.user/list-users db 0 1000000))
         organization-players (db.player/list-players-by-organization organization-id db)
         match-events (db.match-event/list-events-by-pelada pelada-id db)
         player-stats (try (db.match-event/list-player-stats-by-pelada pelada-id db) (catch Exception _ nil))
@@ -327,6 +326,14 @@
 
         is-admin (db.admin/is-user-admin-of-organization? user-id (:organization-id pelada) db)
         transactions (if is-admin (db.transaction/list-transactions-by-pelada pelada-id db) [])
+
+        referenced-user-ids (set (remove nil? (concat
+                                               [(:creator-id pelada)]
+                                               (map :user-id organization-players)
+                                               (map :user-id match-events)
+                                               (map :created-by transactions))))
+        users (map #(select-keys % [:id :name :username :avatar-filename])
+                   (db.user/get-users-by-ids db (vec referenced-user-ids)))
 
         ;; Transform team-players into a map
         team-players-map (into {} (map (fn [[tid tps]]

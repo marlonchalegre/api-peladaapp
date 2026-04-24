@@ -89,6 +89,16 @@
    db]
   (-> (sql/delete! db :users {:id id}) affected-rows-count))
 
+(s/defn get-users-by-ids :- [models.user/User]
+  "Get users by a list of ids"
+  [db ids]
+  (if (empty? ids)
+    []
+    (let [placeholders (str/join "," (repeat (count ids) "?"))
+          query (str "SELECT * FROM users WHERE id IN (" placeholders ")")]
+      (->> (sql/query db (into [query] ids))
+           (map adapter.user/db->model)))))
+
 (s/defn list-users :- [models.user/User]
   "List all users in the database"
   [db offset limit]

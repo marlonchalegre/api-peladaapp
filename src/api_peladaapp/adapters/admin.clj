@@ -17,12 +17,12 @@
   (let [base (cond-> {:id id
                       :organization_id organization-id
                       :user_id user-id}
-                 created-at (assoc :created_at created-at)
-                 user-name (assoc :user_name user-name)
-                 user-username (assoc :user_username user-username)
-                 user-email (assoc :user_email user-email)
-                 user-position (assoc :user_position user-position)
-                 organization-name (assoc :organization_name organization-name))]
+               created-at (assoc :created_at created-at)
+               user-name (assoc :user_name user-name)
+               user-username (assoc :user_username user-username)
+               user-email (assoc :user_email user-email)
+               user-position (assoc :user_position user-position)
+               organization-name (assoc :organization_name organization-name))]
     (assoc base :user_avatar_filename user-avatar-filename)))
 
 (s/defn db->model [db-admin]
