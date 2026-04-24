@@ -17,11 +17,7 @@
    (s/optional-key :is_admin) s/Bool
    (s/optional-key :timer_started_at) (s/maybe s/Any)
    (s/optional-key :timer_accumulated_ms) (s/maybe s/Int)
-   (s/optional-key :timer_status) (s/maybe s/Str)
-   (s/optional-key :vote_ended_message_sent) (s/maybe s/Bool)
-   (s/optional-key :vote_reminder_30m_sent) (s/maybe s/Bool)
-   (s/optional-key :vote_reminder_12h_sent) (s/maybe s/Bool)
-   (s/optional-key :vote_reminder_23h_sent) (s/maybe s/Bool)})
+   (s/optional-key :timer_status) (s/maybe s/Str)})
 
 (s/defschema PeladaBeginResponse
   {:matches_created s/Int})

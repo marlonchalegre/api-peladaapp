@@ -4,6 +4,7 @@
    [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.db.reminder :as db.reminder]
    [api-peladaapp.db.vote :as db.vote]
    [api-peladaapp.logic.grade :as logic.grade]
    [api-peladaapp.logic.notifications :as notifications]
@@ -21,15 +22,16 @@
 (defn- br-now []
   (ZonedDateTime/now (ZoneId/of "America/Sao_Paulo")))
 
-(defn- should-send-attendance-reminder? [pelada ^ZonedDateTime now]
-  (let [last-sent (:last-attendance-reminder-at pelada)
-        hour (.getHour now)
+(defn- should-send-attendance-reminder? [last-sent ^ZonedDateTime now]
+  (let [hour (.getHour now)
         ;; Reminders at 10:00 and 18:00
         is-reminder-hour? (or (= hour 10) (= hour 18))]
     (and is-reminder-hour?
-         (or (not (seq last-sent))
+         (or (not (seq (str last-sent)))
              (try
-               (let [last-sent-inst (Instant/parse last-sent)
+               (let [last-sent-inst (if (instance? Instant last-sent)
+                                      last-sent
+                                      (Instant/parse (str last-sent)))
                      diff (Duration/between last-sent-inst (.toInstant now))]
                  ;; If last-sent was more than 4 hours ago, we are likely in a new slot (10h vs 18h)
                  (> (.toHours diff) 4))
@@ -42,15 +44,16 @@
         (when (:waha-attendance-reminder-enabled org)
           (let [active-peladas (filter #(= "attendance" (:status %)) (db.pelada/list-peladas org-id 10 0 db))]
             (doseq [p active-peladas]
-              (if (should-send-attendance-reminder? p now)
-                (let [pending (db.attendance/list-pending-mensalistas-by-pelada (:id p) db)]
-                  (if (seq pending)
-                    (do
-                      (log/info "Sending automated attendance reminder for pelada" (:id p) "in organization" (:name org))
-                      (notifications/send-notification! org-id :attendance-reminder {:pending-players pending} db)
-                      (db.pelada/update-pelada (:id p) {:last-attendance-reminder-at (str (.toInstant now))} db))
-                    (log/debug "No pending attendance for pelada" (:id p) "- skipping reminder")))
-                (log/trace "Not the right time or already sent for pelada" (:id p))))))))))
+              (let [last-sent (db.reminder/get-last-reminder-at (:id p) "attendance" db)]
+                (if (should-send-attendance-reminder? last-sent now)
+                  (let [pending (db.attendance/list-pending-mensalistas-by-pelada (:id p) db)]
+                    (if (seq pending)
+                      (do
+                        (log/info "Sending automated attendance reminder for pelada" (:id p) "in organization" (:name org))
+                        (notifications/send-notification! org-id :attendance-reminder {:pending-players pending} db)
+                        (db.reminder/insert-reminder! (:id p) "attendance" db))
+                      (log/debug "No pending attendance for pelada" (:id p) "- skipping reminder")))
+                  (log/trace "Not the right time or already sent for pelada" (:id p)))))))))))
 
 (defn- check-vote-ended! [db]
   ;; 1. Check for Ended Voting (24h)
@@ -79,7 +82,7 @@
                   (db.player/update-player-grade player-id new-grade db)))
 
               (notifications/send-notification! org-id :vote-ended {:ranking ranking} db)
-              (db.pelada/update-pelada (:id p) {:vote-ended-message-sent true} db)))
+              (db.reminder/insert-reminder! (:id p) "vote_ended" db)))
           (log/debug "Voting ended for pelada" (:id p) "but WAHA vote-ended message is disabled for organization" (or (:name org) org-id))))))
 
   ;; 2. Check for Vote Reminders (12h and 23h)
@@ -98,12 +101,12 @@
                 (log/info "Sending" type "vote reminder for pelada" (:id pelada) "in organization" (:name org))
                 (notifications/send-notification! org-id :vote-reminder {:pending-voters pending :pelada-id (:id pelada)} db))
               (log/debug "No pending voters for pelada" (:id pelada) "- skipping" type "reminder"))
-            (db.pelada/update-pelada (:id pelada)
-                                     (case type
-                                       :30m {:vote-reminder-30m-sent true}
-                                       :12h {:vote-reminder-12h-sent true}
-                                       :23h {:vote-reminder-23h-sent true})
-                                     db))
+            (db.reminder/insert-reminder! (:id pelada)
+                                          (case type
+                                            :30m "vote_30m"
+                                            :12h "vote_12h"
+                                            :23h "vote_23h")
+                                          db))
           (log/debug "Vote reminder" type "due for pelada" (:id pelada) "but disabled for organization" (or (:name org) org-id)))))))
 
 (defn- tick! [db]

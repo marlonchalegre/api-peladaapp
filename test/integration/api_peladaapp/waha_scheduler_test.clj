@@ -24,15 +24,16 @@
 
         ;; Pelada 1: Closed 25h ago, message NOT sent -> SHOULD be returned
         (db.pelada/insert-pelada {:organization-id org-id :status "closed"} db)
-        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ?, vote_ended_message_sent = 0 WHERE id = 1" old-date])
+        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ? WHERE id = 1" old-date])
 
         ;; Pelada 2: Closed 23h ago, message NOT sent -> SHOULD NOT be returned
         (db.pelada/insert-pelada {:organization-id org-id :status "closed"} db)
-        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ?, vote_ended_message_sent = 0 WHERE id = 2" recent-date])
+        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ? WHERE id = 2" recent-date])
 
         ;; Pelada 3: Closed 25h ago, message ALREADY sent -> SHOULD NOT be returned
         (db.pelada/insert-pelada {:organization-id org-id :status "closed"} db)
-        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ?, vote_ended_message_sent = 1 WHERE id = 3" old-date])
+        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ? WHERE id = 3" old-date])
+        (jdbc/execute! db ["INSERT INTO PeladaReminders (pelada_id, type) VALUES (3, 'vote_ended')"])
 
         (let [results (db.pelada/list-peladas-for-vote-notification db)]
           (is (= 1 (count results)))
@@ -47,15 +48,18 @@
 
         ;; Pelada 4: Closed 13h ago, 12h reminder NOT sent -> SHOULD be returned as :12h
         (db.pelada/insert-pelada {:organization-id org-id :status "closed"} db)
-        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ?, vote_reminder_30m_sent = 1, vote_reminder_12h_sent = 0 WHERE id = 4" date-13h])
+        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ? WHERE id = 4" date-13h])
+        (jdbc/execute! db ["INSERT INTO PeladaReminders (pelada_id, type) VALUES (4, 'vote_30m')"])
 
         ;; Pelada 5: Closed 23.5h ago, 23h reminder NOT sent -> SHOULD be returned as :23h (and also :12h if not sent)
         (db.pelada/insert-pelada {:organization-id org-id :status "closed"} db)
-        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ?, vote_reminder_30m_sent = 1, vote_reminder_12h_sent = 1, vote_reminder_23h_sent = 0 WHERE id = 5" date-23-5h])
+        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ? WHERE id = 5" date-23-5h])
+        (jdbc/execute! db ["INSERT INTO PeladaReminders (pelada_id, type) VALUES (5, 'vote_30m')"])
+        (jdbc/execute! db ["INSERT INTO PeladaReminders (pelada_id, type) VALUES (5, 'vote_12h')"])
 
         ;; Pelada 6: Closed 31m ago, 30m reminder NOT sent -> SHOULD be returned as :30m
         (db.pelada/insert-pelada {:organization-id org-id :status "closed"} db)
-        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ?, vote_reminder_30m_sent = 0 WHERE id = 6" date-31m])
+        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ? WHERE id = 6" date-31m])
 
         (let [results (db.pelada/list-peladas-for-vote-reminders db)
               p4-rem (first (filter #(and (= 4 (:id (:pelada %))) (= :12h (:type %))) results))
