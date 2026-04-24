@@ -1,6 +1,5 @@
 (ns api-peladaapp.components
   (:require
-   [api-peladaapp.components.scheduler :as scheduler]
    [api-peladaapp.server :as server]
    [clojure.string :as str]
    [com.stuartsierra.component :as component]
@@ -95,7 +94,6 @@
   (component/system-map
    :database (new-database db-spec skip-migrations)
    :app      (new-app server/app)
-   :server   (new-web-server)
-   :scheduler (scheduler/new-scheduler)))
+   :server   (new-web-server)))
 
 

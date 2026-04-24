@@ -1,4 +1,4 @@
-(ns api-peladaapp.components.scheduler
+(ns api-peladaapp.logic.scheduler
   (:require
    [api-peladaapp.db.attendance :as db.attendance]
    [api-peladaapp.db.organization :as db.organization]
@@ -8,11 +8,8 @@
    [api-peladaapp.db.vote :as db.vote]
    [api-peladaapp.logic.grade :as logic.grade]
    [api-peladaapp.logic.notifications :as notifications]
-   [chime.core :as chime]
-   [clojure.tools.logging :as log]
-   [com.stuartsierra.component :as component])
+   [clojure.tools.logging :as log])
   (:import
-   [java.lang AutoCloseable]
    [java.time
     Duration
     Instant
@@ -109,31 +106,12 @@
                                           db))
           (log/debug "Vote reminder" type "due for pelada" (:id pelada) "but disabled for organization" (or (:name org) org-id)))))))
 
-(defn- tick! [db]
+(defn execute-tasks! [db]
   (let [now (br-now)]
-    (log/info (str "Scheduler tick execution started at " now))
+    (log/info (str "Scheduler tasks execution started at " now))
     (try
       (run-attendance-reminders! db now)
       (check-vote-ended! db)
-      (log/info "Scheduler tick execution finished successfully.")
+      (log/info "Scheduler tasks execution finished successfully.")
       (catch Exception e
-        (log/error e "Error during scheduler tick")))))
-
-(defrecord Scheduler [database chime]
-  component/Lifecycle
-  (start [this]
-    (log/info "Starting Scheduler component...")
-    (let [db-val (-> this :database :database)
-          db (if (fn? db-val) (db-val) db-val)]
-      (assoc this
-             :chime (chime/chime-at (chime/periodic-seq (Instant/now) (Duration/ofMinutes 5))
-                                    (fn [_] (tick! db))))))
-  (stop [this]
-    (log/info "Stopping Scheduler component...")
-    (when chime (.close ^AutoCloseable chime))
-    (assoc this :chime nil)))
-
-(defn new-scheduler []
-  (component/using
-   (map->Scheduler {})
-   [:database]))
+        (log/error e "Error during scheduler tasks execution")))))

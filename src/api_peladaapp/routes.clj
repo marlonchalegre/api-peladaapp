@@ -6,6 +6,7 @@
    [api-peladaapp.handlers.avatar :as handler.avatar]
    [api-peladaapp.handlers.finance :as handler.finance]
    [api-peladaapp.handlers.health :as handler.health]
+   [api-peladaapp.handlers.internal :as handler.internal]
    [api-peladaapp.handlers.manual-stats :as handler.manual-stats]
    [api-peladaapp.handlers.match :as handler.match]
    [api-peladaapp.handlers.organization :as handler.organization]
@@ -19,6 +20,9 @@
    [compojure.route    :refer [not-found]]))
 
 (defroutes api-routes
+  (context "/internal" []
+    (POST "/scheduler/tick" [] handler.internal/trigger-scheduler))
+
   (context "/api" []
     ;; Users
     (GET "/users" [] handler.user/list-all)
@@ -141,7 +145,17 @@
 (defn any-access [_]
   true)
 
-(def access-rules [{:pattern #"^/auth/.*"
+(defn internal-access [request]
+  (let [remote-addr (:remote-addr request)]
+    (or (= remote-addr "127.0.0.1")
+        (= remote-addr "localhost")
+        (= remote-addr "0:0:0:0:0:0:0:1")
+        (clojure.string/starts-with? remote-addr "172.")
+        (clojure.string/starts-with? remote-addr "192.168."))))
+
+(def access-rules [{:pattern #"^/internal/.*"
+                    :handler internal-access}
+                   {:pattern #"^/auth/.*"
                     :handler any-access}
                    {:pattern #"^/api/health"
                     :handler any-access}
