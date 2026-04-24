@@ -22,7 +22,10 @@
 
 (defroutes api-routes
   (context "/internal" []
-    (POST "/scheduler/tick" [] handler.internal/trigger-scheduler))
+    (POST "/scheduler/tick" [] handler.internal/trigger-scheduler)
+    (POST "/profile/start" [] handler.internal/start-profiler)
+    (POST "/profile/stop" [] handler.internal/stop-profiler)
+    (POST "/profile/serve" [] handler.internal/serve-profiler-results))
 
   (context "/api" []
     ;; Users

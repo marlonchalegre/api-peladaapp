@@ -103,6 +103,12 @@
    (-> (sql/insert! db :teamplayers {:team_id team-id :player_id player-id :is_goalkeeper (if is-goalkeeper 1 0)})
        affected-rows-count)))
 
+(s/defn add-team-players-batch! :- s/Any
+  "Inserts multiple team players in a single batch. Skips validations (caller must ensure consistency)."
+  [assignments db]
+  (when (seq assignments)
+    (sql/insert-multi! db :teamplayers assignments)))
+
 (s/defn remove-player-from-team :- s/Int
   [team-id player-id db]
   (-> (sql/delete! db :teamplayers {:team_id team-id :player_id player-id})

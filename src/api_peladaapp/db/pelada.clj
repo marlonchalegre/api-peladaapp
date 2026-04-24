@@ -1,11 +1,9 @@
 (ns api-peladaapp.db.pelada
   (:require
    [api-peladaapp.adapters.pelada :as adapter.pelada]
-   [api-peladaapp.adapters.user :as adapter.user]
    [api-peladaapp.db.attendance :as db.attendance]
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.team :as db.team]
-   [api-peladaapp.db.user :as db.user]
    [api-peladaapp.logic.score :as logic.score]
    [medley.core :as medley.core]
    [next.jdbc.sql :as sql]
@@ -179,23 +177,33 @@
                                attendance)
           ;; If not in attendance mode, we only care about confirmed players
           all-players-in-org (db.player/list-players-by-organization organization-id db)
+          players-map (into {} (map (juxt :id identity)) all-players-in-org)
+
+          ;; Build users-map from players in the organization instead of fetching ALL users
+          users-map (into {} (map (fn [p]
+                                    [(:user-id p)
+                                     {:id (:user-id p)
+                                      :name (:user-name p)
+                                      :username (:user-username p)
+                                      :position (:user-position p)
+                                      :avatar_filename (:user-avatar-filename p)}]))
+                          all-players-in-org)
+
           all-org-players (if (= "attendance" (:status pelada))
                             all-players-in-org
                             (filter (fn [p] (= "confirmed" (:status (get attendance-map (:id p)))))
                                     all-players-in-org))
 
-          all-users (map #(adapter.user/model->response % true) (db.user/list-users db 0 100000)) ;; Exclude email for privacy
-          users-map (into {} (map (juxt :id identity)) all-users)
           teams (db.team/list-pelada-teams pelada-id db)
           team-players-raw (db.team/list-team-players-by-pelada pelada-id db)
 
           ;; Group team players by team ID
           team-players-grouped (group-by :team_id team-players-raw)
 
-          ;; Add players to teams - Use all-players-in-org to avoid nulls if some team player is not 'confirmed'
+          ;; Add players to teams - Use players-map to avoid O(N*M) filter
           teams-with-players (map (fn [team]
                                     (assoc team :players (keep (fn [team-player]
-                                                                 (when-let [player (first (filter #(= (:player_id team-player) (:id %)) all-players-in-org))]
+                                                                 (when-let [player (get players-map (:player_id team-player))]
                                                                    (let [user (get users-map (:user-id player))]
                                                                      (assoc player :user user :is_goalkeeper (:is_goalkeeper team-player)))))
                                                                (get team-players-grouped (:id team) []))))
@@ -226,10 +234,10 @@
        :teams teams-with-players
        :available-players available-players-with-users
        :scores scores-map
-       :attendance (filter (fn [a] (some #(= (:player_id a) (:id %)) all-org-players))
-                           (map (fn [a] (assoc a :player (let [p (first (filter #(= (:player_id a) (:id %)) all-players-in-org))]
+       :attendance (filter (fn [a] (contains? players-map (:player_id a)))
+                           (map (fn [a] (assoc a :player (let [p (get players-map (:player_id a))]
                                                            (assoc p :user (get users-map (:user-id p))))))
                                 attendance))
        :users-map users-map
-       :org-players-map (into {} (map (juxt :id identity)) all-players-in-org)})
+       :org-players-map players-map})
     (throw (ex-info "Pelada not found" {:type :not-found :message "Pelada not found"}))))
