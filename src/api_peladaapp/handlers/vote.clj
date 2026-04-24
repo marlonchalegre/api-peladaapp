@@ -1,5 +1,4 @@
 (ns api-peladaapp.handlers.vote
-  (:refer-clojure :exclude [cast])
   (:require
    [api-peladaapp.adapters.vote :as adapter.vote]
    [api-peladaapp.controllers.vote :as controller.vote]

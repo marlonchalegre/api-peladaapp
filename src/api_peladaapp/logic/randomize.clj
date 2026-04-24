@@ -100,17 +100,17 @@
               teams (db.team/list-pelada-teams pelada-id tx)
 
               ;; Initial team states
-              initial-team-states (get-team-states teams players-per-team org-id tx)]
+              initial-team-states (get-team-states teams players-per-team org-id tx)
 
-          ;; Distribute remaining players and collect assignments for batch insert
-          (let [assignments (loop [remaining sorted-players
-                                   states initial-team-states
-                                   acc []]
-                              (if-let [player (first remaining)]
-                                (let [[team-id new-states] (assign-player-to-best-team player states)]
-                                  (if team-id
-                                    (recur (rest remaining) new-states (conj acc {:team_id team-id :player_id (:id player) :is_goalkeeper 0}))
-                                    (recur (rest remaining) states acc)))
-                                acc))]
-            (when (seq assignments)
-              (db.team/add-team-players-batch! assignments tx))))))))
+              ;; Distribute remaining players and collect assignments for batch insert
+              assignments (loop [remaining sorted-players
+                                 states initial-team-states
+                                 acc []]
+                            (if-let [player (first remaining)]
+                              (let [[team-id new-states] (assign-player-to-best-team player states)]
+                                (if team-id
+                                  (recur (rest remaining) new-states (conj acc {:team_id team-id :player_id (:id player) :is_goalkeeper 0}))
+                                  (recur (rest remaining) states acc)))
+                              acc))]
+          (when (seq assignments)
+            (db.team/add-team-players-batch! assignments tx)))))))
