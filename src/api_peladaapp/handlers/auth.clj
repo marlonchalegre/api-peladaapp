@@ -31,6 +31,15 @@
 (defn- clear-attempts [attempts-atom identifier]
   (swap! attempts-atom dissoc identifier))
 
+(defn- set-token-cookie [response token]
+  (assoc-in response [:cookies "authToken"]
+            {:value token
+             :http-only true
+             :secure (not= (System/getenv "APP_VERSION") "development")
+             :same-site :strict
+             :path "/"
+             :max-age 604800})) ;; 7 days
+
 (defn auth-handler
   [request]
   (let [body (-> request :body)
@@ -45,10 +54,22 @@
                                           (controllers.auth/authenticate db))]
              (clear-attempts login-attempts email)
              (-> (adapters.credential/model->response token user)
-                 ok))
+                 ok
+                 (set-token-cookie token)))
            (catch Exception e
              (record-failure login-attempts email)
              (exception/api-exception-handler e))))))
+
+(defn logout-handler
+  [_]
+  (-> (ok {:message "Logged out successfully."})
+      (assoc-in [:cookies "authToken"]
+                {:value ""
+                 :http-only true
+                 :secure (not= (System/getenv "APP_VERSION") "development")
+                 :same-site :strict
+                 :path "/"
+                 :max-age 0})))
 
 (defn get-me-handler
   [request]
@@ -94,7 +115,8 @@
         db (-> request :database)]
     (try (let [{:keys [token user]} (controllers.auth/first-access body db)]
            (-> (adapters.credential/model->response token user)
-               ok))
+               ok
+               (set-token-cookie token)))
          (catch Exception e
            (exception/api-exception-handler e)))))
 

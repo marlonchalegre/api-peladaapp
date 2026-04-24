@@ -137,6 +137,7 @@
 (defroutes auth-routes
   (context "/auth" []
     (POST "/login" [] auth/auth-handler)
+    (POST "/logout" [] auth/logout-handler)
     (POST "/forgot-password" [] auth/forgot-password-handler)
     (POST "/reset-password" [] auth/reset-password-handler)
     (POST "/first-access" [] auth/first-access-handler)
