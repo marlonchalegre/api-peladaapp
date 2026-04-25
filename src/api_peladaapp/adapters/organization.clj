@@ -51,5 +51,6 @@
    :player_id (:player-id result)
    :email (:email result)
    :name (:name result)
+   :token (:token result)
    :is_new_user (:is-new-user result)
    :organization_id (:organization-id result)})
