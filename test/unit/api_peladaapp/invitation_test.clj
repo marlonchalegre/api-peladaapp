@@ -94,7 +94,7 @@
         (let [db-user (first (jdbc/execute! db ["SELECT * FROM Users WHERE id = ?" user-id] opts))]
           (is (= "inviteduser" (:username db-user)))
           (is (some? (:password db-user))))
-        
+
         ;; Verify player added to org
         (let [player (first (jdbc/execute! db ["SELECT * FROM OrganizationPlayers WHERE user_id = ? AND organization_id = ?" user-id org-id] opts))]
           (is (some? player)))))

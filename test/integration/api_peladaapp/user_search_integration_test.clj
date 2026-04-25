@@ -24,7 +24,7 @@
                      ((fn [row] (or (:id row) (get row "id") (first (vals row))))))]
       ;; Add admin to org
       (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, grade) VALUES (?, ?, ?)" org-id admin-user-id 5.0])
-      
+
       ;; Seed data and add to org
       (doseq [user [{:name "Cristiano Ronaldo" :email "cr7@test.com"}
                     {:name "Lionel Messi" :email "leo@test.com"}
