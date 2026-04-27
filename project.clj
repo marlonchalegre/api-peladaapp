@@ -25,7 +25,8 @@
                  [org.clojure/math.combinatorics "0.3.0"]
                  [jarohen/chime "0.3.3"]
                  [clj-http "3.13.0"]
-                 [com.draines/postal "2.0.5"]]
+                 [com.draines/postal "2.0.5"]
+                 [com.clojure-goes-fast/clj-async-profiler "1.6.1"]]
   :plugins [[lein-ancient "1.0.0-RC3"]
             [lein-ring "0.12.6"]
             [migratus-lein "0.7.3"]]
@@ -43,8 +44,7 @@
                    :dependencies [[com.stuartsierra/component.repl "1.0.0"]
                                   [prismatic/schema-generators "0.1.5"]
                                   [org.clojure/tools.namespace "1.4.4"]
-                                  [ring/ring-devel "1.13.0"]
-                                  [com.clojure-goes-fast/clj-async-profiler "1.6.1"]]
+                                  [ring/ring-devel "1.13.0"]]
                    :source-paths ["dev"]
                    :repl-options {:init-ns dev}}
             :test {:dependencies [[ring/ring-mock "0.4.0"]]}}
