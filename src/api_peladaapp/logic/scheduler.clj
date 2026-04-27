@@ -78,7 +78,7 @@
                                     player-id current-grade new-grade performance))
                   (db.player/update-player-grade player-id new-grade db)))
 
-              (notifications/send-notification! org-id :vote-ended {:ranking ranking} db)
+              (notifications/send-notification! org-id :vote-ended {:ranking ranking :pelada-id (:id p)} db)
               (db.reminder/insert-reminder! (:id p) "vote_ended" db)))
           (log/debug "Voting ended for pelada" (:id p) "but WAHA vote-ended message is disabled for organization" (or (:name org) org-id))))))
 

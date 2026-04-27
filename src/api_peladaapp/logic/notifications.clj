@@ -31,6 +31,9 @@
 (defn- generate-voting-link [pelada-id]
   (str (get-base-url) "/peladas/" pelada-id "/voting"))
 
+(defn- generate-results-link [pelada-id]
+  (str (get-base-url) "/peladas/" pelada-id "/results"))
+
 (defn generate-start-message [teams team-players]
   (let [title "*ESCALAÇÃO DA PELADA*\n\n"
         teams-grouped (group-by :team_id team-players)
@@ -172,14 +175,10 @@
          footer
          "\n```")))
 
-(defn generate-vote-ended-message [ranking]
-  (let [title "🏆 *Ranking da Pelada!* 🏆\n\nA votação encerrou. Confira os destaques:\n\n"
-        ranking-str (->> ranking
-                         (map-indexed (fn [idx r]
-                                        (let [medal (case idx 0 "🥇" 1 "🥈" 2 "🥉" "•")]
-                                          (str medal " *" (:player-name r) "*: " (format "%.1f" (:score r)) " ⭐"))))
-                         (str/join "\n"))]
-    (str title ranking-str)))
+(defn generate-vote-ended-message [pelada-id]
+  (let [title "🏆 *Ranking da Pelada!* 🏆\n\nA votação encerrou. Os resultados já estão disponíveis!\n\n"
+        link (generate-results-link pelada-id)]
+    (str title "Confira os destaques no link abaixo:\n" link)))
 
 (defn- format-mention [player]
   (if-let [phone (:phone player)]
@@ -217,7 +216,7 @@
           (let [message (case type
                           :start (generate-start-message (:teams data) (:team-players data))
                           :end (generate-end-message data)
-                          :vote-ended (generate-vote-ended-message (:ranking data))
+                          :vote-ended (generate-vote-ended-message (:pelada-id data))
                           :attendance-reminder (generate-attendance-reminder (:pending-players data))
                           :vote-reminder (generate-vote-reminder (:pelada-id data) (:pending-voters data)))
                 mentions (case type

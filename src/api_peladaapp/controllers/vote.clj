@@ -225,8 +225,7 @@
 
             ;; Sort for awards
             mvp (->> player-scores
-                     (sort-by :average-stars >)
-                     (take 10)) ;; Show more in full ranking
+                     (sort-by :average-stars >)) ;; Show all in full ranking
             strikers (->> player-scores
                           (filter #(> (:goals %) 0))
                           (sort-by :goals >)
