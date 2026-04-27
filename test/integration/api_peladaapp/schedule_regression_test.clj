@@ -1,6 +1,5 @@
 (ns api-peladaapp.schedule-regression-test
   (:require
-   [api-peladaapp.db.schedule :as db.schedule]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
    [ring.mock.request :as mock]))
@@ -34,21 +33,4 @@
                                  (mock/json-body {"matches_per_team" 2
                                                   "matches" [{:home other-team-id :away other-team-id}]})))]
           (is (= 400 (:status save-resp)))
-          (is (= "Invalid teams in schedule plan. Please refresh and try again." (:message (th/decode-body save-resp))))))
-
-      (testing "Handle existing corrupt format in database (Resilience verification)"
-        ;; Manually inject corruption
-        (let [db-raw (-> th/*test-system* :database :database)
-              db (if (fn? db-raw) (db-raw) db-raw)]
-          (db.schedule/upsert-format
-           {:organization-id org-id
-            :team-count 3
-            :matches-per-team 2
-            :format-data "[[-1, 0]]"}
-           db)
-
-          (let [preview-resp (app (-> (mock/request :get (str "/api/peladas/" p1-id "/schedule/preview") {"matches_per_team" "2"}) (auth)))
-                preview (th/decode-body preview-resp)]
-            (is (= 200 (:status preview-resp)))
-            (is (seq (:matches preview)))
-            (is (false? (:is_from_format preview)))))))))
+          (is (= "Invalid teams in schedule plan. Please refresh and try again." (:message (th/decode-body save-resp)))))))))

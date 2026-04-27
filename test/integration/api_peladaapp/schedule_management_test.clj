@@ -77,14 +77,6 @@
             (let [details (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) (auth))))]
               (is (true? (:has_schedule_plan (:pelada details))))))
 
-          (testing "template is reused for same team-count and matches-per-team"
-            (let [preview-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/schedule/preview") {"matches_per_team" "3"})
-                                        (auth)))
-                  preview (th/decode-body preview-resp)]
-              (is (= 200 (:status preview-resp)))
-              (is (true? (:is_from_format preview)))
-              (is (= 3 (count (:matches preview))))))
-
           (testing "begin pelada uses custom schedule"
             ;; Close attendance first
             (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth))

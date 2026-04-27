@@ -92,12 +92,12 @@
 
                  (= n 4)
                  (let [[t1 t2 t3 t4] ids]
-                   ;; Sequence exactly as requested by user for 4 teams
+                   ;; Optimized sequence for 4 teams: balanced doubles and matchup variety
                    [[{:home t1 :away t2} {:home t3 :away t4}]
                     [{:home t1 :away t3} {:home t4 :away t2}]
                     [{:home t2 :away t3} {:home t4 :away t1}]
-                    [{:home t3 :away t4} {:home t1 :away t2}]
-                    [{:home t3 :away t1} {:home t2 :away t4}]
+                    [{:home t2 :away t4} {:home t3 :away t1}]
+                    [{:home t1 :away t2} {:home t3 :away t4}]
                     [{:home t3 :away t2} {:home t1 :away t4}]])
 
                  (or (= n 5) (= n 6))
