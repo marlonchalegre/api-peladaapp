@@ -28,7 +28,7 @@
              (try
                (let [last-sent-inst (if (instance? Instant last-sent)
                                       last-sent
-                                      (Instant/parse (str last-sent)))
+                                      (Instant/parse (str (clojure.string/replace (str last-sent) " " "T") "Z")))
                      diff (Duration/between last-sent-inst (.toInstant now))]
                  ;; If last-sent was more than 4 hours ago, we are likely in a new slot (10h vs 18h)
                  (> (.toHours diff) 4))
