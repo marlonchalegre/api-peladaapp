@@ -11,7 +11,8 @@
   (case key
     :jwt-secret (let [secret (or (System/getenv "PELADA_API_SECURITY_SIGNING_KEY")
                                  (get data key nil))]
-                  (when (and (not= (System/getenv "APP_VERSION") "development")
+                  (when (and (not *compile-files*)
+                             (not= (System/getenv "APP_VERSION") "development")
                              (or (nil? secret) (= secret "dev-secret-key-change-me-in-prod")))
                     (throw (ex-info "CRITICAL: PELADA_API_SECURITY_SIGNING_KEY must be set in production!"
                                     {:type :config-error})))

@@ -33,7 +33,7 @@
           (handler request)))
       (handler request))))
 
-(def auth-backend (jws-backend {:secret (config/get-key :jwt-secret)
+(def auth-backend (jws-backend {:secret (fn [& _] (config/get-key :jwt-secret))
                                 :token extract-token
                                 :options {:alg :hs512}}))
 
