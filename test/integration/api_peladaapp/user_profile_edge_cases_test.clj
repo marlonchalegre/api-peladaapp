@@ -14,7 +14,7 @@
 
         token (th/register-and-login! app {:name "Edge User" :username "edge_user" :email "edge@test.com" :password "pass123"})
         user-id (th/user-id-by-email db "edge@test.com")
-        auth (fn [req] (mock/header req "Authorization" (str "Token " token)))]
+        auth (th/auth-cookie token)]
 
     (testing "Update profile with empty email (optional)"
       (let [resp (app (-> (mock/request :put (str "/api/user/" user-id "/profile"))

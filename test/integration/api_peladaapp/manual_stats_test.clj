@@ -32,7 +32,7 @@
         stats [{:player-id org-player-id :year 2026 :goals 10 :assists 5 :own-goals 1}]
         response (app (-> (mock/request :post (str "/api/organizations/" org-id "/manual-stats"))
                           (mock/json-body stats)
-                          ((th/auth-header admin-token))))]
+                          ((th/auth-cookie admin-token))))]
     (is (= 200 (:status response)))
     (is (= 1 (-> response th/decode-body :updated)))))
 
@@ -44,7 +44,7 @@
         stats [{:player-id org-player-id :year 2026 :goals 10 :assists 5 :own-goals 1}]
         response (app (-> (mock/request :post (str "/api/organizations/" org-id "/manual-stats"))
                           (mock/json-body stats)
-                          ((th/auth-header player-token))))]
+                          ((th/auth-cookie player-token))))]
     (is (= 403 (:status response)))))
 
 (deftest statistics-includes-manual-stats-test
@@ -56,7 +56,7 @@
         ;; 1. Add Manual Stats: 10 goals, 5 assists
         _ (app (-> (mock/request :post (str "/api/organizations/" org-id "/manual-stats"))
                    (mock/json-body [{:player-id org-player-id :year 2026 :goals 10 :assists 5 :own-goals 1}])
-                   ((th/auth-header admin-token))))
+                   ((th/auth-cookie admin-token))))
 
         ;; 2. Add Match and Event: 2 goals from matches
         _ (jdbc/execute! ds ["INSERT INTO Peladas (organization_id, scheduled_at, status) VALUES (?, '2026-01-01 10:00:00', 'closed')" org-id])
@@ -74,7 +74,7 @@
         ;; Fetch statistics (total should be 10 + 2 = 12 goals)
         response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
                           (mock/query-string {:year 2026})
-                          ((th/auth-header player-token))))
+                          ((th/auth-cookie player-token))))
         body (th/decode-body response)
         stat (first body)]
 
@@ -94,17 +94,17 @@
         ;; 1. First adjustment: 5 goals
         _ (app (-> (mock/request :post (str "/api/organizations/" org-id "/manual-stats"))
                    (mock/json-body [{:player-id org-player-id :year 2026 :goals 5}])
-                   ((th/auth-header admin-token))))
+                   ((th/auth-cookie admin-token))))
 
         ;; 2. Second adjustment tomorrow: 3 goals
         _ (app (-> (mock/request :post (str "/api/organizations/" org-id "/manual-stats"))
                    (mock/json-body [{:player-id org-player-id :year 2026 :goals 3}])
-                   ((th/auth-header admin-token))))
+                   ((th/auth-cookie admin-token))))
 
         ;; Fetch statistics (total should be 5 + 3 = 8 goals)
         response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
                           (mock/query-string {:year 2026})
-                          ((th/auth-header player-token))))
+                          ((th/auth-cookie player-token))))
         body (th/decode-body response)
         stat (first body)]
 

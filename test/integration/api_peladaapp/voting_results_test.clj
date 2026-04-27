@@ -14,9 +14,9 @@
 
         ;; Setup: Admin, Player 1, Player 2
         token-admin (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass"})
-        auth-admin (th/auth-header token-admin)
+        auth-admin (th/auth-cookie token-admin)
         token-p1 (th/register-and-login! app {:name "Player 1" :email "p1@test.com" :password "pass"})
-        auth-p1 (th/auth-header token-p1)
+        auth-p1 (th/auth-cookie token-p1)
         _ (th/register-and-login! app {:name "Player 2" :email "p2@test.com" :password "pass"})
 
         org-id (:id (th/decode-body (app (-> (mock/request :post "/api/organizations")

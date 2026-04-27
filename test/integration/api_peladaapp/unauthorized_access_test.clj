@@ -11,8 +11,8 @@
         ;; Register admin and a regular user
         admin-token (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass"})
         user-token (th/register-and-login! app {:name "User" :email "user@test.com" :password "pass"})
-        admin-auth (th/auth-header admin-token)
-        user-auth (th/auth-header user-token)
+        admin-auth (th/auth-cookie admin-token)
+        user-auth (th/auth-cookie user-token)
 
     ;; Admin creates an organization
         org-resp (app (-> (mock/request :post "/api/organizations")

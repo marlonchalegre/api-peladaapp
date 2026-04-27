@@ -15,7 +15,7 @@
 
           ;; Register and login
           token (th/register-and-login! app {:name "Admin User" :email "admin@test.com" :password "pass123"})
-          auth (th/auth-header token)
+          auth (th/auth-cookie token)
           user-id (th/user-id-by-email ds "admin@test.com")
 
           ;; Create organization

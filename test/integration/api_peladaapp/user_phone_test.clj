@@ -43,13 +43,13 @@
 
     (testing "Verify initial phone"
       (let [resp (app (-> (mock/request :get (str "/api/user/" user-id))
-                          (mock/header "Authorization" (str "Token " token))))
+                          (th/auth-cookie token)))
             body (th/decode-body resp)]
         (is (= initial-phone (:phone body)))))
 
     (testing "Update phone"
       (let [resp (app (-> (mock/request :put (str "/api/user/" user-id "/profile"))
-                          (mock/header "Authorization" (str "Token " token))
+                          (th/auth-cookie token)
                           (mock/json-body {:phone new-phone})))
             body (th/decode-body resp)]
         (is (= 200 (:status resp)))
@@ -57,7 +57,7 @@
 
     (testing "Clear phone (set to nil/empty)"
       (let [resp (app (-> (mock/request :put (str "/api/user/" user-id "/profile"))
-                          (mock/header "Authorization" (str "Token " token))
+                          (th/auth-cookie token)
                           (mock/json-body {:phone ""})))
             body (th/decode-body resp)]
         (is (= 200 (:status resp)))

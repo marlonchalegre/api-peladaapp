@@ -14,7 +14,7 @@
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
 
         token1 (th/register-and-login! app {:name "User 1" :email "u1@test.com" :password "pass"})
-        auth1 (th/auth-header token1)
+        auth1 (th/auth-cookie token1)
         _ (th/register-and-login! app {:name "User 2" :email "u2@test.com" :password "pass"})
 
         org-id (:id (th/decode-body (app (-> (mock/request :post "/api/organizations")

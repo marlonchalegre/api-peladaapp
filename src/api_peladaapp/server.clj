@@ -6,10 +6,10 @@
    [buddy.auth.middleware    :refer [wrap-authorization]]
    [clojure.string           :as str]
    [next.jdbc                :as jdbc]
+   [ring.middleware.cookies  :refer [wrap-cookies]]
    [ring.middleware.json     :refer [wrap-json-body wrap-json-response]]
    [ring.middleware.multipart-params :refer [wrap-multipart-params]]
-   [ring.middleware.params   :refer [wrap-params]]
-   [ring.middleware.cookies  :refer [wrap-cookies]])
+   [ring.middleware.params   :refer [wrap-params]])
   (:gen-class))
 
 (defn on-error

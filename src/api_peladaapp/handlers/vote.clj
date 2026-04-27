@@ -33,9 +33,10 @@
 
 (defn voting-results [request]
   (try (let [db (:database request)
-             pelada-id (Integer/parseInt (str (get-in request [:params :id])))]
+             pelada-id (Integer/parseInt (str (get-in request [:params :id])))
+             user-id (auth/get-user-id-from-request request)]
          (ok (adapter.vote/voting-results-model->response
-              (controller.vote/get-voting-results pelada-id db))))
+              (controller.vote/get-voting-results pelada-id user-id db))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn voting-status [request]

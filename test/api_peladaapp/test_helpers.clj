@@ -65,8 +65,9 @@
                                                  (catch Exception _ nil))))
       :else nil)))
 
-(defn auth-header [token]
-  (fn [req] (mock/header req "Authorization" (str "Token " token))))
+(defn auth-cookie
+  ([token] (fn [req] (mock/cookie req "authToken" token)))
+  ([req token] (mock/cookie req "authToken" token)))
 
 (defn register-and-login! [app {:keys [name email password username phone] :or {username (str "user" (rand-int 1000))}}]
   (app (-> (mock/request :post "/auth/register") (mock/json-body {:name name :email email :username username :password password :phone phone})))

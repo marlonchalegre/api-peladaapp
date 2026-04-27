@@ -20,7 +20,7 @@
 
         ;; Create organization (user1 becomes admin and player)
         create-resp (app (-> (mock/request :post "/api/organizations")
-                             (mock/header "Authorization" (str "Token " token1))
+                             (helpers/auth-cookie token1)
                              (mock/json-body {:name "Test Org"})))
         org (helpers/decode-body create-resp)
         org-id (:id org)
@@ -35,15 +35,15 @@
 
     ;; Verify initial state
     (is (= 200 (:status (app (-> (mock/request :get (str "/api/organizations/" org-id))
-                                 (mock/header "Authorization" (str "Token " token2))))))
+                                 (helpers/auth-cookie token2)))))
         "Player should be member of org")
 
     ;; 1. Player leaves organization
     (let [leave-resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/leave"))
-                              (mock/header "Authorization" (str "Token " token2))))]
+                              (helpers/auth-cookie token2)))]
       (is (= 200 (:status leave-resp)) "Player should leave successfully")
       (is (= 403 (:status (app (-> (mock/request :get (str "/api/organizations/" org-id))
-                                   (mock/header "Authorization" (str "Token " token2))))))
+                                   (helpers/auth-cookie token2)))))
           "Player should no longer have access")
 
       ;; Verify in DB
@@ -51,7 +51,7 @@
 
     ;; 2. Last admin tries to leave
     (let [leave-resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/leave"))
-                              (mock/header "Authorization" (str "Token " token1))))]
+                              (helpers/auth-cookie token1)))]
       (is (= 400 (:status leave-resp)) "Last admin should not be able to leave")
       (is (str/includes? (str (:body leave-resp)) "last administrator")))
 
@@ -60,7 +60,7 @@
           user3-id (helpers/user-id-by-email db "admin3@test.com")]
       ;; Admin 1 adds Admin 3
       (app (-> (mock/request :post (str "/api/organizations/" org-id "/admins"))
-               (mock/header "Authorization" (str "Token " token1))
+               (helpers/auth-cookie token1)
                (mock/json-body {:user_id user3-id})))
       ;; Add as player too
       (jdbc/execute! db ["INSERT INTO OrganizationPlayers (user_id, organization_id, grade) VALUES (?, ?, 5.0)"
@@ -68,10 +68,10 @@
 
       ;; Now Admin 1 can leave
       (let [leave-resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/leave"))
-                                (mock/header "Authorization" (str "Token " token1))))]
+                                (helpers/auth-cookie token1)))]
         (is (= 200 (:status leave-resp)) "Non-last admin should be able to leave")
         (is (= 403 (:status (app (-> (mock/request :get (str "/api/organizations/" org-id))
-                                     (mock/header "Authorization" (str "Token " token1))))))
+                                     (helpers/auth-cookie token1)))))
             "Former admin should no longer have access")
 
         ;; Verify in DB

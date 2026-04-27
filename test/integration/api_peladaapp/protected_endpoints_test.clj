@@ -51,7 +51,7 @@
     (let [app (-> th/*test-system* :app :handler)]
       (doseq [{:keys [method path]} protected-endpoints]
         (let [req (-> (mock/request method path)
-                      (mock/header "Authorization" "Token invalid-token-12345"))
+                      (mock/cookie "authToken" "invalid-token-12345"))
               resp (app req)]
           (is (= 401 (:status resp))
               (str "Expected 401 for " method " " path " with invalid token, got " (:status resp))))))))
@@ -72,7 +72,7 @@
             get-endpoints (filter #(= :get (:method %)) protected-endpoints)]
         (doseq [{:keys [method path]} get-endpoints]
           (let [req (-> (mock/request method path)
-                        (mock/header "Authorization" (str "Token " token)))
+                        (mock/cookie "authToken" token))
                 resp (app req)]
             ;; Should not return 401 - might be 404, 200, or other status depending on data
             (is (not= 401 (:status resp))
@@ -103,32 +103,20 @@
         (is (= 201 (:status register-resp))
             "Register endpoint should be public and return 201")))))
 
-(deftest missing-authorization-header-format
-  (testing "Requests with malformed Authorization header return 401"
+(deftest missing-cookie
+  (testing "Requests without authToken cookie return 401"
     (let [app (-> th/*test-system* :app :handler)
-          ;; Missing "Token" prefix
-          req1 (-> (mock/request :get "/api/users")
-                   (mock/header "Authorization" "just-a-token"))
-          resp1 (app req1)
-
-          ;; Empty Authorization header
-          req2 (-> (mock/request :get "/api/users")
-                   (mock/header "Authorization" ""))
-          resp2 (app req2)]
-
-      (is (= 401 (:status resp1))
-          "Expected 401 for malformed Authorization header")
-
-      (is (= 401 (:status resp2))
-          "Expected 401 for empty Authorization header"))))
+          req (mock/request :get "/api/users")
+          resp (app req)]
+      (is (= 401 (:status resp))
+          "Expected 401 for missing authToken cookie"))))
 
 (deftest expired-token-handling
   (testing "Expired tokens should be rejected"
     (let [app (-> th/*test-system* :app :handler)
           ;; This is a token that has a past expiration date
-          ;; In a real scenario, you would generate a token with exp in the past
           req (-> (mock/request :get "/api/users")
-                  (mock/header "Authorization" "Token eyJhbGciOiJIUzUxMiJ9.expiredtoken"))
+                  (mock/cookie "authToken" "eyJhbGciOiJIUzUxMiJ9.expiredtoken"))
           resp (app req)]
       (is (= 401 (:status resp))
           "Expected 401 for expired token"))))

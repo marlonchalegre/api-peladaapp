@@ -12,19 +12,12 @@
    [buddy.auth :refer [authenticated?]]
    [buddy.auth.accessrules :refer [error]]
    [buddy.auth.backends.token :refer [jws-backend]]
-   [buddy.sign.jwt :as jwt]
-   [clojure.string :as str]))
+   [buddy.sign.jwt :as jwt]))
 
 (defn extract-token [request]
-  (let [cookies (:cookies request)
-        cookie-token (or (get-in cookies ["authToken" :value])
-                         (get-in cookies [:authToken :value]))
-        header-token (some-> request
-                             (get-in [:headers "authorization"])
-                             (str/split #"\s+" 2)
-                             (->> (filter seq))
-                             second)]
-    (or cookie-token header-token)))
+  (let [cookies (:cookies request)]
+    (or (get-in cookies ["authToken" :value])
+        (get-in cookies [:authToken :value]))))
 
 (defn wrap-manual-auth
   "Custom authentication middleware that manually validates JWT from cookies or header.

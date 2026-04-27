@@ -24,7 +24,7 @@
 (deftest authenticated-access-with-invalid-token
   (testing "authenticated-access returns RuleError when token is invalid"
     (with-redefs [buddy-auth/authenticated? (fn [_] false)]
-      (let [request {:headers {"authorization" "Token invalid-token"}}
+      (let [request {:cookies {"authToken" {:value "invalid-token"}}}
             result (auth/authenticated-access request)]
         (is (instance? buddy.auth.accessrules.RuleError result))))))
 

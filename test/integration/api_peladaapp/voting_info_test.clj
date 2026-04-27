@@ -15,11 +15,11 @@
 
         ;; 1. Set up Organization and Pelada
         token1 (th/register-and-login! app {:name "User 1" :email "u1@test.com" :password "pass"})
-        auth1 (th/auth-header token1)
+        auth1 (th/auth-cookie token1)
         token2 (th/register-and-login! app {:name "User 2" :email "u2@test.com" :password "pass"})
-        auth2 (th/auth-header token2)
+        auth2 (th/auth-cookie token2)
         token3 (th/register-and-login! app {:name "User 3" :email "u3@test.com" :password "pass"})
-        auth3 (th/auth-header token3)
+        auth3 (th/auth-cookie token3)
 
         ;; User 1 creates org
         org-id (:id (th/decode-body (app (-> (mock/request :post "/api/organizations")

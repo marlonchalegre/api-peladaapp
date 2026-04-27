@@ -15,9 +15,9 @@
 
         ;; Setup: 3 users
         token1 (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass"})
-        auth1 (th/auth-header token1)
+        auth1 (th/auth-cookie token1)
         token2 (th/register-and-login! app {:name "Player 1" :email "p1@test.com" :password "pass"})
-        auth2 (th/auth-header token2)
+        auth2 (th/auth-cookie token2)
         _ (th/register-and-login! app {:name "Player 2" :email "p2@test.com" :password "pass"})
 
         ;; Admin creates org

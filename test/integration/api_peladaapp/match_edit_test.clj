@@ -13,7 +13,7 @@
         app (fn [req] (server/app (assoc req :database db)))
 
         token (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass"})
-        auth (fn [req] (mock/header req "Authorization" (str "Token " token)))
+        auth (th/auth-cookie token)
 
         ;; Setup: Org -> Pelada -> Teams -> Begin
         org-resp (app (-> (mock/request :post "/api/organizations") (mock/json-body {:name "Org"}) auth))
@@ -63,7 +63,7 @@
 
     (testing "Editing match after pelada is closed should FAIL for non-admin"
       (let [token2 (th/register-and-login! app {:name "Player" :email "player@test.com" :password "pass"})
-            auth2 (fn [req] (mock/header req "Authorization" (str "Token " token2)))
+            auth2 (th/auth-cookie token2)
             resp (app (-> (mock/request :post (str "/api/matches/" match-id "/events"))
                           (mock/json-body {:player_id player-id :event_type "goal"})
                           auth2))]

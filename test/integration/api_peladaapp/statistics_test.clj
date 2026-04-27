@@ -37,7 +37,7 @@
     ;; Test the endpoint for specific year
     (let [response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
                             (mock/query-string {:year 2026})
-                            ((th/auth-header token))))
+                            ((th/auth-cookie token))))
           body (th/decode-body response)
           stat (first body)]
 
@@ -83,7 +83,7 @@
 
     (let [response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
                             (mock/query-string {:year 2026})
-                            ((th/auth-header token))))
+                            ((th/auth-cookie token))))
           body (th/decode-body response)
           stat (first (filter #(= "User Rating" (:player_name %)) body))]
 
@@ -123,7 +123,7 @@
     ;; Test the endpoint for 2025
     (let [response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
                             (mock/query-string {:year 2025})
-                            ((th/auth-header token))))
+                            ((th/auth-cookie token))))
           body (th/decode-body response)
           stat (first body)]
 
@@ -159,7 +159,7 @@
 
     (let [response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
                             (mock/query-string {:year 2026})
-                            ((th/auth-header token))))
+                            ((th/auth-cookie token))))
           body (th/decode-body response)
           stat (first body)]
 
@@ -184,7 +184,7 @@
 
         response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
                           (mock/query-string {:year 2030}) ;; Future year with no data
-                          ((th/auth-header token))))
+                          ((th/auth-cookie token))))
         body (th/decode-body response)]
 
     (is (= 200 (:status response)))

@@ -24,7 +24,7 @@
 
     ;; 1. Upload Avatar
     (let [resp (app (-> (mock/request :post (str "/api/user/" user-id "/avatar"))
-                        (mock/header "Authorization" (str "Token " token))
+                        (mock/cookie "authToken" token)
                         (assoc :multipart-params {"avatar" {:tempfile test-image
                                                             :filename "test.png"
                                                             :content-type "image/png"
@@ -35,7 +35,7 @@
 
     ;; 2. Serve Avatar (Authenticated)
     (let [resp (app (-> (mock/request :get (str "/api/user/" user-id "/avatar"))
-                        (mock/header "Authorization" (str "Token " token))))]
+                        (mock/cookie "authToken" token)))]
       (is (= 200 (:status resp)))
       (is (= "image/png" (get-in resp [:headers "Content-Type"])))
       (is (= "private, max-age=3600" (get-in resp [:headers "Cache-Control"]))))
@@ -46,12 +46,12 @@
 
     ;; 4. Delete Avatar
     (let [resp (app (-> (mock/request :delete (str "/api/user/" user-id "/avatar"))
-                        (mock/header "Authorization" (str "Token " token))))]
+                        (mock/cookie "authToken" token)))]
       (is (= 204 (:status resp))))
 
     ;; 5. Verify it's gone
     (let [resp (app (-> (mock/request :get (str "/api/user/" user-id "/avatar"))
-                        (mock/header "Authorization" (str "Token " token))))]
+                        (mock/cookie "authToken" token)))]
       (is (= 404 (:status resp))))))
 
 (deftest avatar-upload-invalid-type
@@ -66,7 +66,7 @@
       (.write out (.getBytes "not-an-image")))
 
     (let [resp (app (-> (mock/request :post (str "/api/user/" user-id "/avatar"))
-                        (mock/header "Authorization" (str "Token " token))
+                        (mock/cookie "authToken" token)
                         (assoc :multipart-params {"avatar" {:tempfile test-file
                                                             :filename "test.txt"
                                                             :content-type "text/plain"
@@ -84,7 +84,7 @@
         test-file (java.io.File/createTempFile "large" ".png")]
 
     (let [resp (app (-> (mock/request :post (str "/api/user/" user-id "/avatar"))
-                        (mock/header "Authorization" (str "Token " token))
+                        (mock/cookie "authToken" token)
                         (assoc :multipart-params {"avatar" {:tempfile test-file
                                                             :filename "large.png"
                                                             :content-type "image/png"

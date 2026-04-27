@@ -13,7 +13,7 @@
     (app (-> (mock/request :post "/auth/register") (mock/json-body {"name" "Admin" "email" "admin@test.com" "password" "pass123"})))
     (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {"email" "admin@test.com" "password" "pass123"})))
           token (:token (th/decode-body login))
-          auth (fn [req] (mock/header req "authorization" (str "Token " token)))
+          auth (th/auth-cookie token)
 
           org-resp (app (-> (mock/request :post "/api/organizations") (mock/json-body {"name" "Regression Club"}) auth))
           org-id (:id (th/decode-body org-resp))

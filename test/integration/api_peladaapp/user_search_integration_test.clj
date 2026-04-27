@@ -34,7 +34,7 @@
 
     (testing "GET /api/users/search - search by name"
       (let [resp (app (-> (mock/request :get "/api/users/search")
-                          ((th/auth-header admin-token))
+                          ((th/auth-cookie admin-token))
                           (assoc :query-params {"q" "Messi"})))
             body (th/decode-body resp)]
         (is (= 200 (:status resp)))
@@ -43,7 +43,7 @@
 
     (testing "GET /api/users/search - search by email domain"
       (let [resp (app (-> (mock/request :get "/api/users/search")
-                          ((th/auth-header admin-token))
+                          ((th/auth-cookie admin-token))
                           (assoc :query-params {"q" "@test.com"})))
             body (th/decode-body resp)]
         (is (= 200 (:status resp)))
@@ -52,7 +52,7 @@
 
     (testing "GET /api/users/search - pagination headers"
       (let [resp (app (-> (mock/request :get "/api/users/search")
-                          ((th/auth-header admin-token))
+                          ((th/auth-cookie admin-token))
                           (assoc :query-params {"q" "" "per_page" "2"})))]
         (is (= 200 (:status resp)))
         ;; Total should be 4 (3 seeded + 1 admin)

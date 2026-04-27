@@ -13,7 +13,7 @@
         app (fn [req] (server/app (assoc req :database db)))
 
         token (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass"})
-        auth (fn [req] (mock/header req "Authorization" (str "Token " token)))
+        auth (th/auth-cookie token)
 
         ;; Setup: Org -> Pelada
         org-resp (app (-> (mock/request :post "/api/organizations") (mock/json-body {:name "Org"}) auth))

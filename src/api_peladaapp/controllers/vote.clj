@@ -161,16 +161,34 @@
      :total-voted (count voted-ids)}))
 
 (s/defn get-voting-results :- responses.vote/VotingResultsResponse
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Int user-id :- s/Int db]
   (let [pelada (db.pelada/get-pelada pelada-id db)]
     (when (vote.logic/voting-open? pelada)
       (throw (ex-info "Voting still in progress"
                       {:type :bad-request
                        :message "Results are only available after the voting period ends (24h after close)."})))
-    (let [status (get-voting-status pelada-id db)
-          votes (db.vote/list-votes-by-pelada pelada-id db)
-          ;; Get stats for all players
-          stats-query "SELECT op.id as player_id, u.id as user_id, u.name, u.position, u.avatar_filename,
+
+    (let [org-id (:organization-id pelada)
+          is-admin (db.admin/is-user-admin-of-organization? user-id org-id db)
+          voter-player (db.player/get-org-player-by-user-id user-id org-id db)
+          voter-player-id (:id voter-player)
+          participation-query "SELECT 1 FROM TeamPlayers tp
+                               JOIN Teams t ON t.id = tp.team_id
+                               WHERE t.pelada_id = ? AND tp.player_id = ?"
+          participated (boolean (and voter-player-id
+                                     (seq (sql/query db [participation-query pelada-id voter-player-id]))))]
+
+      (when (and participated
+                 (not is-admin)
+                 (not (db.vote/has-voter-voted? pelada-id voter-player-id db)))
+        (throw (ex-info "You must vote to see the results"
+                        {:type :forbidden
+                         :message "Você precisa votar para ter acesso aos resultados da pelada."})))
+
+      (let [status (get-voting-status pelada-id db)
+            votes (db.vote/list-votes-by-pelada pelada-id db)
+            ;; Get stats for all players
+            stats-query "SELECT op.id as player_id, u.id as user_id, u.name, u.position, u.avatar_filename,
                               COALESCE(s.goals, 0) as goals, 
                               COALESCE(s.assists, 0) as assists, 
                               COALESCE(s.own_goals, 0) as own_goals
@@ -182,44 +200,44 @@
                          JOIN Teams t ON t.id = tp.team_id
                          WHERE t.pelada_id = ?
                        )"
-          participants-raw (sql/query db [stats-query pelada-id pelada-id])
-          participants (mapv (fn [p]
-                               (let [up (misc/unamespace p)]
-                                 {:player-id (:player_id up)
-                                  :user-id (:user_id up)
-                                  :name (:name up)
-                                  :avatar-filename (:avatar_filename up)
-                                  :position (:position up)
-                                  :goals (int (or (:goals up) 0))
-                                  :assists (int (or (:assists up) 0))
-                                  :own-goals (int (or (:own_goals up) 0))}))
-                             participants-raw)
+            participants-raw (sql/query db [stats-query pelada-id pelada-id])
+            participants (mapv (fn [p]
+                                 (let [up (misc/unamespace p)]
+                                   {:player-id (:player_id up)
+                                    :user-id (:user_id up)
+                                    :name (:name up)
+                                    :avatar-filename (:avatar_filename up)
+                                    :position (:position up)
+                                    :goals (int (or (:goals up) 0))
+                                    :assists (int (or (:assists up) 0))
+                                    :own-goals (int (or (:own_goals up) 0))}))
+                               participants-raw)
 
-          ;; Calculate average stars per player
-          votes-by-target (group-by :target-id votes)
-          player-scores (map (fn [p]
-                               (let [p-votes (get votes-by-target (:player-id p) [])
-                                     avg (if (seq p-votes)
-                                           (double (/ (reduce + (map :stars p-votes)) (count p-votes)))
-                                           0.0)]
-                                 (assoc p :average-stars avg)))
-                             participants)
+            ;; Calculate average stars per player
+            votes-by-target (group-by :target-id votes)
+            player-scores (map (fn [p]
+                                 (let [p-votes (get votes-by-target (:player-id p) [])
+                                       avg (if (seq p-votes)
+                                             (double (/ (reduce + (map :stars p-votes)) (count p-votes)))
+                                             0.0)]
+                                   (assoc p :average-stars avg)))
+                               participants)
 
-          ;; Sort for awards
-          mvp (->> player-scores
-                   (sort-by :average-stars >)
-                   (take 10)) ;; Show more in full ranking
-          strikers (->> player-scores
-                        (filter #(> (:goals %) 0))
-                        (sort-by :goals >)
-                        (take 3))
-          garcoms (->> player-scores
-                       (filter #(> (:assists %) 0))
-                       (sort-by :assists >)
-                       (take 3))]
-      (assoc status
-             :mvp mvp
-             :striker strikers
-             :garcom garcoms
-             :organization-id (:organization-id pelada)
-             :organization-name (:organization-name pelada)))))
+            ;; Sort for awards
+            mvp (->> player-scores
+                     (sort-by :average-stars >)
+                     (take 10)) ;; Show more in full ranking
+            strikers (->> player-scores
+                          (filter #(> (:goals %) 0))
+                          (sort-by :goals >)
+                          (take 3))
+            garcoms (->> player-scores
+                         (filter #(> (:assists %) 0))
+                         (sort-by :assists >)
+                         (take 3))]
+        (assoc status
+               :mvp mvp
+               :striker strikers
+               :garcom garcoms
+               :organization-id (:organization-id pelada)
+               :organization-name (:organization-name pelada))))))

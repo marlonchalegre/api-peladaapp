@@ -31,7 +31,7 @@
     (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Test User" :email "test@user.com" :password "password"})))
     (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "test@user.com" :password "password"})))
           token (:token (decode-body login))
-          auth (fn [req] (mock/header req "authorization" (str "Token " token)))
+          auth (th/auth-cookie token)
 
           ;; Create organization
           org-resp (app (-> (mock/request :post "/api/organizations")

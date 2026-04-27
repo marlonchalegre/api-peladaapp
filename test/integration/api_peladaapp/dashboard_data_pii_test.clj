@@ -13,7 +13,7 @@
         app (fn [req] (server/app (assoc req :database db)))
 
         token1 (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass" :phone "1234567890"})
-        auth1 (fn [req] (mock/header req "Authorization" (str "Token " token1)))
+        auth1 (th/auth-cookie token1)
 
         ;; create a user that is not in the pelada or org, with PII
         _ (th/register-and-login! app {:name "Random" :email "random@test.com" :password "pass2" :phone "0987654321"})

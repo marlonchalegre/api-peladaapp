@@ -13,7 +13,7 @@
         db-file (:db-file th/*test-system*)
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
         token (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass"})
-        auth (th/auth-header token)
+        auth (th/auth-cookie token)
 
         ;; Create organization
         org-resp (app (-> (mock/request :post "/api/organizations")

@@ -34,7 +34,7 @@
     (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Player 1" :email "p1@ex.com" :password "p"})))
     (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "p1@ex.com" :password "p"})))
           token (:token (decode-body login))
-          auth (fn [req] (mock/header req "authorization" (str "Token " token)))
+          auth (th/auth-cookie token)
           user-id (th/user-id-by-email ds "p1@ex.com")
 
           ;; Create organization (user becomes admin automatically)
@@ -102,7 +102,7 @@
 
     (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "admin@ex.com" :password "p"})))
           token (:token (decode-body login))
-          auth (fn [req] (mock/header req "authorization" (str "Token " token)))
+          auth (th/auth-cookie token)
           admin-id (th/user-id-by-email ds "admin@ex.com")
           u2-id (th/user-id-by-email ds "u2@ex.com")
           u3-id (th/user-id-by-email ds "u3@ex.com")
@@ -155,11 +155,11 @@
 
     (let [admin-login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "admin@ex.com" :password "p"})))
           admin-token (:token (decode-body admin-login))
-          admin-auth (fn [req] (mock/header req "authorization" (str "Token " admin-token)))
+          admin-auth (th/auth-cookie admin-token)
 
           convidado-login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "convidado@ex.com" :password "p"})))
           convidado-token (:token (decode-body convidado-login))
-          convidado-auth (fn [req] (mock/header req "authorization" (str "Token " convidado-token)))
+          convidado-auth (th/auth-cookie convidado-token)
           convidado-id (th/user-id-by-email ds "convidado@ex.com")
 
           ;; 2. Create organization
