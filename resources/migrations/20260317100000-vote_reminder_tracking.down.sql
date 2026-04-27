@@ -19,6 +19,7 @@ CREATE TABLE Peladas_new (
     vote_ended_message_sent BOOLEAN DEFAULT 0,
     FOREIGN KEY (organization_id) REFERENCES Organizations(id) ON DELETE CASCADE
 );
+--;;
 
 INSERT INTO Peladas_new (id, organization_id, scheduled_at, num_teams, players_per_team, fixed_goalkeepers, 
                          home_fixed_goalkeeper_id, away_fixed_goalkeeper_id, status, closed_at, 
@@ -27,6 +28,8 @@ SELECT id, organization_id, scheduled_at, num_teams, players_per_team, fixed_goa
        home_fixed_goalkeeper_id, away_fixed_goalkeeper_id, status, closed_at, 
        timer_started_at, timer_accumulated_ms, timer_status, vote_ended_message_sent
 FROM Peladas;
+--;;
 
 DROP TABLE Peladas;
+--;;
 ALTER TABLE Peladas_new RENAME TO Peladas;

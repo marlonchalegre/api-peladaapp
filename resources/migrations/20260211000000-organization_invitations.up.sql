@@ -10,7 +10,10 @@ CREATE TABLE IF NOT EXISTS "OrganizationInvitations" (
   FOREIGN KEY ("organization_id") REFERENCES "Organizations"("id"),
   FOREIGN KEY ("invited_by") REFERENCES "Users"("id")
 );
+--;;
 
 CREATE INDEX IF NOT EXISTS "OrgInvitations_index_org" ON "OrganizationInvitations" ("organization_id");
+--;;
 CREATE INDEX IF NOT EXISTS "OrgInvitations_index_email" ON "OrganizationInvitations" ("email");
+--;;
 CREATE INDEX IF NOT EXISTS "OrgInvitations_index_token" ON "OrganizationInvitations" ("token");

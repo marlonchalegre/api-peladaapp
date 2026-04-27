@@ -8,6 +8,7 @@ WHERE id NOT IN (
     )
     WHERE rn = 1
 );
+--;;
 
 -- 2. Add unique index to prevent future duplicates
 CREATE UNIQUE INDEX IF NOT EXISTS "OrgPlayers_unique_org_user" ON "OrganizationPlayers" ("organization_id", "user_id");

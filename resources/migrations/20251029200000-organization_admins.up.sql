@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS "OrganizationAdmins" (
   FOREIGN KEY ("organization_id") REFERENCES "Organizations"("id") ON DELETE CASCADE,
   FOREIGN KEY ("user_id") REFERENCES "Users"("id") ON DELETE CASCADE
 );
+--;;
 
 CREATE INDEX IF NOT EXISTS "OrgAdmins_index_org" ON "OrganizationAdmins" ("organization_id");
+--;;
 CREATE INDEX IF NOT EXISTS "OrgAdmins_index_user" ON "OrganizationAdmins" ("user_id");

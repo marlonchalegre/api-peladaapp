@@ -8,5 +8,7 @@ CREATE TABLE IF NOT EXISTS "MatchEvents" (
   FOREIGN KEY ("match_id") REFERENCES "Matches"("id"),
   FOREIGN KEY ("player_id") REFERENCES "OrganizationPlayers"("id")
 );
+--;;
 CREATE INDEX IF NOT EXISTS "MatchEvents_index_match" ON "MatchEvents" ("match_id");
+--;;
 CREATE INDEX IF NOT EXISTS "MatchEvents_index_player" ON "MatchEvents" ("player_id");

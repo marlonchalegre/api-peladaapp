@@ -9,5 +9,6 @@ CREATE TABLE IF NOT EXISTS "peladaattendance" (
   FOREIGN KEY ("pelada_id") REFERENCES "Peladas"("id"),
   FOREIGN KEY ("player_id") REFERENCES "OrganizationPlayers"("id")
 );
+--;;
 
 CREATE INDEX IF NOT EXISTS "Attendance_index_pelada" ON "peladaattendance" ("pelada_id");

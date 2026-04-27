@@ -13,6 +13,7 @@ CREATE TABLE OrganizationWahaConfigs (
     vote_ended_msg_enabled BOOLEAN DEFAULT 0,
     FOREIGN KEY (organization_id) REFERENCES Organizations(id) ON DELETE CASCADE
 );
+--;;
 
 -- Add tracking for vote ended message to Peladas table
 ALTER TABLE Peladas ADD COLUMN vote_ended_message_sent BOOLEAN DEFAULT 0;
