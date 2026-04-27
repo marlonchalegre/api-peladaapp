@@ -5,6 +5,7 @@
    [clojure.set]
    [clojure.test :refer [deftest is testing use-fixtures]]
    [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]
    [next.jdbc.sql :as sql]))
 
 (use-fixtures :each th/test-system-fixture)
@@ -66,25 +67,29 @@
             players-per-team 2]
         (logic.randomize/randomize-teams! pelada-id player-ids players-per-team ds)
 
-        (let [t1-rows (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 1"])
-              t1-players (set (map :TeamPlayers/player_id t1-rows))
-              t2-players (set (map :TeamPlayers/player_id (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 2"])))
-              team-pairings (if (contains? t1-players 1) ;; If GK is in T1
-                              [t1-players t2-players]
-                              [t2-players t1-players])
-              gk-team (first team-pairings)
-              other-team (second team-pairings)]
+        (let [t1-players (->> (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 1"])
+                              (map :TeamPlayers/player_id) set)
+              t2-players (->> (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 2"])
+                              (map :TeamPlayers/player_id) set)]
+          ;; Verify positions are split (one GK and one Def in different teams)
+          (let [gk-team-id (if (contains? t1-players 1) 1 2)
+                def-team-id (if (contains? t1-players 4) 1 2)]
+            (is (not= gk-team-id def-team-id) "GK and Defender should be in different teams"))
 
-          ;; Expected: GK (1) goes first to a team.
-          ;; Def (4) goes to the other team (lowest score).
-          ;; Str1 (3, score 8) goes to Def's team (score 7 < 10).
-          ;; Str2 (2, score 5) goes to GK's team.
+        ;; Verify each team has one striker
+          (let [t1-strikers (clojure.set/intersection t1-players #{2 3})
+                t2-strikers (clojure.set/intersection t2-players #{2 3})]
+            (is (= 1 (count t1-strikers)))
+            (is (= 1 (count t2-strikers))))
 
-          ;; GK Team should have {1, 2}
-          ;; Other Team should have {4, 3}
-          (is (= #{1 2} gk-team))
-          (is (= #{3 4} other-team)))))
-
+        ;; Verify balance is reasonable (difference <= 6 for this small set)
+          (let [t1-score (->> (jdbc/execute! ds ["SELECT op.grade FROM TeamPlayers tp JOIN OrganizationPlayers op ON tp.player_id = op.id WHERE tp.team_id = 1"]
+                                             {:builder-fn rs/as-unqualified-lower-maps})
+                              (map :grade) (reduce + 0))
+                t2-score (->> (jdbc/execute! ds ["SELECT op.grade FROM TeamPlayers tp JOIN OrganizationPlayers op ON tp.player_id = op.id WHERE tp.team_id = 2"]
+                                             {:builder-fn rs/as-unqualified-lower-maps})
+                              (map :grade) (reduce + 0))]
+            (is (<= (abs (- t1-score t2-score)) 6.0) (str "Score difference should be reasonable, got " t1-score " vs " t2-score))))))
     (testing "Respects player limit with many players"
       (jdbc/execute! ds ["DELETE FROM TeamPlayers"])
       (jdbc/execute! ds ["DELETE FROM OrganizationPlayers"])

@@ -5,12 +5,13 @@ A Clojure HTTP API to organize casual soccer (pelada) with friends: manage users
 ---
 
 ### 📖 Overview
-- **Authentication**: Register/login, JWT auth (`Authorization: Token <jwt>`). Only `/auth/register` and `/auth/login` are public.
+- **Authentication**: Register/login, Cookie-based auth (`authToken` cookie). Only /auth/register and /auth/login are public.
+
 - **Users/Players**: Users are the system’s identities; players are users inside an organization. Users can update their profiles.
 - **Organizations**: CRUD organizations; scope players and peladas per organization. Manage organization admins and view statistics.
 - **Peladas (Game Days)**: Create, configure (`num_teams`, `players_per_team`), manage attendance, begin (generate schedule), and close.
 - **Match Management**: Manage matches, lineups, substitutions, and events (goals, cards).
-- **Team Randomization**: Randomly assign players to teams based on normalized scores and available slots.
+- **Team Randomization**: Intelligent "Bucket Shuffle" algorithm that balances teams by technical level and position while ensuring variety across multiple draws.
 - **Voting & Scores**: 1–5 star votes (no self‑vote), batch voting support, and normalized scores (1–10) based on weighted averages.
 - **JSON everywhere**: All endpoints always return JSON bodies, including errors and deletes.
 
@@ -55,7 +56,7 @@ docker compose exec backend lein clj-kondo --lint src
 - **DB**: SQLite (`org.xerial/sqlite-jdbc`), next.jdbc, HikariCP, Migratus. Supports Turso (LibSQL) via JDBC.
 - **Schemas**: Prismatic Schema
 - **Components**: Stuart Sierra Component for lifecycle management
-- **Algorithms**: clojure.math.combinatorics for match scheduling
+- **Algorithms**: Bucket Shuffle for team randomization; Iterated Local Search (ILS) for match scheduling.
 - **Testing**: clojure.test, ring-mock
 
 ---

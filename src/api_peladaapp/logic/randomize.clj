@@ -29,10 +29,16 @@
                    {:builder-fn rs/as-unqualified-lower-maps})))
 
 (defn- sort-players-for-balance
-  [players]
-  (sort-by (juxt #(get position-priority (:position %) 4)
-                 (comp - #(or (:grade %) 0)))
-           players))
+  [players num-teams]
+  (let [sorted (sort-by (juxt #(get position-priority (:position %) 4)
+                              (comp - #(or (:grade %) 0)))
+                        players)]
+    (if (pos? num-teams)
+      (->> sorted
+           (partition-all num-teams)
+           (mapcat shuffle)
+           (vec))
+      (vec sorted))))
 
 (defn- get-team-states
   "Calculates current score, player count and position distribution for each team."
@@ -94,10 +100,11 @@
               ;; Fetch details for players (verifies they belong to org)
               players-details (get-player-details remaining-player-ids org-id tx)
 
-              ;; Sort players: Position first, then Grade
-              sorted-players (sort-players-for-balance (shuffle players-details))
-
               teams (db.team/list-pelada-teams pelada-id tx)
+              num-teams (count teams)
+
+              ;; Sort players: Position first, then Grade, with bucket shuffle for variety
+              sorted-players (sort-players-for-balance (shuffle players-details) num-teams)
 
               ;; Initial team states
               initial-team-states (get-team-states teams players-per-team org-id tx)
