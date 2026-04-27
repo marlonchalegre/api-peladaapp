@@ -56,3 +56,85 @@
        (catch Exception e
          (log/error e "Failed to send WAHA message")
          {:error (.getMessage e)})))))
+
+(defn healthcheck
+  "Checks if WAHA service is up by calling server version endpoint."
+  []
+  (let [base-url (or (System/getenv "WAHA_API_URL") "http://localhost:8080/waha")
+        url (str base-url "/api/server/version")
+        api-key (config/get-key :waha-api-key)]
+    (try
+      (let [response (http/get url
+                               {:accept :json
+                                :headers (when api-key {"X-Api-Key" api-key})})]
+        (if (= 200 (:status response))
+          {:status "UP" :details (json/read-str (:body response))}
+          {:status "DOWN" :error (str "Unexpected status: " (:status response))}))
+      (catch Exception e
+        {:status "DOWN" :error (.getMessage e)}))))
+
+(defn resume-session
+  "Starts a WAHA session by name."
+  [session-name]
+  (let [base-url (or (System/getenv "WAHA_API_URL") "http://localhost:8080/waha")
+        url (str base-url "/api/sessions/" session-name "/start")
+        api-key (config/get-key :waha-api-key)]
+    (try
+      (let [response (http/post url
+                                {:accept :json
+                                 :headers (when api-key {"X-Api-Key" api-key})})]
+        (if (or (= 200 (:status response)) (= 201 (:status response)))
+          {:status "success" :message (str "Session " session-name " started/resumed")}
+          {:status "error" :error (str "Unexpected status: " (:status response))}))
+      (catch Exception e
+        {:status "error" :error (.getMessage e)}))))
+
+(defn start-session
+  "Creates and starts a new WAHA session."
+  [session-name]
+  (let [base-url (or (System/getenv "WAHA_API_URL") "http://localhost:8080/waha")
+        url (str base-url "/api/sessions")
+        api-key (config/get-key :waha-api-key)
+        payload {:name session-name
+                 :engine "GOWS" ;; Using GOWS as per docker-compose.yml
+                 :start true}
+        body (json/write-str payload)]
+    (try
+      (let [response (http/post url
+                                {:body body
+                                 :content-type :json
+                                 :accept :json
+                                 :headers (when api-key {"X-Api-Key" api-key})})]
+        (if (or (= 200 (:status response)) (= 201 (:status response)))
+          {:status "success" :message (str "Session " session-name " created and started")}
+          {:status "error" :error (str "Unexpected status: " (:status response))}))
+      (catch Exception e
+        {:status "error" :error (.getMessage e)}))))
+
+(defn stop-session
+  "Stops/Deletes a WAHA session."
+  [session-name]
+  (let [base-url (or (System/getenv "WAHA_API_URL") "http://localhost:8080/waha")
+        url (str base-url "/api/sessions/" session-name)
+        api-key (config/get-key :waha-api-key)]
+    (try
+      (let [response (http/delete url
+                                  {:accept :json
+                                   :headers (when api-key {"X-Api-Key" api-key})})]
+        (if (contains? #{200 201 204} (:status response))
+          {:status "success" :message (str "Session " session-name " stopped/deleted")}
+          {:status "error" :error (str "Unexpected status: " (:status response))}))
+      (catch Exception e
+        {:status "error" :error (.getMessage e)}))))
+
+(defn sleep [ms]
+  (Thread/sleep ms))
+
+(defn restart-session
+  "Restarts a WAHA session (stop, wait 5s, start)."
+  [session-name]
+  (log/info "Restarting WAHA session:" session-name)
+  (stop-session session-name)
+  (log/info "Waiting 5 seconds for cleanup...")
+  (sleep 5000)
+  (start-session session-name))

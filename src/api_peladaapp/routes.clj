@@ -23,6 +23,9 @@
 (defroutes api-routes
   (context "/internal" []
     (POST "/scheduler/tick" [] handler.internal/trigger-scheduler)
+    (GET "/waha/healthcheck" [] handler.health/waha-healthcheck)
+    (POST "/waha/resume" [] handler.health/waha-resume)
+    (POST "/waha/restart" [] handler.health/waha-restart)
     (POST "/profile/start" [] handler.internal/start-profiler)
     (POST "/profile/stop" [] handler.internal/stop-profiler)
     (POST "/profile/serve" [] handler.internal/serve-profiler-results))
