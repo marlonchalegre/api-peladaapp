@@ -11,10 +11,37 @@
    [api-peladaapp.logic.password-reset :as logic.password-reset]
    [buddy.auth :refer [authenticated?]]
    [buddy.auth.accessrules :refer [error]]
-   [buddy.auth.backends.token :refer [jws-backend]]))
+   [buddy.auth.backends.token :refer [jws-backend]]
+   [buddy.sign.jwt :as jwt]
+   [clojure.string :as str]))
+
+(defn extract-token [request]
+  (let [cookies (:cookies request)
+        cookie-token (or (get-in cookies ["authToken" :value])
+                         (get-in cookies [:authToken :value]))
+        header-token (some-> request
+                             (get-in [:headers "authorization"])
+                             (str/split #"\s+" 2)
+                             (->> (filter seq))
+                             second)]
+    (or cookie-token header-token)))
+
+(defn wrap-manual-auth
+  "Custom authentication middleware that manually validates JWT from cookies or header.
+  Bypasses buddy-auth's wrap-authentication which was failing on multipart requests."
+  [handler]
+  (fn [request]
+    (if-let [token (extract-token request)]
+      (try
+        (let [secret (config/get-key :jwt-secret)
+              claims (jwt/unsign token secret {:alg :hs512})]
+          (handler (assoc request :identity claims)))
+        (catch Exception _
+          (handler request)))
+      (handler request))))
 
 (def auth-backend (jws-backend {:secret (config/get-key :jwt-secret)
-                                :token-name "Token"
+                                :token extract-token
                                 :options {:alg :hs512}}))
 
 ;; Simple brute-force protection
@@ -36,7 +63,7 @@
             {:value token
              :http-only true
              :secure (not= (System/getenv "APP_VERSION") "development")
-             :same-site :strict
+             :same-site :lax
              :path "/"
              :max-age 604800})) ;; 7 days
 
@@ -67,7 +94,7 @@
                 {:value ""
                  :http-only true
                  :secure (not= (System/getenv "APP_VERSION") "development")
-                 :same-site :strict
+                 :same-site :lax
                  :path "/"
                  :max-age 0})))
 

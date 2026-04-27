@@ -60,7 +60,6 @@
         teams (db.team/list-pelada-teams pelada-id db)
         team-ids (mapv :id teams)
         team-count (count team-ids)]
-    (println "[DEBUG] get-schedule-preview pelada=" pelada-id " team-count=" team-count " mpt=" matches-per-team)
     (if (< team-count 2)
       {:matches [] :is_from_format false}
       (let [format (db.schedule/get-organization-schedule-format org-id team-count matches-per-team db)

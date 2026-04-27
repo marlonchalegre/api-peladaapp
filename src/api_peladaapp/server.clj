@@ -3,12 +3,13 @@
    [api-peladaapp.handlers.auth :as auth]
    [api-peladaapp.routes     :as routes]
    [buddy.auth.accessrules   :refer [wrap-access-rules]]
-   [buddy.auth.middleware    :refer [wrap-authentication wrap-authorization]]
+   [buddy.auth.middleware    :refer [wrap-authorization]]
    [clojure.string           :as str]
    [next.jdbc                :as jdbc]
    [ring.middleware.json     :refer [wrap-json-body wrap-json-response]]
    [ring.middleware.multipart-params :refer [wrap-multipart-params]]
-   [ring.middleware.params   :refer [wrap-params]])
+   [ring.middleware.params   :refer [wrap-params]]
+   [ring.middleware.cookies  :refer [wrap-cookies]])
   (:gen-class))
 
 (defn on-error
@@ -74,12 +75,14 @@
 
 (def app (as-> #'routes/app-handler $
            (wrap-exception-log $)
+           ;; Provide the DataSource directly
+           (wrap-assoc $ :database datasource)
            (wrap-multipart-params $)
            (wrap-params $)
            (wrap-json-body $ {:keywords? true :bigdecimals? true})
-           ;; Provide the DataSource directly
-           (wrap-assoc $ :database datasource)
            (wrap-access-rules $ {:rules routes/access-rules :on-error on-error})
            (wrap-authorization $ auth/auth-backend)
-           (wrap-authentication $ auth/auth-backend)
+           (auth/wrap-manual-auth $)
+           ;; Parse cookies BEFORE authentication so extract-token can access them
+           (wrap-cookies $)
            (wrap-json-response $ {:charset "utf-8"})))
