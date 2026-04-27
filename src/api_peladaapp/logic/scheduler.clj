@@ -62,25 +62,24 @@
     (doseq [p peladas]
       (let [org-id (:organization-id p)
             org (db.organization/get-organization org-id db)]
-        (if (and org (:waha-vote-ended-msg-enabled org))
-          (do
-            (log/info "Processing ended voting for pelada" (:id p) "in organization" (:name org))
-            (let [ranking (db.vote/list-ranking-by-pelada (:id p) db)]
-              ;; Automated Grade Update
-              (doseq [r ranking]
-                (let [player-id (:player-id r)
-                      avg-stars (:avg-stars r)
-                      performance (logic.grade/performance-from-stars avg-stars)
-                      current-player (db.player/get-player player-id db)
-                      current-grade (or (:grade current-player) 5.0)
-                      new-grade (logic.grade/calculate-new-grade current-grade performance)]
-                  (log/info (format "Updating player %d grade: %.2f -> %.2f (perf: %.2f)"
-                                    player-id current-grade new-grade performance))
-                  (db.player/update-player-grade player-id new-grade db)))
+        (log/info "Processing ended voting for pelada" (:id p) "in organization" (:name org))
+        (let [ranking (db.vote/list-ranking-by-pelada (:id p) db)]
+          ;; Automated Grade Update
+          (doseq [r ranking]
+            (let [player-id (:player-id r)
+                  avg-stars (:avg-stars r)
+                  performance (logic.grade/performance-from-stars avg-stars)
+                  current-player (db.player/get-player player-id db)
+                  current-grade (or (:grade current-player) 5.0)
+                  new-grade (logic.grade/calculate-new-grade current-grade performance)]
+              (log/info (format "Updating player %d grade: %.2f -> %.2f (perf: %.2f)"
+                                player-id current-grade new-grade performance))
+              (db.player/update-player-grade player-id new-grade db)))
 
-              (notifications/send-notification! org-id :vote-ended {:ranking ranking :pelada-id (:id p)} db)
-              (db.reminder/insert-reminder! (:id p) "vote_ended" db)))
-          (log/debug "Voting ended for pelada" (:id p) "but WAHA vote-ended message is disabled for organization" (or (:name org) org-id))))))
+          (if (and org (:waha-vote-ended-msg-enabled org))
+            (notifications/send-notification! org-id :vote-ended {:ranking ranking :pelada-id (:id p)} db)
+            (log/debug "Voting ended for pelada" (:id p) "but WAHA vote-ended message is disabled for organization" (or (:name org) org-id)))
+          (db.reminder/insert-reminder! (:id p) "vote_ended" db)))))
 
   ;; 2. Check for Vote Reminders (12h and 23h)
   (let [reminders (db.pelada/list-peladas-for-vote-reminders db)]
@@ -97,15 +96,14 @@
               (do
                 (log/info "Sending" type "vote reminder for pelada" (:id pelada) "in organization" (:name org))
                 (notifications/send-notification! org-id :vote-reminder {:pending-voters pending :pelada-id (:id pelada)} db))
-              (log/debug "No pending voters for pelada" (:id pelada) "- skipping" type "reminder"))
-            (db.reminder/insert-reminder! (:id pelada)
-                                          (case type
-                                            :30m "vote_30m"
-                                            :12h "vote_12h"
-                                            :23h "vote_23h")
-                                          db))
-          (log/debug "Vote reminder" type "due for pelada" (:id pelada) "but disabled for organization" (or (:name org) org-id)))))))
-
+              (log/debug "No pending voters for pelada" (:id pelada) "- skipping" type "reminder")))
+          (log/debug "Vote reminder" type "due for pelada" (:id pelada) "but disabled for organization" (or (:name org) org-id)))
+        (db.reminder/insert-reminder! (:id pelada)
+                                      (case type
+                                        :30m "vote_30m"
+                                        :12h "vote_12h"
+                                        :23h "vote_23h")
+                                      db)))))
 (defn execute-tasks! [db]
   (let [now (br-now)]
     (log/info (str "Scheduler tasks execution started at " now))
