@@ -5,7 +5,7 @@
             :url  "https://www.eclipse.org/legal/epl-2.0/"}
   :dependencies [[org.clojure/clojure "1.12.4"]
                  [org.clojure/data.json "2.5.2"]
-                 [ring/ring "1.13.0"]
+                 [ring/ring "1.15.4"]
                  [buddy/buddy-core "1.12.0-430"]
                  [buddy/buddy-sign "3.6.1-359"]
                  [buddy/buddy-auth "3.0.323"]
@@ -43,7 +43,7 @@
                    :dependencies [[com.stuartsierra/component.repl "1.0.0"]
                                   [prismatic/schema-generators "0.1.5"]
                                   [org.clojure/tools.namespace "1.5.1"]
-                                  [ring/ring-devel "1.13.0"]
+                                  [ring/ring-devel "1.15.4"]
                                   [com.clojure-goes-fast/clj-async-profiler "1.7.0"]]
                    :source-paths ["dev"]
                    :repl-options {:init-ns dev}}
