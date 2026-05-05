@@ -139,7 +139,8 @@
                                        SELECT 1 FROM PeladaReminders pr 
                                        WHERE pr.pelada_id = p.id AND pr.type = 'vote_30m'
                                      )
-                                     AND p.closed_at < datetime('now', '-30 minutes')"])
+                                     AND p.closed_at < datetime('now', '-30 minutes')
+                                     AND p.closed_at >= datetime('now', '-90 minutes')"])
                      (map (fn [p] {:pelada (adapter.pelada/db->model p) :type :30m})))
         rem-12h (->> (sql/query db ["SELECT p.*, o.name as organization_name 
                                      FROM Peladas p 
@@ -149,7 +150,8 @@
                                        SELECT 1 FROM PeladaReminders pr 
                                        WHERE pr.pelada_id = p.id AND pr.type = 'vote_12h'
                                      )
-                                     AND p.closed_at < datetime('now', '-12 hours')"])
+                                     AND p.closed_at < datetime('now', '-12 hours')
+                                     AND p.closed_at >= datetime('now', '-13 hours')"])
                      (map (fn [p] {:pelada (adapter.pelada/db->model p) :type :12h})))
         rem-23h (->> (sql/query db ["SELECT p.*, o.name as organization_name 
                                      FROM Peladas p 
@@ -159,7 +161,8 @@
                                        SELECT 1 FROM PeladaReminders pr 
                                        WHERE pr.pelada_id = p.id AND pr.type = 'vote_23h'
                                      )
-                                     AND p.closed_at < datetime('now', '-23 hours')"])
+                                     AND p.closed_at < datetime('now', '-23 hours')
+                                     AND p.closed_at >= datetime('now', '-24 hours')"])
                      (map (fn [p] {:pelada (adapter.pelada/db->model p) :type :23h})))]
     (concat rem-30m rem-12h rem-23h)))
 

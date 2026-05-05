@@ -181,9 +181,8 @@
     (str title "Confira os destaques no link abaixo:\n" link)))
 
 (defn- format-mention [player]
-  (if-let [phone (:phone player)]
-    (let [digits (str/replace phone #"\D" "")]
-      (str "@" digits))
+  (if (:phone player)
+    (str "@" (:player-name player))
     (:player-name player)))
 
 (defn generate-attendance-reminder [pending-players]

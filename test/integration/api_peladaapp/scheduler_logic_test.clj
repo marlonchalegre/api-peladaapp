@@ -65,3 +65,34 @@
                   ;; 7. Verify reminder was inserted to prevent infinite loops
             (is (some? (db.reminder/get-last-reminder-at pelada-id "vote_ended" db))
                 "PeladaReminder 'vote_ended' should have been inserted even with WAHA disabled")))))))
+
+(deftest test-scheduler-vote-reminder-bounds
+  (let [db-file (:db-file th/*test-system*)
+        db (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
+    (testing "list-peladas-for-vote-reminders only returns peladas within the 1-hour windows"
+      (let [org-id (db.organization/insert-organization {:name "Org Bounds Test" :owner-id nil} db)
+            now (java.time.Instant/now)
+            ;; Helper to create pelada at specific time
+            create-pelada (fn [duration]
+                            (let [d (sqlite-date (.minus now duration))
+                                  p-id (db.pelada/insert-pelada {:organization-id org-id :status "closed"} db)]
+                              (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ? WHERE id = ?" d p-id])
+                              p-id))
+            ;; Inside windows
+            p-30m-in (create-pelada (java.time.Duration/ofMinutes 45))
+            p-12h-in (create-pelada (java.time.Duration/ofMinutes (+ (* 12 60) 30)))
+            p-23h-in (create-pelada (java.time.Duration/ofMinutes (+ (* 23 60) 30)))
+            ;; Outside windows
+            p-30m-out (create-pelada (java.time.Duration/ofMinutes 95))
+            p-12h-out (create-pelada (java.time.Duration/ofMinutes (+ (* 13 60) 30)))
+            p-23h-out (create-pelada (java.time.Duration/ofMinutes (+ (* 24 60) 30)))]
+
+        (let [reminders (db.pelada/list-peladas-for-vote-reminders db)
+              ;; Filter out reminders from other tests
+              my-reminders (filter #(= org-id (-> % :pelada :organization-id)) reminders)
+              by-type (group-by :type my-reminders)
+              ids-by-type (fn [t] (set (map #(-> % :pelada :id) (get by-type t))))]
+
+          (is (= #{p-30m-in} (ids-by-type :30m)) "Only 45m pelada should be in 30m window")
+          (is (= #{p-12h-in} (ids-by-type :12h)) "Only 12.5h pelada should be in 12h window")
+          (is (= #{p-23h-in} (ids-by-type :23h)) "Only 23.5h pelada should be in 23h window"))))))
