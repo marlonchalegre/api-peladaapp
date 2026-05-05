@@ -360,10 +360,10 @@
                                                          :user (get-in a [:player :user]))))
                                (:attendance pelada-data))
         transactions (if is-admin (db.transaction/list-transactions-by-pelada pelada-id db) [])]
-    (-> pelada-data
-        (assoc :pelada mapped-pelada
-               :teams mapped-teams
-               :available_players mapped-available
-               :attendance mapped-attendance
-               :pelada_transactions (map adapter.finance/model->transaction-response transactions)
-               :voting_info voting-info))))
+    {:pelada mapped-pelada
+     :teams mapped-teams
+     :available_players mapped-available
+     :attendance mapped-attendance
+     :pelada_transactions (map adapter.finance/model->transaction-response transactions)
+     :voting_info voting-info
+     :scores (:scores pelada-data)}))

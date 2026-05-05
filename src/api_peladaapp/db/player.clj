@@ -61,7 +61,7 @@
     nil))
 
 (s/defn list-players-by-organization [organization-id db]
-  (->> (next.jdbc/execute! db ["SELECT op.*, u.name as user_name, u.username as user_username, u.email as user_email, u.position as user_position, u.avatar_filename 
+  (->> (next.jdbc/execute! db ["SELECT op.*, u.name as user_name, u.username as user_username, u.position as user_position, u.avatar_filename 
                                 FROM organizationplayers op 
                                 JOIN users u ON op.user_id = u.id 
                                 WHERE op.organization_id = ?" organization-id] opts)

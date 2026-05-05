@@ -22,7 +22,7 @@
 
 (s/defn model->response :- responses.user/UserResponse
   ([user :- models.user/User]
-   (model->response user false))
+   (model->response user true))
   ([user :- models.user/User exclude-email? :- s/Bool]
    (let [fields (if exclude-email?
                   [:id :name :username :position :avatar-filename :avatar_filename :phone]

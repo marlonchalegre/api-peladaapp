@@ -15,4 +15,4 @@
   [token :- s/Str
    user :- models.user/User]
   {:token token
-   :user (adapters.user/model->response user)})
+   :user (adapters.user/model->response user false)})

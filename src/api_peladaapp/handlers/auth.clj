@@ -95,7 +95,7 @@
   [request]
   (try (let [db (:database request)
              user-id (auth.logic/get-user-id-from-request request)]
-         (ok (adapters.user/model->response (controllers.user/get-user user-id db))))
+         (ok (adapters.user/model->response (controllers.user/get-user user-id db) false)))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn forgot-password-handler

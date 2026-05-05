@@ -48,7 +48,8 @@
          :user ""
          :password turso-token})
       {:dbtype "sqlite"
-       :dbname (or (System/getenv "DB_NAME") "peladaapp.db")})))
+       :dbname (or (System/getenv "DB_NAME") "peladaapp.db")
+       :connectionInitSql "PRAGMA busy_timeout = 5000;"})))
 
 (defonce ^:private datasource
   (jdbc/get-datasource db-spec))
@@ -83,6 +84,5 @@
            (wrap-access-rules $ {:rules routes/access-rules :on-error on-error})
            (wrap-authorization $ auth/auth-backend)
            (auth/wrap-manual-auth $)
-           ;; Parse cookies BEFORE authentication so extract-token can access them
            (wrap-cookies $)
            (wrap-json-response $ {:charset "utf-8"})))

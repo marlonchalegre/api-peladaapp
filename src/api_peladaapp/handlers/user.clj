@@ -63,7 +63,7 @@
           db (-> request :database)]
       (auth/require-self-or-admin! request id)
       (-> (controller.user/get-user id db)
-          adapter.user/model->response
+          (adapter.user/model->response false)
           responses/ok))
     (catch Exception e
       (exception/api-exception-handler e))))
@@ -76,7 +76,7 @@
       (auth/require-self-or-admin! request id)
       (-> (adapter.user/update-profile-request->model body)
           (controller.user/update-user-profile id db)
-          adapter.user/model->response
+          (adapter.user/model->response false)
           responses/ok))
     (catch Exception e
       (exception/api-exception-handler e))))

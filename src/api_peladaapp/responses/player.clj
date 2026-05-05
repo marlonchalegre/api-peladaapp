@@ -11,7 +11,6 @@
    (s/optional-key :member_type) s/Str
    (s/optional-key :user_name) s/Str
    (s/optional-key :user_username) s/Str
-   (s/optional-key :user_email) s/Str
    (s/optional-key :user_position) (s/maybe s/Str)
    (s/optional-key :user_avatar_filename) (s/maybe s/Str)
    (s/optional-key :attendance_status) (s/maybe s/Str)

@@ -27,7 +27,10 @@
                              :connectionTestQuery "SELECT 1"})
                           (do
                             (println "Using local SQLite database")
-                            (merge {:dbtype "sqlite" :dbname "peladaapp.db"} db-spec)))]
+                            (merge {:dbtype "sqlite"
+                                    :dbname "peladaapp.db"
+                                    :connectionInitSql "PRAGMA busy_timeout = 5000;"}
+                                   db-spec)))]
       ;; Enable WAL mode for local SQLite before starting the pool
       (when-not (and turso-url turso-token)
         (try
