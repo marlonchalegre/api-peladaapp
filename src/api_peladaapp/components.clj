@@ -27,15 +27,19 @@
                              :connectionTestQuery "SELECT 1"})
                           (do
                             (println "Using local SQLite database")
-                            (merge {:dbtype "sqlite"
-                                    :dbname "peladaapp.db"
-                                    :connectionInitSql "PRAGMA busy_timeout = 5000;"}
-                                   db-spec)))]
+                            (let [db-name (or (:dbname db-spec) "peladaapp.db")
+                                  jdbc-url (str "jdbc:sqlite:" db-name "?busy_timeout=10000")]
+                              (merge {:jdbcUrl jdbc-url
+                                      :connectionInitSql "PRAGMA busy_timeout = 10000; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;"}
+                                     db-spec))))]
       ;; Enable WAL mode for local SQLite before starting the pool
       (when-not (and turso-url turso-token)
         (try
-          (with-open [conn (jdbc/get-connection final-db-spec)]
-            (jdbc/execute! conn ["PRAGMA journal_mode=WAL;"]))
+          (let [db-name (or (:dbname final-db-spec) "peladaapp.db")
+                conn-spec {:dbtype "sqlite" :dbname db-name}]
+            (with-open [conn (jdbc/get-connection conn-spec)]
+              (jdbc/execute! conn ["PRAGMA journal_mode=WAL;"])
+              (jdbc/execute! conn ["PRAGMA synchronous=NORMAL;"])))
           (catch Exception e
             (println "Warning: Could not enable WAL mode:" (.getMessage e)))))
       (let [ds-component (connection/component HikariDataSource final-db-spec)
