@@ -7,6 +7,8 @@
    :organization-id s/Int
    :mensalista-price s/Num
    :diarista-price s/Num
+   (s/optional-key :monthly-fine-amount) (s/maybe s/Num)
+   (s/optional-key :monthly-cut-off-day) (s/maybe s/Int)
    :currency s/Str})
 
 (s/defschema Transaction
@@ -15,6 +17,7 @@
    (s/optional-key :player-id) (s/maybe s/Int)
    (s/optional-key :pelada-id) (s/maybe s/Int)
    :amount s/Num
+   (s/optional-key :fine-amount) (s/maybe s/Num)
    :type (s/enum "income" "expense")
    :category s/Str
    (s/optional-key :description) (s/maybe s/Str)

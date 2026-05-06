@@ -13,6 +13,8 @@
       {:organization-id org-id
        :mensalista-price 0.0
        :diarista-price 0.0
+       :monthly-fine-amount 0.0
+       :monthly-cut-off-day 5
        :currency "BRL"})))
 
 (s/defn upsert-organization-finance
@@ -20,17 +22,17 @@
   (let [row (adapter.finance/finance->db finance)
         exists? (jdbc/execute-one! db ["SELECT 1 FROM \"OrganizationFinances\" WHERE \"organization_id\" = ?" org-id])]
     (if exists?
-      (jdbc/execute! db ["UPDATE \"OrganizationFinances\" SET \"mensalista_price\" = ?, \"diarista_price\" = ?, \"currency\" = ? WHERE \"organization_id\" = ?"
-                         (:mensalista_price row) (:diarista_price row) (:currency row) org-id])
-      (jdbc/execute! db ["INSERT INTO \"OrganizationFinances\" (\"organization_id\", \"mensalista_price\", \"diarista_price\", \"currency\") VALUES (?, ?, ?, ?)"
-                         org-id (:mensalista_price row) (:diarista_price row) (:currency row)]))
+      (jdbc/execute! db ["UPDATE \"OrganizationFinances\" SET \"mensalista_price\" = ?, \"diarista_price\" = ?, \"monthly_fine_amount\" = ?, \"monthly_cut_off_day\" = ?, \"currency\" = ? WHERE \"organization_id\" = ?"
+                         (:mensalista_price row) (:diarista_price row) (:monthly_fine_amount row) (:monthly_cut_off_day row) (:currency row) org-id])
+      (jdbc/execute! db ["INSERT INTO \"OrganizationFinances\" (\"organization_id\", \"mensalista_price\", \"diarista_price\", \"monthly_fine_amount\", \"monthly_cut_off_day\", \"currency\") VALUES (?, ?, ?, ?, ?, ?)"
+                         org-id (:mensalista_price row) (:diarista_price row) (:monthly_fine_amount row) (:monthly_cut_off_day row) (:currency row)]))
     1))
 
 (s/defn add-transaction
   [transaction db]
   (let [row (adapter.finance/transaction->db transaction)
-        sql "INSERT INTO \"Transactions\" (\"organization_id\", \"player_id\", \"pelada_id\", \"amount\", \"type\", \"category\", \"description\", \"payment_date\", \"created_by\", \"status\") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        params [(:organization_id row) (:player_id row) (:pelada_id row) (:amount row) (:type row) (:category row) (:description row) (:payment_date row) (:created_by row) (or (:status row) "paid")]
+        sql "INSERT INTO \"Transactions\" (\"organization_id\", \"player_id\", \"pelada_id\", \"amount\", \"fine_amount\", \"type\", \"category\", \"description\", \"payment_date\", \"created_by\", \"status\") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        params [(:organization_id row) (:player_id row) (:pelada_id row) (:amount row) (or (:fine_amount row) 0.0) (:type row) (:category row) (:description row) (:payment_date row) (:created_by row) (or (:status row) "paid")]
         _ (jdbc/execute! db (into [sql] params))
         result (jdbc/execute-one! db ["SELECT last_insert_rowid() as id"])
         new-id (or (:id result) (get result (keyword "last_insert_rowid()")) (get result "last_insert_rowid()"))]

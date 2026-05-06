@@ -17,6 +17,8 @@
        :organization-id (:organization_id row)
        :mensalista-price (:mensalista_price row)
        :diarista-price (:diarista_price row)
+       :monthly-fine-amount (:monthly_fine_amount row)
+       :monthly-cut-off-day (:monthly_cut_off_day row)
        :currency (:currency row)})))
 
 (defn finance->db [model]
@@ -25,6 +27,8 @@
                             :organization_id (:organization-id model)
                             :mensalista_price (:mensalista-price model)
                             :diarista_price (:diarista-price model)
+                            :monthly_fine_amount (:monthly-fine-amount model)
+                            :monthly_cut_off_day (:monthly-cut-off-day model)
                             :currency (:currency model))))
 
 (defn payload->finance [payload]
@@ -35,6 +39,8 @@
                               :organization-id (:organization_id p)
                               :mensalista-price (:mensalista_price p)
                               :diarista-price (:diarista_price p)
+                              :monthly-fine-amount (:monthly_fine_amount p)
+                              :monthly-cut-off-day (:monthly_cut_off_day p)
                               :currency (:currency p)))))
 
 (defn model->finance-response [model]
@@ -43,6 +49,8 @@
      :organization_id (:organization-id model)
      :mensalista_price (:mensalista-price model)
      :diarista_price (:diarista-price model)
+     :monthly_fine_amount (:monthly-fine-amount model)
+     :monthly_cut_off_day (:monthly-cut-off-day model)
      :currency (:currency model)}))
 
 ;; --- Transactions ---
@@ -57,6 +65,7 @@
                               :player-name (:player_name row)
                               :pelada-id (:pelada_id row)
                               :amount (:amount row)
+                              :fine-amount (:fine_amount row)
                               :type (:type row)
                               :category (:category row)
                               :description (:description row)
@@ -73,6 +82,7 @@
                             :player_id (:player-id model)
                             :pelada_id (:pelada-id model)
                             :amount (:amount model)
+                            :fine_amount (:fine-amount model)
                             :type (:type model)
                             :category (:category model)
                             :description (:description model)
@@ -89,6 +99,7 @@
                               :player-id (:player_id p)
                               :pelada-id (:pelada_id p)
                               :amount (:amount p)
+                              :fine-amount (:fine_amount p)
                               :type (:type p)
                               :category (:category p)
                               :description (:description p)
@@ -105,6 +116,7 @@
                             :player_name (:player-name model)
                             :pelada_id (:pelada-id model)
                             :amount (:amount model)
+                            :fine_amount (:fine-amount model)
                             :type (:type model)
                             :category (:category model)
                             :description (:description model)

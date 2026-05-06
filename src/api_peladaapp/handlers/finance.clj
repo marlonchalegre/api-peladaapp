@@ -6,6 +6,7 @@
    [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.helpers.responses :refer [created ok]]
    [api-peladaapp.logic.authorization :as auth]
+   [api-peladaapp.logic.finance :as logic.finance]
    [next.jdbc :as jdbc]))
 
 (defn get-finance [request]
@@ -86,9 +87,19 @@
                  player-id (:player-id payment-req)
                  year (:year payment-req)
                  month (:month payment-req)
-                 amount (:amount body)
-                 payment-date (:payment_date body)
+                 payment-date (or (:payment_date body) (str (java.time.LocalDate/now)))
 
+                 org-finance (db.finance/get-organization-finance org-id tx)
+
+                 fine (if paid?
+                        (logic.finance/calculate-monthly-fine
+                         year month payment-date
+                         (:monthly-fine-amount org-finance)
+                         (:monthly-cut-off-day org-finance))
+                        0.0)
+
+                 amount (or (:amount body)
+                            (+ (:mensalista-price org-finance) fine))
                  ;; Find existing payment record to see if there's a transaction to reverse
                  existing-payments (db.finance/get-monthly-payments org-id year month tx)
                  existing (first (filter (fn [p] (and (= (some-> p :player-id long) (some-> player-id long))
@@ -104,10 +115,11 @@
                                            {:organization-id org-id
                                             :player-id player-id
                                             :amount (or amount 0.0)
+                                            :fine-amount fine
                                             :type "income"
                                             :category "monthly_fee"
-                                            :description (str "Mensalidade " month "/" year)
-                                            :payment-date (or payment-date (str (java.time.LocalDate/now)))
+                                            :description (str "Mensalidade " month "/" year (if (> fine 0) " (com multa)" ""))
+                                            :payment-date payment-date
                                             :created-by user-id}
                                            tx)]
                                     (:id t))
