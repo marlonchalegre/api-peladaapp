@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.test-helpers :as th]
    [clojure.java.io :as io]
+   [clojure.string :as str]
    [clojure.test :refer [deftest is use-fixtures]]
    [next.jdbc :as jdbc]
    [ring.mock.request :as mock]))
@@ -73,7 +74,7 @@
                                                             :size (.length test-file)}})))
           body (th/decode-body resp)]
       (is (= 400 (:status resp)))
-      (is (clojure.string/includes? (:message body) "Invalid file type")))))
+      (is (str/includes? (:message body) "Invalid file type")))))
 
 (deftest avatar-upload-too-large
   (let [app (-> th/*test-system* :app :handler)
@@ -81,14 +82,14 @@
         ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
         token (th/register-and-login! app {:name "Avatar User" :email "avatar3@example.com" :password "pass"})
         user-id (th/user-id-by-email ds "avatar3@example.com")
-        test-file (java.io.File/createTempFile "large" ".png")]
+        test-file (java.io.File/createTempFile "large" ".png")
 
-    (let [resp (app (-> (mock/request :post (str "/api/user/" user-id "/avatar"))
-                        (mock/cookie "authToken" token)
-                        (assoc :multipart-params {"avatar" {:tempfile test-file
-                                                            :filename "large.png"
-                                                            :content-type "image/png"
-                                                            :size (* 3 1024 1024)}}))) ; 3MB
-          body (th/decode-body resp)]
-      (is (= 400 (:status resp)))
-      (is (clojure.string/includes? (:message body) "File too large")))))
+        resp (app (-> (mock/request :post (str "/api/user/" user-id "/avatar"))
+                      (mock/cookie "authToken" token)
+                      (assoc :multipart-params {"avatar" {:tempfile test-file
+                                                          :filename "large.png"
+                                                          :content-type "image/png"
+                                                          :size (* 3 1024 1024)}}))) ; 3MB
+        body (th/decode-body resp)]
+    (is (= 400 (:status resp)))
+    (is (str/includes? (:message body) "File too large"))))

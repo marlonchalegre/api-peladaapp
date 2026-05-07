@@ -31,12 +31,18 @@
     (POST "/profile/serve" [] handler.internal/serve-profiler-results))
 
   (context "/api" []
+    (GET "/organizations/:organization_id/substitutions" [] handler.organization/list-substitutions)
+    (POST "/organizations/:organization_id/substitutions" [] handler.organization/create-substitution)
+    (POST "/organizations/:organization_id/substitutions/:sub_id/end" [] handler.organization/end-substitution)
+
     ;; Users
     (GET "/users" [] handler.user/list-all)
     (GET "/users/search" [] handler.user/search)
     (GET "/user/:id" [] handler.user/get-by-id)
     (PUT "/user/:id/profile" [] handler.user/update-profile)
     (DELETE "/user/:id" [] handler.user/delete)
+    (GET "/users/me" [] auth/get-me-handler)
+    (GET "/users/:user_id/organizations" [] handler.organization/list-by-user)
 
     ;; Avatars
     (POST "/user/:id/avatar" [] handler.avatar/upload)
@@ -87,10 +93,6 @@
     (PUT "/players/:id" [] handler.player/update-player-score)
     (DELETE "/players/:id" [] handler.player/delete)
     (GET "/organizations/:organization_id/players" [] handler.player/list-by-org)
-
-    ;; Users
-    (GET "/users/me" [] auth/get-me-handler)
-    (GET "/users/:user_id/organizations" [] handler.organization/list-by-user)
 
     ;; Organizations
     (POST "/organizations" [] handler.organization/create)

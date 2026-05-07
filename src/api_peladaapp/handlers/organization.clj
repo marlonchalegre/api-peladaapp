@@ -5,11 +5,13 @@
    [api-peladaapp.adapters.organization :as adapter.organization]
    [api-peladaapp.controllers.organization :as controller.organization]
    [api-peladaapp.db.admin :as db.admin]
+   [api-peladaapp.db.monthly-substitution :as db.monthly-sub]
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.exception :as exception]
    [api-peladaapp.helpers.responses :refer [bad-request created deleted ok]]
    [api-peladaapp.logic.authorization :as auth]
+   [api-peladaapp.logic.monthly-substitution :as logic.monthly-sub]
    [clojure.string :as str]
    [next.jdbc :as jdbc]))
 
@@ -168,6 +170,36 @@
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id id db)
          (ok (controller.organization/test-waha-connection id db)))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn list-substitutions [request]
+  (try (let [db (:database request)
+             org-id (Integer/parseInt (str (get-in request [:params :organization_id])))
+             user-id (auth/get-user-id-from-request request)]
+         (auth/require-organization-member! user-id org-id db)
+         (ok (db.monthly-sub/list-substitutions-by-org org-id db)))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn create-substitution [request]
+  (try (let [db (:database request)
+             org-id (Integer/parseInt (str (get-in request [:params :organization_id])))
+             user-id (auth/get-user-id-from-request request)
+             body (:body request)
+             permanent-player-id (:permanent_player_id body)
+             temporary-player-id (:temporary_player_id body)
+             start-date (:start_date body)]
+         (auth/require-organization-admin! user-id org-id db)
+         (ok (logic.monthly-sub/substitute-player! org-id permanent-player-id temporary-player-id start-date db)))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn end-substitution [request]
+  (try (let [db (:database request)
+             org-id (Integer/parseInt (str (get-in request [:params :organization_id])))
+             user-id (auth/get-user-id-from-request request)
+             sub-id (Integer/parseInt (str (get-in request [:params :sub_id])))
+             end-date (get-in request [:body :end_date] (str (java.time.LocalDate/now)))]
+         (auth/require-organization-admin! user-id org-id db)
+         (ok (logic.monthly-sub/end-substitution! sub-id end-date db)))
        (catch Exception e (exception/api-exception-handler e))))
 
 

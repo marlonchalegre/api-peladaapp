@@ -9,6 +9,7 @@
    [clojure.string :as str]
    [clojure.test :refer [deftest is use-fixtures]]
    [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
@@ -207,55 +208,53 @@
 
 (deftest list-pending-attendance-test
   (let [db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
+        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
 
-    ;; 1. Setup organization
-    (let [user-id (db.user/insert-user {:name "Admin" :email "admin-notification@test.com" :password "pass"} ds)
-          org-id (db.organization/insert-organization {:name "Notification Org" :owner-id user-id} ds)
+        ;; 1. Setup organization
+        user-id (db.user/insert-user {:name "Admin" :email "admin-notification@test.com" :password "pass"} ds)
+        org-id (db.organization/insert-organization {:name "Notification Org" :owner-id user-id} ds)
 
-          ;; 2. Setup players: 1 mensalista, 1 diarista
-          p1-id (jdbc/execute-one! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, member_type) VALUES (?, ?, ?) RETURNING id"
-                                       org-id user-id "mensalista"]
-                                   {:return-keys true :builder-fn next.jdbc.result-set/as-unqualified-lower-maps})
-          p1-id (:id p1-id)
+        ;; 2. Setup players: 1 mensalista, 1 diarista
+        p1-id (:id (jdbc/execute-one! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, member_type) VALUES (?, ?, ?) RETURNING id"
+                                          org-id user-id "mensalista"]
+                                      {:return-keys true :builder-fn rs/as-unqualified-lower-maps}))
 
-          user2-id (db.user/insert-user {:name "Diarista" :email "diarista-notification@test.com" :password "pass"} ds)
-          p2-id (jdbc/execute-one! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, member_type) VALUES (?, ?, ?) RETURNING id"
-                                       org-id user2-id "diarista"]
-                                   {:return-keys true :builder-fn next.jdbc.result-set/as-unqualified-lower-maps})
-          p2-id (:id p2-id)
+        user2-id (db.user/insert-user {:name "Diarista" :email "diarista-notification@test.com" :password "pass"} ds)
 
-          ;; 3. Create pelada
-          pelada-id (db.pelada/insert-pelada {:organization-id org-id :status "attendance"} ds)]
+        ;; 3. Create pelada
+        pelada-id (db.pelada/insert-pelada {:organization-id org-id :status "attendance"} ds)]
 
-      ;; Initial state: only mensalista should be listed
-      (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
-        (is (= 1 (count pending)))
-        (is (some #(= (:player-name %) "Admin") pending))
-        (is (not (some #(= (:player-name %) "Diarista") pending))))
+    (jdbc/execute-one! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, member_type) VALUES (?, ?, ?)"
+                           org-id user2-id "diarista"])
 
-      ;; 4. If mensalista confirms, they should be removed from pending
-      (db.attendance/upsert-attendance pelada-id p1-id "confirmed" ds)
-      (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
-        (is (= 0 (count pending))))
+    ;; Initial state: only mensalista should be listed
+    (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
+      (is (= 1 (count pending)))
+      (is (some #(= (:player-name %) "Admin") pending))
+      (is (not (some #(= (:player-name %) "Diarista") pending))))
 
-      ;; 5. If mensalista declines, they should also be removed from pending
-      (db.attendance/upsert-attendance pelada-id p1-id "declined" ds)
-      (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
-        (is (= 0 (count pending))))
+    ;; 4. If mensalista confirms, they should be removed from pending
+    (db.attendance/upsert-attendance pelada-id p1-id "confirmed" ds)
+    (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
+      (is (= 0 (count pending))))
 
-      ;; 6. If mensalista is 'pending', they should still be listed
-      (db.attendance/upsert-attendance pelada-id p1-id "pending" ds)
-      (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
-        (is (= 1 (count pending)))
-        (is (some #(= (:player-name %) "Admin") pending)))
+    ;; 5. If mensalista declines, they should also be removed from pending
+    (db.attendance/upsert-attendance pelada-id p1-id "declined" ds)
+    (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
+      (is (= 0 (count pending))))
 
-      ;; 7. If all mensalistas have responded (confirmed/declined/waitlist) but diaristas haven't
-      ;; p1 is currently 'pending', let's make them 'confirmed'
-      (db.attendance/upsert-attendance pelada-id p1-id "confirmed" ds)
-      ;; p2 is a 'diarista' and has NOT responded yet (no record in PeladaAttendance)
-      (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
-        (is (= 0 (count pending)))))))
+    ;; 6. If mensalista is 'pending', they should still be listed
+    (db.attendance/upsert-attendance pelada-id p1-id "pending" ds)
+    (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
+      (is (= 1 (count pending)))
+      (is (some #(= (:player-name %) "Admin") pending)))
+
+    ;; 7. If all mensalistas have responded (confirmed/declined/waitlist) but diaristas haven't
+    ;; p1 is currently 'pending', let's make them 'confirmed'
+    (db.attendance/upsert-attendance pelada-id p1-id "confirmed" ds)
+    ;; p2 is a 'diarista' and has NOT responded yet (no record in PeladaAttendance)
+    (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
+      (is (= 0 (count pending))))))
 
 
 

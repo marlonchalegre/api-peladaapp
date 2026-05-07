@@ -69,7 +69,7 @@
                JOIN Users u ON op.user_id = u.id
                JOIN Peladas p ON op.organization_id = p.organization_id
                WHERE p.id = ?
-               AND op.member_type = 'mensalista'
+               AND op.member_type IN ('mensalista', 'mensalista_temporario')
                AND NOT EXISTS (
                  SELECT 1 FROM PeladaAttendance pa 
                  WHERE pa.pelada_id = p.id 

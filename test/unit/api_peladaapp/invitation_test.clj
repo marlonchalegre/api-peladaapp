@@ -72,7 +72,7 @@
                    first
                    ((fn [row] (or (:id row) (get row "id") (first (vals row))))))
         ;; Use controller to create invite (which also creates partial user)
-        invite-result (controller.organization/invite-player-improved org-id email nil 99 db)
+        _ (controller.organization/invite-player-improved org-id email nil 99 db)
         token (:token (first (controller.organization/list-organization-invitations org-id db)))
         user (first (jdbc/execute! db ["SELECT id FROM Users WHERE email = ?" email] opts))
         user-id (:id user)]

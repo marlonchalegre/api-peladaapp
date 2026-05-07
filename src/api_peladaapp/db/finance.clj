@@ -69,7 +69,7 @@
                JOIN Users u ON op.user_id = u.id
                LEFT JOIN \"MonthlyPayments\" mp ON op.id = mp.player_id 
                     AND mp.year = ? AND mp.month = ?
-               WHERE op.organization_id = ? AND op.member_type = 'mensalista'
+               WHERE op.organization_id = ? AND op.member_type IN ('mensalista', 'mensalista_temporario')
                ORDER BY u.name ASC"
         result (jdbc/execute! db [query year month org-id])]
     (map adapter.finance/db->monthly-payment result)))

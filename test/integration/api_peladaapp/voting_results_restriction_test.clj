@@ -43,7 +43,7 @@
           p-admin-id (th/player-id-by-user-id ds (th/user-id-by-email ds "admin@test.com") org-id)
           p1-id (th/player-id-by-user-id ds (th/user-id-by-email ds "p1@test.com") org-id)
           p2-id (th/player-id-by-user-id ds (th/user-id-by-email ds "p2@test.com") org-id)
-          p3-id (th/player-id-by-user-id ds (th/user-id-by-email ds "p3@test.com") org-id)]
+          _p3-id (th/player-id-by-user-id ds (th/user-id-by-email ds "p3@test.com") org-id)]
 
       ;; Only Admin, P1 and P2 participated
       (doseq [pid [p-admin-id p1-id p2-id]]
