@@ -92,10 +92,12 @@
                  org-finance (db.finance/get-organization-finance org-id tx)
 
                  fine (if paid?
-                        (logic.finance/calculate-monthly-fine
-                         year month payment-date
-                         (:monthly-fine-amount org-finance)
-                         (:monthly-cut-off-day org-finance))
+                        (if (contains? body :fine_amount)
+                          (double (or (:fine_amount body) 0.0))
+                          (logic.finance/calculate-monthly-fine
+                           year month payment-date
+                           (:monthly-fine-amount org-finance)
+                           (:monthly-cut-off-day org-finance)))
                         0.0)
 
                  amount (or (:amount body)
@@ -108,30 +110,51 @@
                                          existing-payments))
 
                  existing-tx-id (:transaction-id existing)
+                 existing-fine-tx-id (:fine-transaction-id existing)
 
-                 transaction-id (if paid?
-                                  ;; Mark as paid: create income transaction
-                                  (let [t (db.finance/add-transaction
-                                           {:organization-id org-id
-                                            :player-id player-id
-                                            :amount (or amount 0.0)
-                                            :fine-amount fine
-                                            :type "income"
-                                            :category "monthly_fee"
-                                            :description (str "Mensalidade " month "/" year (if (> fine 0) " (com multa)" ""))
-                                            :payment-date payment-date
-                                            :created-by user-id}
-                                           tx)]
-                                    (:id t))
-                                  ;; Mark as unpaid: reverse existing transaction if any
-                                  (do
-                                    (when existing-tx-id
-                                      (db.finance/reverse-transaction existing-tx-id tx))
-                                    nil))
+                 transactions (if paid?
+                                ;; Mark as paid: create income transactions
+                                (let [base-amount (- (or amount 0.0) fine)
+                                      base-tx (db.finance/add-transaction
+                                               {:organization-id org-id
+                                                :player-id player-id
+                                                :amount base-amount
+                                                :type "income"
+                                                :category "monthly_fee"
+                                                :description (str "Mensalidade " month "/" year)
+                                                :payment-date payment-date
+                                                :created-by user-id}
+                                               tx)
+                                      fine-tx (when (> fine 0)
+                                                (db.finance/add-transaction
+                                                 {:organization-id org-id
+                                                  :player-id player-id
+                                                  :amount fine
+                                                  :type "income"
+                                                  :category "fine"
+                                                  :description (str "Multa Mensalidade " month "/" year)
+                                                  :payment-date payment-date
+                                                  :created-by user-id}
+                                                 tx))]
+                                  {:transaction-id (:id base-tx)
+                                   :fine-transaction-id (:id fine-tx)})
+                                ;; Mark as unpaid: reverse existing transactions if any
+                                (do
+                                  (when existing-tx-id
+                                    (db.finance/reverse-transaction existing-tx-id tx))
+                                  (when existing-fine-tx-id
+                                    (db.finance/reverse-transaction existing-fine-tx-id tx))
+                                  {:transaction-id nil
+                                   :fine-transaction-id nil}))
 
-                 payment (assoc payment-req :organization-id org-id :transaction-id transaction-id)]
+                 payment (assoc payment-req
+                                :organization-id org-id
+                                :transaction-id (:transaction-id transactions)
+                                :fine-transaction-id (:fine-transaction-id transactions))]
              (db.finance/mark-monthly-payment payment tx)
-             (ok {:message "Payment status updated" :transaction_id transaction-id}))))
+             (ok {:message "Payment status updated"
+                  :transaction_id (:transaction-id transactions)
+                  :fine_transaction_id (:fine-transaction-id transactions)}))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn get-summary [request]

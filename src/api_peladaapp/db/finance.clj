@@ -42,8 +42,12 @@
   [transaction-id db]
   (jdbc/with-transaction [tx db]
     (jdbc/execute! tx ["UPDATE \"Transactions\" SET \"status\" = 'reversed' WHERE id = ?" transaction-id])
-    (jdbc/execute! tx ["UPDATE \"MonthlyPayments\" SET \"paid\" = 0, \"transaction_id\" = NULL WHERE \"transaction_id\" = ?" transaction-id])))
-
+    ;; If it's a base fee transaction, mark the payment as unpaid
+    (jdbc/execute! tx ["UPDATE \"MonthlyPayments\" SET \"paid\" = 0, \"transaction_id\" = NULL WHERE \"transaction_id\" = ?" transaction-id])
+    ;; If it's a fine transaction, just clear the link (keep paid=1 if base fee is still there)
+    ;; Actually, we might want to keep the link but we already check status='reversed' in the UI.
+    ;; But for consistency with the base fee behavior, we clear the ID.
+    (jdbc/execute! tx ["UPDATE \"MonthlyPayments\" SET \"fine_transaction_id\" = NULL WHERE \"fine_transaction_id\" = ?" transaction-id])))
 (s/defn count-transactions
   [org-id db]
   (:count (jdbc/execute-one! db ["SELECT COUNT(*) as count FROM \"Transactions\" WHERE \"organization_id\" = ?" org-id])))
@@ -60,17 +64,20 @@
                LIMIT ? OFFSET ?"
         result (jdbc/execute! db [query org-id limit offset])]
     (map adapter.finance/db->transaction result)))
-
 (s/defn get-monthly-payments
   [org-id year month db]
-  (let [query "SELECT mp.id, op.id as player_id, u.name as player_name, op.member_type, 
-                      mp.year, mp.month, mp.transaction_id, mp.paid
-               FROM OrganizationPlayers op
-               JOIN Users u ON op.user_id = u.id
-               LEFT JOIN \"MonthlyPayments\" mp ON op.id = mp.player_id 
-                    AND mp.year = ? AND mp.month = ?
-               WHERE op.organization_id = ? AND op.member_type IN ('mensalista', 'mensalista_temporario')
-               ORDER BY u.name ASC"
+  (let [query "SELECT mp.id, op.id as player_id, u.name as player_name, op.member_type,
+                       mp.year, mp.month, mp.transaction_id, mp.fine_transaction_id, mp.paid,
+                       t.amount, t.fine_amount,
+                       ft.amount as actual_fine_amount, ft.status as fine_status
+                FROM OrganizationPlayers op
+                JOIN Users u ON op.user_id = u.id
+                LEFT JOIN \"MonthlyPayments\" mp ON op.id = mp.player_id
+                     AND mp.year = ? AND mp.month = ?
+                LEFT JOIN \"Transactions\" t ON mp.transaction_id = t.id
+                LEFT JOIN \"Transactions\" ft ON mp.fine_transaction_id = ft.id
+                WHERE op.organization_id = ? AND op.member_type IN ('mensalista', 'mensalista_temporario')
+                ORDER BY u.name ASC"
         result (jdbc/execute! db [query year month org-id])]
     (map adapter.finance/db->monthly-payment result)))
 
@@ -80,10 +87,10 @@
         exists? (jdbc/execute-one! db ["SELECT id FROM \"MonthlyPayments\" WHERE \"organization_id\" = ? AND \"player_id\" = ? AND \"year\" = ? AND \"month\" = ?"
                                        (:organization_id row) (:player_id row) (:year row) (:month row)])]
     (if exists?
-      (jdbc/execute! db ["UPDATE \"MonthlyPayments\" SET \"transaction_id\" = ?, \"paid\" = ? WHERE id = ?"
-                         (:transaction_id row) (:paid row) (or (:id exists?) (get exists? (keyword "MonthlyPayments/id")))])
-      (jdbc/execute! db ["INSERT INTO \"MonthlyPayments\" (\"organization_id\", \"player_id\", \"year\", \"month\", \"transaction_id\", \"paid\") VALUES (?, ?, ?, ?, ?, ?)"
-                         (:organization_id row) (:player_id row) (:year row) (:month row) (:transaction_id row) (:paid row)]))
+      (jdbc/execute! db ["UPDATE \"MonthlyPayments\" SET \"transaction_id\" = ?, \"fine_transaction_id\" = ?, \"paid\" = ? WHERE id = ?"
+                         (:transaction_id row) (:fine_transaction_id row) (:paid row) (or (:id exists?) (get exists? (keyword "MonthlyPayments/id")))])
+      (jdbc/execute! db ["INSERT INTO \"MonthlyPayments\" (\"organization_id\", \"player_id\", \"year\", \"month\", \"transaction_id\", \"fine_transaction_id\", \"paid\") VALUES (?, ?, ?, ?, ?, ?, ?)"
+                         (:organization_id row) (:player_id row) (:year row) (:month row) (:transaction_id row) (:fine_transaction_id row) (:paid row)]))
     1))
 
 (s/defn get-summary
