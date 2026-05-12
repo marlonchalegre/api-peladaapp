@@ -110,7 +110,7 @@
    limit :- s/Int
    offset :- s/Int
    db]
-  ;; Note: In Postgres, we don't have datetime() function like SQLite.
+  ;; Note: In Postgres, we use the now() function or CURRENT_TIMESTAMP.
   ;; We use CURRENT_TIMESTAMP and interval arithmetic.
   ;; For ordering, we'll use a simpler CASE expression.
   (let [one-day-ago (.minus (OffsetDateTime/now) 24 ChronoUnit/HOURS)

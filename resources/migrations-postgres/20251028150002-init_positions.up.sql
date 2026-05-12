@@ -1,4 +1,0 @@
-CREATE TABLE IF NOT EXISTS "Positions" (
-  id SERIAL PRIMARY KEY,
-  value VARCHAR
-);

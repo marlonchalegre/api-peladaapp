@@ -8,7 +8,8 @@
 (s/defn substitute-player!
   [org-id permanent-player-id temporary-player-id start-date db]
   (jdbc/with-transaction [tx db]
-    (let [permanent-player (db.player/get-player permanent-player-id tx)]
+    ;; Lock the permanent player record to prevent concurrent substitutions for the same player
+    (let [permanent-player (db.player/get-player permanent-player-id tx true)]
 
       (when-not (= (:member-type permanent-player) "mensalista")
         (throw (ex-info "Permanent player must be a mensalista"

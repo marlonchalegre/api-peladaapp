@@ -1,4 +1,0 @@
--- SQLite doesn't support dropping columns easily before 3.35, but we can't do much about it in a simple migration.
--- However, for simple ALTER TABLE ADD COLUMN, we usually just leave it or recreate the table if we really need to.
--- In many setups, down migrations for SQLite are just ignored or best effort.
--- We will leave it empty as it's just an added column.

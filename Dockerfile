@@ -1,7 +1,6 @@
 # Multi-stage build for api-peladaapp
 
 # --- Builder image: builds the uberjar
-# Using Java 23 to match LibSQL driver requirements
 FROM --platform=$BUILDPLATFORM clojure:temurin-23-lein AS builder
 WORKDIR /app
 
@@ -27,26 +26,16 @@ WORKDIR /app
 
 # Combine apt operations to reduce layers
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
     ca-certificates \
-    && ARCH=$(dpkg --print-architecture) && \
-    if [ "$ARCH" = "armhf" ]; then L_ARCH="arm"; else L_ARCH="$ARCH"; fi && \
-    curl -L "https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-${L_ARCH}.deb" -o litestream.deb && \
-    dpkg -i litestream.deb && \
-    rm litestream.deb && \
-    apt-get purge -y --auto-remove curl && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy artifacts from builder
 COPY --from=builder /app/app.jar /app/app.jar
 COPY --from=builder /app/resources /app/resources
-COPY litestream.yml /etc/litestream.yml
-COPY run.sh /app/run.sh
-RUN chmod +x /app/run.sh
 
 EXPOSE 8080
 
 # Production runtime JVM opts
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 
-ENTRYPOINT ["/app/run.sh"]
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]

@@ -16,8 +16,7 @@
   (jdbc/execute! ds (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps}))
 
 (deftest get-normalized-scores-test
-  (let [db-file (:db-file th/*test-system*)
-        ds (th/get-test-datasource db-file)]
+  (let [ds (th/get-test-datasource)]
 
     ;; Setup Organization
     (insert! ds (-> (h/insert-into :Organizations)

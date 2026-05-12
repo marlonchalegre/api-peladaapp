@@ -11,15 +11,9 @@
    [next.jdbc.result-set :as rs]
    [ring.mock.request :as mock])
   (:import
-   (java.io File)
    (java.net URI)))
 
 (def ^:dynamic *test-system* nil)
-
-(defn temp-db-file []
-  (let [f (File/createTempFile "test-db-" ".sqlite")]
-    (.deleteOnExit f)
-    (.getAbsolutePath f)))
 
 (defn decode-body [resp]
   (try
@@ -91,15 +85,12 @@
       new-ds)))
 
 (defn get-test-datasource
-  "Return a datasource for tests. If DATABASE_URL is set, returns the postgres datasource.
-   Otherwise returns the sqlite datasource for db-file."
-  [db-file]
+  "Return a datasource for tests. DATABASE_URL must be set."
+  []
   (if-let [db-url (System/getenv "DATABASE_URL")]
     (let [jdbc-url (parse-database-url db-url)]
       (get-or-create-postgres-ds jdbc-url))
-    (if db-file
-      (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
-      (throw (ex-info "No database configured for tests (no db-file and no DATABASE_URL)" {})))))
+    (throw (ex-info "No database configured for tests (DATABASE_URL is missing)" {}))))
 
 (defn truncate-tables [ds]
   (let [tables ["Organizations" "Users" "Positions" "OrganizationPlayers" "Peladas" "Teams" "TeamPlayers" "Matches" "MonthlyPlayerSubstitutions" "Transactions" "Votes" "MatchEvents" "PeladaPlayerStats" "Attendance" "PeladaReminders"]]
@@ -126,23 +117,13 @@
 (defonce migrations-run? (atom false))
 
 (defn test-system-fixture [f]
-  (let [db-url (System/getenv "DATABASE_URL")
-        ds (get-test-datasource nil)]
-    (if db-url
-      (do
-        (reset-postgres-schema ds)
-        (let [config {:store :database
-                      :migration-dir "migrations-postgres"
-                      :db {:datasource ds}}]
-          (migratus/migrate config))
-        (seed-positions ds))
-      (let [db-file (temp-db-file)
-            ds (get-test-datasource db-file)
-            config {:store :database
-                    :migration-dir "migrations"
-                    :db {:datasource ds}}]
-        (migratus/migrate config)
-        (seed-positions ds)))
+  (let [ds (get-test-datasource)]
+    (reset-postgres-schema ds)
+    (let [config {:store :database
+                  :migration-dir "migrations"
+                  :db {:datasource ds}}]
+      (migratus/migrate config))
+    (seed-positions ds)
     (binding [*test-system* (let [sys (components/system {:db-spec {:datasource ds} :skip-migrations true})]
                               (-> sys
                                   (dissoc :server)

@@ -57,12 +57,15 @@
     (-> (jdbc/execute-one! db (hsql/format query) opts)
         affected-rows-count)))
 
-(s/defn get-player [id db]
-  (let [query (-> (h/select :*)
-                  (h/from :OrganizationPlayers)
-                  (h/where [:= :id id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
-        adapter.player/db->model)))
+(s/defn get-player
+  ([id db] (get-player id db false))
+  ([id db for-update?]
+   (let [query (cond-> (-> (h/select :*)
+                           (h/from :OrganizationPlayers)
+                           (h/where [:= :id id]))
+                 for-update? (assoc :for [:update]))]
+     (-> (jdbc/execute-one! db (hsql/format query) opts)
+         adapter.player/db->model))))
 
 (s/defn get-org-player-by-user-id :- s/Any
   [user-id organization-id db]

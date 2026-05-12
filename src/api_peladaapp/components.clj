@@ -14,8 +14,6 @@
     (if (or datasource database)
       (assoc this :datasource (or datasource database) :database (or database datasource))
       (let [database-url (System/getenv "DATABASE_URL")
-            turso-url (System/getenv "TURSO_DATABASE_URL")
-            turso-token (System/getenv "TURSO_AUTH_TOKEN")
 
             final-db-spec (cond
                             (:jdbcUrl db-spec)
@@ -23,17 +21,6 @@
                               (println (str "Using explicit jdbcUrl from db-spec: " (:jdbcUrl db-spec)))
                               (try (Class/forName "org.postgresql.Driver") (catch Exception _))
                               (assoc db-spec :connectionTestQuery "SELECT 1" :maximumPoolSize 10))
-
-                          ;; Turso / LibSQL (existing behavior)
-                            (and turso-url turso-token)
-                            (let [url (str "jdbc:dbeaver:libsql:https://"
-                                           (clojure.string/replace turso-url #"^libsql://" ""))]
-                              (println (str "Using Turso (LibSQL) Cloud Database: " url))
-                              (Class/forName "com.dbeaver.jdbc.driver.libsql.LibSqlDriver")
-                              {:jdbcUrl url
-                               :user ""
-                               :password turso-token
-                               :connectionTestQuery "SELECT 1"})
 
                           ;; Postgres via DATABASE_URL
                             database-url
@@ -46,13 +33,9 @@
                               {:jdbcUrl jdbc-url
                                :connectionTestQuery "SELECT 1"})
 
-                          ;; SQLite Default
+                          ;; Fallback
                             :else
-                            (do
-                              (println "Using SQLite database (default)")
-                              (assoc db-spec
-                                     :dbtype "sqlite"
-                                     :connectionInitSql "PRAGMA busy_timeout = 10000; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")))
+                            (throw (Exception. "No DATABASE_URL found and no db-spec provided. PostgreSQL is now mandatory.")))
 
             ds (jdbc/get-datasource final-db-spec)]
         (assoc this :datasource ds :database ds))))

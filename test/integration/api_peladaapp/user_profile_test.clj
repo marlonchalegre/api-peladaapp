@@ -18,8 +18,8 @@
 
 (deftest get-user-profile-success
   (let [app (-> th/*test-system* :app :app-handler)
-        db-file (:db-file th/*test-system*)
-        ds (api-peladaapp.test-helpers/get-test-datasource db-file)
+        ds (api-peladaapp.test-helpers/get-test-datasource)
+
         token (th/register-and-login! app {:name "Profile User" :email "profile@example.com" :password "pass"})
         user-id (th/user-id-by-email ds "profile@example.com")
         resp (app (-> (mock/request :get (str "/api/user/" user-id))
@@ -38,8 +38,8 @@
 
 (deftest update-user-profile-success
   (let [app (-> th/*test-system* :app :app-handler)
-        db-file (:db-file th/*test-system*)
-        ds (api-peladaapp.test-helpers/get-test-datasource db-file)
+        ds (api-peladaapp.test-helpers/get-test-datasource)
+
         token (th/register-and-login! app {:name "Old Name" :email "old@example.com" :password "pass"})
         user-id (th/user-id-by-email ds "old@example.com")
         resp (app (-> (mock/request :put (str "/api/user/" user-id "/profile"))
@@ -52,8 +52,8 @@
 
 (deftest delete-user-success
   (let [app (-> th/*test-system* :app :app-handler)
-        db-file (:db-file th/*test-system*)
-        ds (api-peladaapp.test-helpers/get-test-datasource db-file)
+        ds (api-peladaapp.test-helpers/get-test-datasource)
+
         token (th/register-and-login! app {:name "Delete Me" :email "delete@example.com" :password "pass"})
         user-id (th/user-id-by-email ds "delete@example.com")
         resp (app (-> (mock/request :delete (str "/api/user/" user-id))
@@ -63,8 +63,8 @@
 
 (deftest update-user-profile-duplicate-email
   (let [app (-> th/*test-system* :app :app-handler)
-        db-file (:db-file th/*test-system*)
-        ds (api-peladaapp.test-helpers/get-test-datasource db-file)
+        ds (api-peladaapp.test-helpers/get-test-datasource)
+
         ;; Register first user
         _ (th/register-and-login! app {:name "User 1" :username "user1" :email "user1@example.com" :password "pass"})
         ;; Register second user

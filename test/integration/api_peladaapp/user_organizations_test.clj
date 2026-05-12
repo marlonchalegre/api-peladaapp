@@ -9,8 +9,7 @@
 (deftest test-list-user-organizations
   (testing "Listing user organizations with roles"
     (let [app (-> th/*test-system* :app :app-handler)
-          db-file (:db-file th/*test-system*)
-          ds (api-peladaapp.test-helpers/get-test-datasource db-file)
+          ds (api-peladaapp.test-helpers/get-test-datasource)
 
           ;; Register two users
           token1 (th/register-and-login! app {:name "User 1" :email "u1@test.com" :password "pass"})

@@ -12,7 +12,7 @@
 (use-fixtures :each th/test-system-fixture)
 
 (deftest randomize-teams-logic-test
-  (let [ds (th/get-test-datasource (:db-file th/*test-system*))]
+  (let [ds (th/get-test-datasource)]
     (testing "Distributes players to fill teams"
       (let [org-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Organizations)
                                                                (h/values [{:name "Org"}])

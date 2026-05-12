@@ -19,7 +19,6 @@
                  [compojure "1.7.2"]
                  [com.github.seancorfield/next.jdbc "1.3.1093"]
                  [medley/medley "1.4.0"]
-                 [org.xerial/sqlite-jdbc  "3.53.0.0"]
                  [org.postgresql/postgresql "42.6.0"]
                  [com.github.seancorfield/honeysql "2.6.1147"]
                  [prismatic/schema "1.4.1"]

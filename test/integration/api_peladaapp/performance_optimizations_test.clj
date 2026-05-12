@@ -15,12 +15,8 @@
 
 (use-fixtures :each h/test-system-fixture)
 
-(defn get-test-db []
-  (let [db-file (:db-file h/*test-system*)]
-    (api-peladaapp.test-helpers/get-test-datasource db-file)))
-
 (deftest test-list-user-organizations-optimization
-  (let [db (get-test-db)
+  (let [db (h/get-test-datasource)
         u-id (db.user/insert-user {:name "User" :email "u@test.com" :password "p"} db)
         org1-id (db.organization/insert-organization {:name "Admin Org"} db)
         org2-id (db.organization/insert-organization {:name "Player Org"} db)]
@@ -37,7 +33,7 @@
       (is (= "player" (:role (first (get org-map org2-id))))))))
 
 (deftest test-upsert-attendance-optimization
-  (let [db (get-test-db)
+  (let [db (h/get-test-datasource)
         u-id (db.user/insert-user {:name "User" :email "u@test.com" :password "p"} db)
         org-id (db.organization/insert-organization {:name "Org"} db)
         p-id (db.player/insert-player {:user-id u-id :organization-id org-id :grade 5.0 :position-id 1} db)
@@ -55,7 +51,7 @@
       (is (= 1 (count (db.attendance/list-attendance-by-pelada pelada-id db)))))))
 
 (deftest test-pelada-player-stats-triggers
-  (let [db (get-test-db)
+  (let [db (h/get-test-datasource)
         u-id (db.user/insert-user {:name "User" :email "u@test.com" :password "p"} db)
         org-id (db.organization/insert-organization {:name "Org"} db)
         p-id (db.player/insert-player {:user-id u-id :organization-id org-id :grade 5.0 :position-id 1} db)
@@ -83,7 +79,7 @@
       (is (= 1 (:assists stats))))))
 
 (deftest test-batch-vote-insert
-  (let [db (get-test-db)
+  (let [db (h/get-test-datasource)
         ;; Setup users, org, players, pelada...
         u1 (db.user/insert-user {:name "Voter" :email "v@t.com" :password "p"} db)
         u2 (db.user/insert-user {:name "Target1" :email "t1@t.com" :password "p"} db)

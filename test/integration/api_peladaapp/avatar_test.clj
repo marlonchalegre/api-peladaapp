@@ -16,8 +16,8 @@
 
 (deftest avatar-workflow-test
   (let [app (-> th/*test-system* :app :app-handler)
-        db-file (:db-file th/*test-system*)
-        ds (api-peladaapp.test-helpers/get-test-datasource db-file)
+        ds (api-peladaapp.test-helpers/get-test-datasource)
+
         token (th/register-and-login! app {:name "Avatar User" :email "avatar@example.com" :password "pass"})
         user-id (th/user-id-by-email ds "avatar@example.com")
         test-image (create-test-image)]
@@ -56,8 +56,8 @@
 
 (deftest avatar-upload-invalid-type
   (let [app (-> th/*test-system* :app :app-handler)
-        db-file (:db-file th/*test-system*)
-        ds (api-peladaapp.test-helpers/get-test-datasource db-file)
+        ds (api-peladaapp.test-helpers/get-test-datasource)
+
         token (th/register-and-login! app {:name "Avatar User" :email "avatar2@example.com" :password "pass"})
         user-id (th/user-id-by-email ds "avatar2@example.com")
         test-file (java.io.File/createTempFile "test" ".txt")]
@@ -77,8 +77,8 @@
 
 (deftest avatar-upload-too-large
   (let [app (-> th/*test-system* :app :app-handler)
-        db-file (:db-file th/*test-system*)
-        ds (api-peladaapp.test-helpers/get-test-datasource db-file)
+        ds (api-peladaapp.test-helpers/get-test-datasource)
+
         token (th/register-and-login! app {:name "Avatar User" :email "avatar3@example.com" :password "pass"})
         user-id (th/user-id-by-email ds "avatar3@example.com")
         test-file (java.io.File/createTempFile "large" ".png")

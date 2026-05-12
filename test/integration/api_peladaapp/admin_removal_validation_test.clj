@@ -9,8 +9,7 @@
 (deftest test-prevent-removing-last-admin
   (testing "Should prevent removing the last admin of an organization"
     (let [app (-> th/*test-system* :app :app-handler)
-          db-file (:db-file th/*test-system*)
-          ds (api-peladaapp.test-helpers/get-test-datasource db-file)
+          ds (api-peladaapp.test-helpers/get-test-datasource)
 
           ;; Register and login
           token (th/register-and-login! app {:name "Admin User" :email "admin@test.com" :password "pass123"})
