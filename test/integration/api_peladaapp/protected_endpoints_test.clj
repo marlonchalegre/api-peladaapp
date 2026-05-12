@@ -1,13 +1,18 @@
 (ns api-peladaapp.protected-endpoints-test
   (:require
+   [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [buddy.hashers :as hashers]
    [clojure.test :refer [deftest is testing use-fixtures]]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
-   [next.jdbc.sql :as sql]
+   [next.jdbc.result-set :as rs]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
+
+(defn- exec! [ds query]
+  (jdbc/execute! ds (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps}))
 
 (def protected-endpoints
   "List of protected API endpoints that require authentication"
@@ -35,7 +40,7 @@
 
 (deftest protected-endpoints-require-authentication
   (testing "All protected endpoints return 401 when no token is provided"
-    (let [app (-> th/*test-system* :app :handler)]
+    (let [app (-> th/*test-system* :app :app-handler)]
       (doseq [{:keys [method path]} protected-endpoints]
         (let [req (mock/request method path)
               resp (app req)]
@@ -48,7 +53,7 @@
 
 (deftest protected-endpoints-reject-invalid-token
   (testing "All protected endpoints return 401 when invalid token is provided"
-    (let [app (-> th/*test-system* :app :handler)]
+    (let [app (-> th/*test-system* :app :app-handler)]
       (doseq [{:keys [method path]} protected-endpoints]
         (let [req (-> (mock/request method path)
                       (mock/cookie "authToken" "invalid-token-12345"))
@@ -58,13 +63,14 @@
 
 (deftest protected-endpoints-accept-valid-token
   (testing "Protected endpoints accept valid authentication tokens"
-    (let [app (-> th/*test-system* :app :handler)
-          db-file (:db-file th/*test-system*)
-          ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
+    (let [app (-> th/*test-system* :app :app-handler)
+          db-val (-> th/*test-system* :database :database)
+          ds (if (fn? db-val) (db-val) db-val)]
       ;; Create a user and get valid token
-      (sql/insert! ds :users {:name "Test User"
-                              :email "test@example.com"
-                              :password (hashers/encrypt "password123")})
+      (exec! ds (-> (h/insert-into :Users)
+                    (h/values [{:name "Test User"
+                                :email "test@example.com"
+                                :password (hashers/encrypt "password123")}])))
       (let [token (th/register-and-login! app {:name "Auth User"
                                                :email "auth@example.com"
                                                :password "pass123"})
@@ -80,7 +86,7 @@
 
 (deftest login-and-register-are-public
   (testing "Login and register endpoints are accessible without authentication"
-    (let [app (-> th/*test-system* :app :handler)]
+    (let [app (-> th/*test-system* :app :app-handler)]
       ;; Login endpoint should be accessible
       (let [login-req (-> (mock/request :post "/auth/login")
                           (mock/json-body {:email "nonexistent@example.com"
@@ -105,7 +111,7 @@
 
 (deftest missing-cookie
   (testing "Requests without authToken cookie return 401"
-    (let [app (-> th/*test-system* :app :handler)
+    (let [app (-> th/*test-system* :app :app-handler)
           req (mock/request :get "/api/users")
           resp (app req)]
       (is (= 401 (:status resp))
@@ -113,7 +119,7 @@
 
 (deftest expired-token-handling
   (testing "Expired tokens should be rejected"
-    (let [app (-> th/*test-system* :app :handler)
+    (let [app (-> th/*test-system* :app :app-handler)
           ;; This is a token that has a past expiration date
           req (-> (mock/request :get "/api/users")
                   (mock/cookie "authToken" "eyJhbGciOiJIUzUxMiJ9.expiredtoken"))

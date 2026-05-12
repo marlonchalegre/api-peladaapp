@@ -39,7 +39,7 @@
       (let [resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/dashboard-data")) auth))
             body (th/decode-body resp)]
         (is (= 200 (:status resp)))
-        (is (contains? body :attendance))
-        (let [att (first (:attendance body))]
+        (is (contains? body :Attendance))
+        (let [att (first (:Attendance body))]
           (is (= player-id (:player_id att)))
           (is (= "confirmed" (:status att))))))))

@@ -1,16 +1,22 @@
 (ns api-peladaapp.user-phone-test
   (:require
+   [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 
+(defn- exec-one! [ds query]
+  (jdbc/execute-one! ds (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps}))
+
 (deftest registration-with-phone-test
-  (let [app (-> th/*test-system* :app :handler)
-        db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
         email "phone-test@example.com"
         phone "5511999999999"
         resp (app (-> (mock/request :post "/auth/register")
@@ -24,13 +30,13 @@
     (is (= phone (:phone body)))
 
     (testing "Verify in database"
-      (let [user (first (jdbc/execute! ds ["select phone from Users where email = ?" email]))]
-        (is (= phone (or (:phone user) (:Users/phone user))))))))
+      (let [user (exec-one! ds (-> (h/select :phone) (h/from :Users) (h/where [:= :email email])))]
+        (is (= phone (:phone user)))))))
 
 (deftest update-phone-test
-  (let [app (-> th/*test-system* :app :handler)
-        db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
         email "update-phone@example.com"
         initial-phone "111111111"
         new-phone "222222222"

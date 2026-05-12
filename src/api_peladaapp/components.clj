@@ -4,93 +4,100 @@
    [clojure.string :as str]
    [com.stuartsierra.component :as component]
    [next.jdbc :as jdbc]
-   [next.jdbc.connection :as connection]
    [ring.adapter.jetty :refer [run-jetty]])
   (:import
    (com.zaxxer.hikari HikariDataSource)))
 
-(defrecord Database [database connection db-spec skip-migrations]
+(defrecord Database [db-spec skip-migrations datasource database]
   component/Lifecycle
   (start [this]
-    (println "Starting Database component...")
-    (let [turso-url (System/getenv "TURSO_DATABASE_URL")
-          turso-token (System/getenv "TURSO_AUTH_TOKEN")
-          final-db-spec (if (and turso-url turso-token)
-                          (let [url (str "jdbc:dbeaver:libsql:https://"
-                                         (clojure.string/replace turso-url #"^libsql://" ""))]
-                            (println (str "Using Turso (LibSQL) Cloud Database: " url))
-                            ;; Force load the driver class for DriverManager
-                            (Class/forName "com.dbeaver.jdbc.driver.libsql.LibSqlDriver")
-                            {:jdbcUrl url
-                             :user ""
-                             :password turso-token
-                             :connectionTestQuery "SELECT 1"})
-                          (do
-                            (println "Using local SQLite database")
-                            (let [db-name (or (:dbname db-spec) "peladaapp.db")
-                                  jdbc-url (str "jdbc:sqlite:" db-name "?busy_timeout=10000")]
-                              (merge {:jdbcUrl jdbc-url
-                                      :connectionInitSql "PRAGMA busy_timeout = 10000; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;"}
-                                     db-spec))))]
-      ;; Enable WAL mode for local SQLite before starting the pool
-      (when-not (and turso-url turso-token)
-        (try
-          (let [db-name (or (:dbname final-db-spec) "peladaapp.db")
-                conn-spec {:dbtype "sqlite" :dbname db-name}]
-            (with-open [conn (jdbc/get-connection conn-spec)]
-              (jdbc/execute! conn ["PRAGMA journal_mode=WAL;"])
-              (jdbc/execute! conn ["PRAGMA synchronous=NORMAL;"])))
-          (catch Exception e
-            (println "Warning: Could not enable WAL mode:" (.getMessage e)))))
-      (let [ds-component (connection/component HikariDataSource final-db-spec)
-            started-ds (component/start ds-component)]
-        (assoc this :database started-ds))))
+    (if (or datasource database)
+      (assoc this :datasource (or datasource database) :database (or database datasource))
+      (let [database-url (System/getenv "DATABASE_URL")
+            turso-url (System/getenv "TURSO_DATABASE_URL")
+            turso-token (System/getenv "TURSO_AUTH_TOKEN")
+
+            final-db-spec (cond
+                            (:jdbcUrl db-spec)
+                            (do
+                              (println (str "Using explicit jdbcUrl from db-spec: " (:jdbcUrl db-spec)))
+                              (try (Class/forName "org.postgresql.Driver") (catch Exception _))
+                              (assoc db-spec :connectionTestQuery "SELECT 1" :maximumPoolSize 10))
+
+                          ;; Turso / LibSQL (existing behavior)
+                            (and turso-url turso-token)
+                            (let [url (str "jdbc:dbeaver:libsql:https://"
+                                           (clojure.string/replace turso-url #"^libsql://" ""))]
+                              (println (str "Using Turso (LibSQL) Cloud Database: " url))
+                              (Class/forName "com.dbeaver.jdbc.driver.libsql.LibSqlDriver")
+                              {:jdbcUrl url
+                               :user ""
+                               :password turso-token
+                               :connectionTestQuery "SELECT 1"})
+
+                          ;; Postgres via DATABASE_URL
+                            database-url
+                            (let [jdbc-url (if (str/starts-with? database-url "postgres://")
+                                             (let [[_ user pass host port db] (re-matches #"postgres://([^:]+):([^@]+)@([^:]+):(\d+)/(.*)" database-url)]
+                                               (str "jdbc:postgresql://" host ":" port "/" db "?user=" user "&password=" pass))
+                                             database-url)]
+                              (println (str "Using DATABASE_URL: " jdbc-url))
+                              (try (Class/forName "org.postgresql.Driver") (catch Exception _))
+                              {:jdbcUrl jdbc-url
+                               :connectionTestQuery "SELECT 1"})
+
+                          ;; SQLite Default
+                            :else
+                            (do
+                              (println "Using SQLite database (default)")
+                              (assoc db-spec
+                                     :dbtype "sqlite"
+                                     :connectionInitSql "PRAGMA busy_timeout = 10000; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL;")))
+
+            ds (jdbc/get-datasource final-db-spec)]
+        (assoc this :datasource ds :database ds))))
   (stop [this]
-    (println "Stopping Database component...")
-    (when-let [ds (:database this)]
-      (component/stop ds))
-    (assoc this :database nil)))
+    (when (and datasource (instance? HikariDataSource datasource))
+      (.close ^HikariDataSource datasource))
+    (assoc this :datasource nil :database nil)))
 
 (defn new-database [db-spec skip-migrations]
   (map->Database {:db-spec db-spec :skip-migrations skip-migrations}))
 
-(defrecord WebServer [port app]
+(defrecord WebServer [app port server]
   component/Lifecycle
-
-  (start [component]
-    (let [p (or port (when-let [env-port (System/getenv "PORT")] (parse-long env-port)) 8000)]
-      (println "Starting WebServer component on port" p "...")
-      (assoc component
-             ::jetty
-             (run-jetty (-> component :app :handler)
-                        {:port p
-                         :join? false}))))
-
-  (stop [component]
-    (println "Stopping WebServer component...")
-    (-> component ::jetty .stop)
-    component))
+  (start [this]
+    (if server
+      this
+      (let [port (or (some-> (System/getenv "PORT") Integer/parseInt) 8000)
+            server (run-jetty (:app-handler app) {:port port :join? false})]
+        (println (str "Web server started on port " port))
+        (assoc this :port port :server server))))
+  (stop [this]
+    (if server
+      (do
+        (.stop server)
+        (assoc this :server nil))
+      this)))
 
 (defn new-web-server []
   (component/using
    (map->WebServer {})
    [:app]))
 
-(defn wrap-assoc [f key value]
-  (fn [request] (f (assoc request key value))))
-
-(defrecord App [database handler]
+(defrecord App [handler database]
   component/Lifecycle
-
-  (start [component]
-    (println "Starting App component...")
-    (let [db-val (-> component :database :database)
-          database (if (fn? db-val) (db-val) db-val)]
-      (assoc component :handler
-             (wrap-assoc handler :database database))))
-  (stop [component]
+  (start [this]
+    (if (:app-handler this)
+      this
+      (let [db-val (:database database)]
+        (println "Starting App component with database context...")
+        (assoc this :app-handler
+               (fn [request]
+                 (handler (assoc request :database db-val)))))))
+  (stop [this]
     (println "Stopping App component...")
-    component))
+    (assoc this :app-handler nil)))
 
 (defn new-app [handler]
   (component/using
@@ -102,5 +109,3 @@
    :database (new-database db-spec skip-migrations)
    :app      (new-app server/app)
    :server   (new-web-server)))
-
-

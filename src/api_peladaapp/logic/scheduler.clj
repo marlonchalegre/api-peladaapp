@@ -6,16 +6,12 @@
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.reminder :as db.reminder]
    [api-peladaapp.db.vote :as db.vote]
+   [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.grade :as logic.grade]
    [api-peladaapp.logic.notifications :as notifications]
-   [clojure.string :as str]
    [clojure.tools.logging :as log])
   (:import
-   [java.time
-    Duration
-    Instant
-    ZoneId
-    ZonedDateTime]))
+   [java.time Duration ZoneId ZonedDateTime]))
 
 (defn- br-now []
   (ZonedDateTime/now (ZoneId/of "America/Sao_Paulo")))
@@ -27,9 +23,7 @@
     (and is-reminder-hour?
          (or (not (seq (str last-sent)))
              (try
-               (let [last-sent-inst (if (instance? Instant last-sent)
-                                      last-sent
-                                      (Instant/parse (str (str/replace (str last-sent) " " "T") "Z")))
+               (let [last-sent-inst (helpers.time/->instant last-sent)
                      diff (Duration/between last-sent-inst (.toInstant now))]
                  ;; If last-sent was more than 4 hours ago, we are likely in a new slot (10h vs 18h)
                  (> (.toHours diff) 4))
@@ -58,7 +52,7 @@
   (let [peladas (db.pelada/list-peladas-for-vote-notification db)]
     (if (seq peladas)
       (log/info "Found" (count peladas) "peladas with ended voting period. Processing...")
-      (log/debug "No peladas with ended voting period found."))
+      (log/debug "No Peladas with ended voting period found."))
 
     (doseq [p peladas]
       (let [org-id (:organization-id p)

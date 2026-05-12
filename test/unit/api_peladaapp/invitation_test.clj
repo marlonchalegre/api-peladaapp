@@ -3,8 +3,10 @@
    [api-peladaapp.controllers.auth :as controller.auth]
    [api-peladaapp.controllers.organization :as controller.organization]
    [api-peladaapp.controllers.user :as controller.user]
+   [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as helpers]
    [clojure.test :refer [deftest is testing use-fixtures]]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
    [next.jdbc.result-set :as rs]))
 
@@ -15,10 +17,16 @@
 (deftest invite-player-test
   (let [db-val (get-in helpers/*test-system* [:database :database])
         db (if (fn? db-val) (db-val) db-val)
+        ;; Create admin user to satisfy foreign key constraints
+        _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
+                                             (h/values [{:id 99 :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
         org-name "Test Invitation Org"
-        _ (jdbc/execute! db ["INSERT INTO Organizations (name) VALUES (?)" org-name] opts)
-        org (first (jdbc/execute! db ["SELECT id FROM Organizations WHERE name = ?" org-name] opts))
-        org-id (:id org)
+        _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Organizations)
+                                             (h/values [{:name org-name}]))) opts)
+        org-id (-> (jdbc/execute-one! db (hsql/format (-> (h/select :id)
+                                                          (h/from :Organizations)
+                                                          (h/where [:= :name org-name]))) opts)
+                   :id)
         email "new-player@example.com"]
 
     (testing "Inviting a non-existent user creates a partial user and DOES NOT add to org yet"
@@ -28,26 +36,34 @@
         (is (= org-id (:organization-id result)))
 
         ;; Verify user exists in DB
-        (let [user (first (jdbc/execute! db ["SELECT * FROM Users WHERE email = ?" email] opts))]
+        (let [user (jdbc/execute-one! db (hsql/format (-> (h/select :*)
+                                                          (h/from :Users)
+                                                          (h/where [:= :email email]))) opts)]
           (is (some? user))
           (is (nil? (:password user))))
 
         ;; Verify player NOT added to org yet
-        (let [player (first (jdbc/execute! db ["SELECT * FROM OrganizationPlayers WHERE user_id = ? AND organization_id = ?" (:user-id result) org-id] opts))]
+        (let [player (jdbc/execute-one! db (hsql/format (-> (h/select :*)
+                                                            (h/from :OrganizationPlayers)
+                                                            (h/where [:= :user_id (:user-id result)]
+                                                                     [:= :organization_id org-id]))) opts)]
           (is (nil? player)))))
 
     (testing "Inviting an existing user DOES NOT add them to org automatically (requires acceptance)"
       (let [existing-email "existing@example.com"
-            _ (jdbc/execute! db ["INSERT INTO Users (email, name, password) VALUES (?, ?, ?)" existing-email "Existing" "hashed-pass"] opts)
-            user (first (jdbc/execute! db ["SELECT id FROM Users WHERE email = ?" existing-email] opts))
-            user-id (:id user)
+            _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
+                                                 (h/values [{:email existing-email :name "Existing" :password "hashed-pass"}]))) opts)
+            user-id (helpers/user-id-by-email db existing-email)
             result (controller.organization/invite-player-improved org-id existing-email nil 99 db)]
         (is (= existing-email (:email result)))
         (is (not (:is-new-user result)))
         (is (= user-id (:user-id result)))
 
         ;; Verify player NOT added to org yet
-        (let [player (first (jdbc/execute! db ["SELECT * FROM OrganizationPlayers WHERE user_id = ? AND organization_id = ?" user-id org-id] opts))]
+        (let [player (jdbc/execute-one! db (hsql/format (-> (h/select :*)
+                                                            (h/from :OrganizationPlayers)
+                                                            (h/where [:= :user_id user-id]
+                                                                     [:= :organization_id org-id]))) opts)]
           (is (nil? player)))))
 
     (testing "Inviting by name only DOES NOT add user to org automatically (requires acceptance)"
@@ -57,25 +73,35 @@
         (is (nil? (:email result)))
 
         ;; Verify user exists in DB
-        (let [user (first (jdbc/execute! db ["SELECT * FROM Users WHERE name = ?" name] opts))]
+        (let [user (jdbc/execute-one! db (hsql/format (-> (h/select :*)
+                                                          (h/from :Users)
+                                                          (h/where [:= :name name]))) opts)]
           (is (some? user)))
 
         ;; Verify player NOT ADDED to org yet
-        (let [player (first (jdbc/execute! db ["SELECT * FROM OrganizationPlayers WHERE user_id = ? AND organization_id = ?" (:user-id result) org-id] opts))]
+        (let [player (jdbc/execute-one! db (hsql/format (-> (h/select :*)
+                                                            (h/from :OrganizationPlayers)
+                                                            (h/where [:= :user_id (:user-id result)]
+                                                                     [:= :organization_id org-id]))) opts)]
           (is (nil? player)))))))
 
 (deftest first-access-test
   (let [db-val (get-in helpers/*test-system* [:database :database])
         db (if (fn? db-val) (db-val) db-val)
+        ;; Create admin user to satisfy foreign key constraints
+        _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
+                                             (h/values [{:id 99 :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
         email "invited@example.com"
-        org-id (-> (jdbc/execute! db ["INSERT INTO Organizations (name) VALUES (?)" "First Access Org"])
-                   first
-                   ((fn [row] (or (:id row) (get row "id") (first (vals row))))))
+        _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Organizations)
+                                             (h/values [{:name "First Access Org"}]))) opts)
+        org-id (-> (jdbc/execute-one! db (hsql/format (-> (h/select :id)
+                                                          (h/from :Organizations)
+                                                          (h/where [:= :name "First Access Org"]))) opts)
+                   :id)
         ;; Use controller to create invite (which also creates partial user)
         _ (controller.organization/invite-player-improved org-id email nil 99 db)
         token (:token (first (controller.organization/list-organization-invitations org-id db)))
-        user (first (jdbc/execute! db ["SELECT id FROM Users WHERE email = ?" email] opts))
-        user-id (:id user)]
+        user-id (helpers/user-id-by-email db email)]
 
     (testing "Completing first access for invited user"
       (let [payload {:email email
@@ -91,18 +117,26 @@
         (is (= "Striker" (get-in result [:user :position])))
 
         ;; Verify data is stored
-        (let [db-user (first (jdbc/execute! db ["SELECT * FROM Users WHERE id = ?" user-id] opts))]
+        (let [db-user (jdbc/execute-one! db (hsql/format (-> (h/select :*)
+                                                             (h/from :Users)
+                                                             (h/where [:= :id user-id]))) opts)]
           (is (= "inviteduser" (:username db-user)))
           (is (some? (:password db-user))))
 
         ;; Verify player added to org
-        (let [player (first (jdbc/execute! db ["SELECT * FROM OrganizationPlayers WHERE user_id = ? AND organization_id = ?" user-id org-id] opts))]
+        (let [player (jdbc/execute-one! db (hsql/format (-> (h/select :*)
+                                                            (h/from :OrganizationPlayers)
+                                                            (h/where [:= :user_id user-id]
+                                                                     [:= :organization_id org-id]))) opts)]
           (is (some? player)))))
 
     (testing "Cannot use first access for already registered user"
-      (let [org-id-2 (-> (jdbc/execute! db ["INSERT INTO Organizations (name) VALUES (?)" "First Access Org 2"])
-                         first
-                         ((fn [row] (or (:id row) (get row "id") (first (vals row))))))
+      (let [_ (jdbc/execute! db (hsql/format (-> (h/insert-into :Organizations)
+                                                 (h/values [{:name "First Access Org 2"}]))) opts)
+            org-id-2 (-> (jdbc/execute-one! db (hsql/format (-> (h/select :id)
+                                                                (h/from :Organizations)
+                                                                (h/where [:= :name "First Access Org 2"]))) opts)
+                         :id)
             _ (controller.organization/invite-player-improved org-id-2 email nil 99 db)
             token-2 (:token (first (controller.organization/list-organization-invitations org-id-2 db)))
             payload {:email email
@@ -112,17 +146,25 @@
                      :token token-2}]
         ;; It should throw because password was set in previous test if it was same DB, 
         ;; but fixture is :each, so it resets. Wait, I should ensure it HAS a password.
-        (jdbc/execute! db ["UPDATE Users SET password = 'already-set' WHERE email = ?" email] opts)
+        (jdbc/execute! db (hsql/format (-> (h/update :Users)
+                                           (h/set {:password "already-set"})
+                                           (h/where [:= :email email]))) opts)
         (is (thrown-with-msg? Exception #"already has a password"
                               (controller.auth/first-access payload db)))))))
 
 (deftest link-invitation-test
   (let [db-val (get-in helpers/*test-system* [:database :database])
         db (if (fn? db-val) (db-val) db-val)
+        ;; Create admin user to satisfy foreign key constraints
+        _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
+                                             (h/values [{:id 99 :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
         org-name "Link Org"
-        _ (jdbc/execute! db ["INSERT INTO Organizations (name) VALUES (?)" org-name] opts)
-        org (first (jdbc/execute! db ["SELECT id FROM Organizations WHERE name = ?" org-name] opts))
-        org-id (:id org)
+        _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Organizations)
+                                             (h/values [{:name org-name}]))) opts)
+        org-id (-> (jdbc/execute-one! db (hsql/format (-> (h/select :id)
+                                                          (h/from :Organizations)
+                                                          (h/where [:= :name org-name]))) opts)
+                   :id)
         user-id 99] ;; Mock admin id
 
     (testing "Creating/Getting a link invitation"
@@ -138,19 +180,23 @@
     (testing "Accepting a link invitation"
       (let [token (controller.organization/get-or-create-organization-link org-id user-id db)
             new-user-id 100
-            _ (jdbc/execute! db ["INSERT INTO Users (id, email, username, name) VALUES (?, 'tester@test.com', 'testeruser', 'Tester')" new-user-id] opts)
+            _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
+                                                 (h/values [{:id new-user-id :email "tester@test.com" :username "testeruser" :name "Tester"}]))) opts)
             result (controller.organization/accept-invitation token new-user-id db)]
         (is (= org-id (:organization-id result)))
 
         ;; Verify player added
-        (let [player (first (jdbc/execute! db ["SELECT * FROM OrganizationPlayers WHERE user_id = ? AND organization_id = ?" new-user-id org-id] opts))]
+        (let [player (jdbc/execute-one! db (hsql/format (-> (h/select :*)
+                                                            (h/from :OrganizationPlayers)
+                                                            (h/where [:= :user_id new-user-id]
+                                                                     [:= :organization_id org-id]))) opts)]
           (is (some? player)))))
 
     (testing "Listing pending invitations"
       (let [email "invited-user@test.com"
-            _ (jdbc/execute! db ["INSERT INTO Users (email, username, name) VALUES (?, 'inviteduser', 'Invited')" email] opts)
-            user (first (jdbc/execute! db ["SELECT id FROM Users WHERE email = ?" email] opts))
-            u-id (:id user)
+            _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
+                                                 (h/values [{:email email :username "inviteduser" :name "Invited"}]))) opts)
+            u-id (helpers/user-id-by-email db email)
             _ (controller.organization/invite-player org-id email user-id db)
             invites (controller.organization/list-pending-invitations email db)]
         (is (= 1 (count invites)))
@@ -163,10 +209,16 @@
 (deftest manage-invitations-test
   (let [db-val (get-in helpers/*test-system* [:database :database])
         db (if (fn? db-val) (db-val) db-val)
+        ;; Create admin user to satisfy foreign key constraints
+        _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
+                                             (h/values [{:id 99 :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
         org-name "Manage Invites Org"
-        _ (jdbc/execute! db ["INSERT INTO Organizations (name) VALUES (?)" org-name] opts)
-        org (first (jdbc/execute! db ["SELECT id FROM Organizations WHERE name = ?" org-name] opts))
-        org-id (:id org)
+        _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Organizations)
+                                             (h/values [{:name org-name}]))) opts)
+        org-id (-> (jdbc/execute-one! db (hsql/format (-> (h/select :id)
+                                                          (h/from :Organizations)
+                                                          (h/where [:= :name org-name]))) opts)
+                   :id)
         user-id 99]
 
     (testing "Listing and revoking invitations"
@@ -182,10 +234,16 @@
 (deftest invitation-edge-cases-test
   (let [db-val (get-in helpers/*test-system* [:database :database])
         db (if (fn? db-val) (db-val) db-val)
+        ;; Create admin user to satisfy foreign key constraints
+        _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
+                                             (h/values [{:id 99 :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
         org-name "Edge Case Org"
-        _ (jdbc/execute! db ["INSERT INTO Organizations (name) VALUES (?)" org-name] opts)
-        org (first (jdbc/execute! db ["SELECT id FROM Organizations WHERE name = ?" org-name] opts))
-        org-id (:id org)
+        _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Organizations)
+                                             (h/values [{:name org-name}]))) opts)
+        org-id (-> (jdbc/execute-one! db (hsql/format (-> (h/select :id)
+                                                          (h/from :Organizations)
+                                                          (h/where [:= :name org-name]))) opts)
+                   :id)
         user-id 99]
 
     (testing "Accepting invalid token throws exception"
@@ -194,9 +252,12 @@
 
     (testing "Revoking invitation from another organization does nothing"
       ;; Create another org
-      (jdbc/execute! db ["INSERT INTO Organizations (name) VALUES ('Other Org')"] opts)
-      (let [other-org (first (jdbc/execute! db ["SELECT id FROM Organizations WHERE name = 'Other Org'"] opts))
-            other-org-id (:id other-org)]
+      (jdbc/execute! db (hsql/format (-> (h/insert-into :Organizations)
+                                         (h/values [{:name "Other Org"}]))) opts)
+      (let [other-org-id (-> (jdbc/execute-one! db (hsql/format (-> (h/select :id)
+                                                                    (h/from :Organizations)
+                                                                    (h/where [:= :name "Other Org"]))) opts)
+                             :id)]
 
         ;; Create invite in main org
         (controller.organization/invite-player org-id "revoke-fail@test.com" user-id db)
@@ -217,21 +278,23 @@
 
             ;; Create another user
             attacker-email "attacker@test.com"
-            _ (jdbc/execute! db ["INSERT INTO Users (email, username, name) VALUES (?, 'attackeruser', 'Attacker')" attacker-email] opts)
-            attacker (first (jdbc/execute! db ["SELECT id FROM Users WHERE email = ?" attacker-email] opts))
-            attacker-id (:id attacker)]
+            _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
+                                                 (h/values [{:email attacker-email :username "attackeruser" :name "Attacker"}]))) opts)
+            attacker-id (helpers/user-id-by-email db attacker-email)]
 
         (is (thrown-with-msg? Exception #"Invitation does not belong to this user"
                               (controller.organization/accept-invitation token attacker-id db)))))
 
     (testing "UX: Registration claims partial user"
       (let [email "partial-user@test.com"
-            _ (jdbc/execute! db ["INSERT INTO Users (email) VALUES (?)" email] opts) ;; Partial user
-            partial-user (first (jdbc/execute! db ["SELECT id FROM Users WHERE email = ?" email] opts))
-            partial-id (:id partial-user)
+            _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
+                                                 (h/values [{:email email}]))) opts) ;; Partial user
+            partial-id (helpers/user-id-by-email db email)
             new-user-data {:email email :username "claimeduser" :name "Claimed Name" :password "pass123" :position "Striker"}
             result (controller.user/create-user new-user-data db)
-            updated-user (first (jdbc/execute! db ["SELECT * FROM Users WHERE id = ?" partial-id] opts))]
+            updated-user (jdbc/execute-one! db (hsql/format (-> (h/select :*)
+                                                                (h/from :Users)
+                                                                (h/where [:= :id partial-id]))) opts)]
         (is (= partial-id (:id result)))
         (is (= "Claimed Name" (:name updated-user)))
         (is (some? (:password updated-user)))))))
@@ -239,10 +302,16 @@
 (deftest reset-link-invitation-test
   (let [db-val (get-in helpers/*test-system* [:database :database])
         db (if (fn? db-val) (db-val) db-val)
+        ;; Create admin user to satisfy foreign key constraints
+        _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
+                                             (h/values [{:id 99 :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
         org-name "Reset Link Org"
-        _ (jdbc/execute! db ["INSERT INTO Organizations (name) VALUES (?)" org-name] opts)
-        org (first (jdbc/execute! db ["SELECT id FROM Organizations WHERE name = ?" org-name] opts))
-        org-id (:id org)
+        _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Organizations)
+                                             (h/values [{:name org-name}]))) opts)
+        org-id (-> (jdbc/execute-one! db (hsql/format (-> (h/select :id)
+                                                          (h/from :Organizations)
+                                                          (h/where [:= :name org-name]))) opts)
+                   :id)
         user-id 99]
 
     (testing "Resetting a link invitation replaces the old token"

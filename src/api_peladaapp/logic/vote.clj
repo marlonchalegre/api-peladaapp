@@ -1,6 +1,7 @@
 (ns api-peladaapp.logic.vote
   (:require
-   [clojure.string :as str])
+   [clojure.string :as str]
+   [clojure.tools.logging :as log])
   (:import
    [java.time Duration Instant]))
 
@@ -26,6 +27,24 @@
                     {:type :bad-request
                      :message "Voting is only allowed after pelada is closed"}))))
 
+(defn- parse-any-date [d]
+  (cond
+    (instance? Instant d) d
+    (instance? java.time.OffsetDateTime d) (.toInstant d)
+    (instance? java.time.LocalDateTime d) (.toInstant (.atZone d (java.time.ZoneId/systemDefault)))
+    (instance? java.sql.Timestamp d) (.toInstant d)
+    (string? d) (let [s (str/replace d " " "T")
+                      s (if (re-find #"T\d{2}:\d{2}:\d{2}$" s) (str s ".000") s)
+                      s (if (str/ends-with? s "Z") s (str s "Z"))]
+                  (try (Instant/parse s)
+                       (catch Exception _
+                         (try (Instant/parse d)
+                              (catch Exception _
+                                (log/error "Failed to parse date:" d)
+                                (Instant/now))))))
+    :else (do (log/error "Unknown date type:" (type d) "value:" d)
+              (Instant/now))))
+
 (defn ensure-voting-window-open
   "Ensure voting is within 24 hours after pelada closed."
   [pelada]
@@ -34,12 +53,7 @@
       (throw (ex-info "Pelada has no closed_at timestamp"
                       {:type :bad-request
                        :message "Cannot determine voting window"})))
-    (let [closed-instant (cond
-                           (instance? Instant closed-at) closed-at
-                           (string? closed-at) (let [s (str/replace (str closed-at) " " "T")
-                                                     s (if (str/ends-with? s "Z") s (str s "Z"))]
-                                                 (Instant/parse s))
-                           :else (Instant/parse (str closed-at)))
+    (let [closed-instant (parse-any-date closed-at)
           now (Instant/now)
           duration (Duration/between closed-instant now)
           limit (Duration/ofHours 24)]

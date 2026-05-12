@@ -2,16 +2,15 @@
   (:require
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [next.jdbc :as jdbc]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 
 (deftest test-list-user-organizations
   (testing "Listing user organizations with roles"
-    (let [app (-> th/*test-system* :app :handler)
+    (let [app (-> th/*test-system* :app :app-handler)
           db-file (:db-file th/*test-system*)
-          ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+          ds (api-peladaapp.test-helpers/get-test-datasource db-file)
 
           ;; Register two users
           token1 (th/register-and-login! app {:name "User 1" :email "u1@test.com" :password "pass"})

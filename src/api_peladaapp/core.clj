@@ -13,19 +13,44 @@
         turso-token (System/getenv "TURSO_AUTH_TOKEN")
         db-name (or (System/getenv "DB_NAME") "peladaapp.db")
         ;; Build the same spec as in components.clj
-        db-spec (if (and turso-url turso-token)
+        database-url (System/getenv "DATABASE_URL")
+        ;; Build a db-spec usable by Migratus: prefer Turso, then Postgres (parsed), else sqlite
+        db-spec (cond
+                  (and turso-url turso-token)
                   (do
                     (Class/forName "com.dbeaver.jdbc.driver.libsql.LibSqlDriver")
-                    {:jdbcUrl (str "jdbc:dbeaver:libsql:https://"
-                                   (str/replace turso-url #"^libsql://" ""))
+                    {:jdbcUrl (str "jdbc:dbeaver:libsql://" (str/replace turso-url #"^libsql://" ""))
                      :user ""
                      :password turso-token})
+
+                  database-url
+                  (let [uri (try (java.net.URI. database-url) (catch Exception _ nil))
+                        user-info (when uri (.getUserInfo uri))
+                        [user pass] (when user-info (clojure.string/split user-info #":" 2))
+                        host (when uri (.getHost uri))
+                        port (when uri (.getPort uri))
+                        path (when uri (.getPath uri))
+                        db (when path (let [p (if (.startsWith path "/") (subs path 1) path)] p))]
+                    ;; Provide a clojure.java.jdbc style map for migratus
+                    {:dbtype "postgresql"
+                     :dbname (or db "peladaapp")
+                     :host host
+                     :port (when (and port (pos? port)) port)
+                     :user user
+                     :password pass})
+
+                  :else
                   {:dbtype "sqlite" :dbname db-name})
         skip-migrations (= "true" (System/getenv "SKIP_MIGRATIONS"))
         options {:db-spec db-spec
                  :skip-migrations skip-migrations}
+        ;; Choose migration directory based on DB type (sqlite vs postgres)
+        migrations-dir (let [db-url (System/getenv "DATABASE_URL")]
+                         (if (or db-url (and (string? (:jdbcUrl db-spec)) (str/starts-with? (:jdbcUrl db-spec) "jdbc:postgresql:")))
+                           "migrations-postgres"
+                           "migrations"))
         migratus-config {:store :database
-                         :migration-dir "migrations"
+                         :migration-dir migrations-dir
                          :db db-spec}
         ;; Check if we are using Turso
         is-turso (and turso-url turso-token)]

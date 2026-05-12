@@ -87,7 +87,12 @@
                             :category (:category model)
                             :description (:description model)
                             :status (or (:status model) "paid")
-                            :payment_date (:payment-date model)
+                            :payment_date (when-let [pd (:payment-date model)]
+                                            (cond
+                                              (string? pd) (java.sql.Date/valueOf pd)
+                                              (instance? java.time.LocalDate pd) (java.sql.Date/valueOf pd)
+                                              (instance? java.util.Date pd) (java.sql.Date. (.getTime pd))
+                                              :else pd))
                             :created_by (:created-by model))))
 
 (defn payload->transaction [payload]
@@ -159,7 +164,7 @@
                             :transaction_id (:transaction-id model)
                             :fine_transaction_id (:fine-transaction-id model)
                             :paid (if (contains? model :paid)
-                                    (if (:paid model) 1 0)
+                                    (boolean (:paid model))
                                     nil))))
 
 (defn payload->monthly-payment [payload]

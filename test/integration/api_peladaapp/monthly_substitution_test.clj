@@ -2,8 +2,8 @@
   (:require
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.test-helpers :as th]
+   [clojure.string :as str]
    [clojure.test :refer [deftest is use-fixtures]]
-   [next.jdbc :as jdbc]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
@@ -12,9 +12,9 @@
   (th/decode-body resp))
 
 (deftest monthly-substitution-integration-test
-  (let [app (-> th/*test-system* :app :handler)
-        db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
         token (th/register-and-login! app {:name "Admin" :email "admin@ex.com" :password "p"})
         p2-token (th/register-and-login! app {:name "Player 2" :email "p2@ex.com" :password "p"})
         auth (th/auth-cookie token)
@@ -70,7 +70,7 @@
           (is (= 1 (count subs)))
           (is (= admin-player-id (:permanent_player_id (first subs))))
           (is (= p2-player-id (:temporary_player_id (first subs))))
-          (is (= 1 (:active (first subs))))
+          (is (:active (first subs)))
 
           ;; Test: End substitution
           (let [sub-id (:id (first subs))
@@ -88,5 +88,5 @@
 
             ;; Verify substitution inactive
             (let [subs-final (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/substitutions")) auth)))]
-              (is (= 0 (:active (first subs-final))))
-              (is (= "2026-06-06" (:end_date (first subs-final)))))))))))
+              (is (not (:active (first subs-final))))
+              (is (str/starts-with? (:end_date (first subs-final)) "2026-06-06")))))))))

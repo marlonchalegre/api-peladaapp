@@ -1,10 +1,11 @@
 (ns api-peladaapp.logic.notifications
   (:require
    [api-peladaapp.db.organization :as db.organization]
+   [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.waha :as waha]
    [clojure.string :as str])
   (:import
-   [java.time Instant ZoneId]
+   [java.time ZoneId]
    [java.time.format DateTimeFormatter]))
 
 (def position-order
@@ -66,7 +67,7 @@
 
 (defn- format-date [date-str]
   (try
-    (let [instant (Instant/parse date-str)
+    (let [instant (helpers.time/->instant date-str)
           formatter (-> (DateTimeFormatter/ofPattern "dd/MM")
                         (.withZone (ZoneId/of "America/Sao_Paulo")))]
       (.format formatter instant))

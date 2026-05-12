@@ -30,7 +30,7 @@
         ;; Get matches
         dashboard-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/dashboard-data")) auth))
         dashboard (th/decode-body dashboard-resp)
-        match-id (-> dashboard :matches first :id)
+        match-id (-> dashboard :Matches first :id)
         player-id (-> dashboard :organization_players first :id)]
 
     (testing "Record event in running match"

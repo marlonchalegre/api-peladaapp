@@ -37,9 +37,17 @@ Always prefer running commands inside the backend container when the environment
 # Run tests inside container
 docker compose exec backend lein test
 
-# Run linting
-docker compose exec backend lein clj-kondo --lint src
+# Run code analysis (clj-kondo + clojure-lsp check)
+docker compose exec backend lein lint
+
+# Apply automated formatting and namespace cleaning
+docker compose exec backend lein lint-fix
 ```
+
+### 🛠️ Development Workflow
+- **Formatting**: We use `clojure-lsp` for formatting and namespace cleaning.
+- **Linting**: We use `clj-kondo` for static analysis.
+- **CI/Pre-commit**: Always run `lein lint-fix` before committing to ensure the codebase remains consistent and clean.
 
 ---
 

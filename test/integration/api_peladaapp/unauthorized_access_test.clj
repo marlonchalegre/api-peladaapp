@@ -7,7 +7,7 @@
 (use-fixtures :each th/test-system-fixture)
 
 (deftest unauthorized-access-test
-  (let [app (-> th/*test-system* :app :handler)
+  (let [app (-> th/*test-system* :app :app-handler)
         ;; Register admin and a regular user
         admin-token (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass"})
         user-token (th/register-and-login! app {:name "User" :email "user@test.com" :password "pass"})
@@ -53,7 +53,7 @@
                        admin-auth))
             details (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/dashboard-data"))
                                              admin-auth)))
-            match-id (-> details :matches first :id)
+            match-id (-> details :Matches first :id)
             resp (app (-> (mock/request :put (str "/api/matches/" match-id "/score"))
                           (mock/json-body {:status "finished"})
                           user-auth))]

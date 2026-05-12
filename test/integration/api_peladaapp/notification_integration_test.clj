@@ -1,21 +1,29 @@
 (ns api-peladaapp.notification-integration-test
   (:require
    [api-peladaapp.db.organization :as db.organization]
+   [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.logic.notifications :as notifications]
    [api-peladaapp.logic.waha :as waha]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]))
 
 (use-fixtures :each th/test-system-fixture)
 
 (deftest send-notification-with-mentions-test
-  (let [db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+  (let [db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
         org-id (db.organization/insert-organization {:name "Waha Mentions Org"} ds)]
 
-    (jdbc/execute! ds ["INSERT INTO OrganizationWahaConfigs (organization_id, enabled, api_url, instance, group_id, attendance_reminder_enabled, use_all_mention)
-                        VALUES (?, 1, 'http://waha:3000', 'default', 'group123', 1, 1)" org-id])
+    (jdbc/execute! ds (hsql/format (-> (h/insert-into :OrganizationWahaConfigs)
+                                       (h/values [{:organization_id org-id
+                                                   :enabled true
+                                                   :api_url "http://waha:3000"
+                                                   :instance "default"
+                                                   :group_id "group123"
+                                                   :attendance_reminder_enabled true
+                                                   :use_all_mention true}]))))
 
     (testing "Send attendance reminder with mentions AND @all"
       (let [pending-players [{:player-name "User 1" :phone "5511911111111"}
@@ -36,12 +44,18 @@
             (is (re-find #"• @User 1" message))))))))
 
 (deftest send-notification-disabled-all-test
-  (let [db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+  (let [db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
         org-id (db.organization/insert-organization {:name "Waha Disabled All Org"} ds)]
 
-    (jdbc/execute! ds ["INSERT INTO OrganizationWahaConfigs (organization_id, enabled, api_url, instance, group_id, attendance_reminder_enabled, use_all_mention)
-                        VALUES (?, 1, 'http://waha:3000', 'default', 'group123', 1, 0)" org-id])
+    (jdbc/execute! ds (hsql/format (-> (h/insert-into :OrganizationWahaConfigs)
+                                       (h/values [{:organization_id org-id
+                                                   :enabled true
+                                                   :api_url "http://waha:3000"
+                                                   :instance "default"
+                                                   :group_id "group123"
+                                                   :attendance_reminder_enabled true
+                                                   :use_all_mention false}]))))
 
     (testing "Only individual mentions when use_all_mention is disabled"
       (let [pending-players [{:player-name "User 1" :phone "5511911111111"}]

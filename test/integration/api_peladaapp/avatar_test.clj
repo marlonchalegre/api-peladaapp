@@ -4,7 +4,6 @@
    [clojure.java.io :as io]
    [clojure.string :as str]
    [clojure.test :refer [deftest is use-fixtures]]
-   [next.jdbc :as jdbc]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
@@ -16,9 +15,9 @@
     temp-file))
 
 (deftest avatar-workflow-test
-  (let [app (-> th/*test-system* :app :handler)
+  (let [app (-> th/*test-system* :app :app-handler)
         db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+        ds (api-peladaapp.test-helpers/get-test-datasource db-file)
         token (th/register-and-login! app {:name "Avatar User" :email "avatar@example.com" :password "pass"})
         user-id (th/user-id-by-email ds "avatar@example.com")
         test-image (create-test-image)]
@@ -56,9 +55,9 @@
       (is (= 404 (:status resp))))))
 
 (deftest avatar-upload-invalid-type
-  (let [app (-> th/*test-system* :app :handler)
+  (let [app (-> th/*test-system* :app :app-handler)
         db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+        ds (api-peladaapp.test-helpers/get-test-datasource db-file)
         token (th/register-and-login! app {:name "Avatar User" :email "avatar2@example.com" :password "pass"})
         user-id (th/user-id-by-email ds "avatar2@example.com")
         test-file (java.io.File/createTempFile "test" ".txt")]
@@ -77,9 +76,9 @@
       (is (str/includes? (:message body) "Invalid file type")))))
 
 (deftest avatar-upload-too-large
-  (let [app (-> th/*test-system* :app :handler)
+  (let [app (-> th/*test-system* :app :app-handler)
         db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+        ds (api-peladaapp.test-helpers/get-test-datasource db-file)
         token (th/register-and-login! app {:name "Avatar User" :email "avatar3@example.com" :password "pass"})
         user-id (th/user-id-by-email ds "avatar3@example.com")
         test-file (java.io.File/createTempFile "large" ".png")

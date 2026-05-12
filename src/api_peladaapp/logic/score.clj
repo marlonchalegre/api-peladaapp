@@ -7,13 +7,13 @@
 (defn get-normalized-scores
   "Fetches grades for a list of player IDs.
    Returns a map of {player-id grade}.
-   Uses the stored grade from OrganizationPlayers, defaulting to 5.0."
+   Uses the stored grade from \"OrganizationPlayers\", defaulting to 5.0."
   [player-ids db]
   (if (empty? player-ids)
     {}
     (let [placeholders (str/join "," (repeat (count player-ids) "?"))
           query (into [(str "SELECT id, grade
-                             FROM OrganizationPlayers
+                             FROM \"OrganizationPlayers\"
                              WHERE id IN (" placeholders ")")]
                       player-ids)
           db-results (jdbc/execute! db query {:builder-fn rs/as-unqualified-lower-maps})

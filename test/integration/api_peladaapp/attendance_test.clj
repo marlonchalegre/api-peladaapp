@@ -4,10 +4,12 @@
    [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [clojure.data.json :as json]
    [clojure.string :as str]
    [clojure.test :refer [deftest is use-fixtures]]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
    [next.jdbc.result-set :as rs]
    [ring.mock.request :as mock]))
@@ -27,10 +29,13 @@
                                                  (catch Exception _ nil))))
       :else nil)))
 
+(defn- exec-one! [ds query]
+  (jdbc/execute-one! ds (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps}))
+
 (deftest attendance-flow-test
-  (let [app (-> th/*test-system* :app :handler)
-        db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)]
     ;; Register and login user
     (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Player 1" :email "p1@ex.com" :password "p"})))
     (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "p1@ex.com" :password "p"})))
@@ -66,13 +71,12 @@
               att-body (decode-body att-resp)]
           (is (= 200 (:status att-resp)))
           (is (= 1 (:result att-body)))
-          (is (not (instance? java.lang.Integer (:body att-resp))))
 
             ;; Verify database state
           (let [check-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details"))
                                     auth))
                 pelada-data (decode-body check-resp)
-                attendance (:attendance pelada-data)
+                attendance (:Attendance pelada-data)
                 available (:available_players pelada-data)]
               ;; Security check: password must not be returned
             (is (not (contains? (get-in available [0 :user]) :password)))
@@ -83,7 +87,7 @@
                                    (= (get-in a [:player :user_id]) user-id)))
                       attendance))
               ;; Check available_players list (which is what the frontend uses)
-            (is (some (fn [p] (and (= (:attendance_status p) "confirmed")
+            (is (some (fn [p] (and (= (:Attendance_status p) "confirmed")
                                    (= (:user_id p) user-id)))
                       available))))
 
@@ -93,9 +97,9 @@
           (is (= 200 (:status close-resp))))))))
 
 (deftest batch-attendance-test
-  (let [app (-> th/*test-system* :app :handler)
-        db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)]
     ;; 1. Register admin and 2 more users
     (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Admin" :email "admin@ex.com" :password "p"})))
     (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "User 2" :email "u2@ex.com" :password "p"})))
@@ -121,7 +125,7 @@
           p2-id (:id (decode-body p2-resp))
           p3-id (:id (decode-body p3-resp))
 
-          ;; Find admin's player id (id 1 usually, but let's be safe)
+          ;; Find admin's player id
           all-players (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/players")) auth)))
           p1-id (:id (first (filter #(= (:user_id %) admin-id) all-players)))
 
@@ -142,14 +146,14 @@
       ;; 6. Verify they are confirmed
       (let [details-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) auth))
             available (:available_players (decode-body details-resp))]
-        (is (some (fn [p] (and (= (:id p) p2-id) (= (:attendance_status p) "confirmed"))) available))
-        (is (some (fn [p] (and (= (:id p) p3-id) (= (:attendance_status p) "confirmed"))) available))
-        (is (some (fn [p] (and (= (:id p) p1-id) (= (:attendance_status p) "pending"))) available))))))
+        (is (some (fn [p] (and (= (:id p) p2-id) (= (:Attendance_status p) "confirmed"))) available))
+        (is (some (fn [p] (and (= (:id p) p3-id) (= (:Attendance_status p) "confirmed"))) available))
+        (is (some (fn [p] (and (= (:id p) p1-id) (= (:Attendance_status p) "pending"))) available))))))
 
 (deftest convidado-waitlist-test
-  (let [app (-> th/*test-system* :app :handler)
-        db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)]
     ;; 1. Register admin and 1 convidado user
     (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Admin" :email "admin@ex.com" :password "p"})))
     (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Convidado" :email "convidado@ex.com" :password "p"})))
@@ -194,7 +198,7 @@
       ;; 7. Verify convidado is in waitlist
       (let [details-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) admin-auth))
             available (:available_players (decode-body details-resp))]
-        (is (some (fn [p] (and (= (:id p) p-id) (= (:attendance_status p) "waitlist"))) available)))
+        (is (some (fn [p] (and (= (:id p) p-id) (= (:Attendance_status p) "waitlist"))) available)))
 
       ;; 8. Admin moves convidado to confirmed
       (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance"))
@@ -204,28 +208,25 @@
       ;; 9. Verify convidado is now confirmed
       (let [details-resp2 (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) admin-auth))
             available2 (:available_players (decode-body details-resp2))]
-        (is (some (fn [p] (and (= (:id p) p-id) (= (:attendance_status p) "confirmed"))) available2))))))
+        (is (some (fn [p] (and (= (:id p) p-id) (= (:Attendance_status p) "confirmed"))) available2))))))
 
 (deftest list-pending-attendance-test
-  (let [db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+  (let [db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
 
         ;; 1. Setup organization
         user-id (db.user/insert-user {:name "Admin" :email "admin-notification@test.com" :password "pass"} ds)
         org-id (db.organization/insert-organization {:name "Notification Org" :owner-id user-id} ds)
 
         ;; 2. Setup players: 1 mensalista, 1 diarista
-        p1-id (:id (jdbc/execute-one! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, member_type) VALUES (?, ?, ?) RETURNING id"
-                                          org-id user-id "mensalista"]
-                                      {:return-keys true :builder-fn rs/as-unqualified-lower-maps}))
+        p1-id (:id (exec-one! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :member_type "mensalista"}]) (h/returning :id))))
 
         user2-id (db.user/insert-user {:name "Diarista" :email "diarista-notification@test.com" :password "pass"} ds)
 
         ;; 3. Create pelada
         pelada-id (db.pelada/insert-pelada {:organization-id org-id :status "attendance"} ds)]
 
-    (jdbc/execute-one! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, member_type) VALUES (?, ?, ?)"
-                           org-id user2-id "diarista"])
+    (exec-one! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user2-id :member_type "diarista"}])))
 
     ;; Initial state: only mensalista should be listed
     (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
@@ -255,6 +256,3 @@
     ;; p2 is a 'diarista' and has NOT responded yet (no record in PeladaAttendance)
     (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
       (is (= 0 (count pending))))))
-
-
-

@@ -3,7 +3,10 @@
    [api-peladaapp.db.match :as db.match]
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.team :as db.team]
-   [next.jdbc.sql :as sql]
+   [api-peladaapp.helpers.sql :as hsql]
+   [honey.sql.helpers :as h]
+   [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]
    [schema.core :as s]))
 
 (defn- unqualify-row [row]
@@ -16,10 +19,15 @@
 (defn- affected-rows-count [result]
   (-> result vals first))
 
+(def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
+
 (s/defn list-by-match :- [s/Any]
   [match-id db]
-  (->> (sql/find-by-keys db :matchlineups {:match_id match-id})
-       (map unqualify-row)))
+  (let [query (-> (h/select :*)
+                  (h/from :matchlineups)
+                  (h/where [:= :match_id match-id]))]
+    (->> (jdbc/execute! db (hsql/format query) opts)
+         (map unqualify-row))))
 
 (s/defn list-by-match-grouped :- {s/Int [s/Any]}
   [match-id db]
@@ -44,8 +52,8 @@
             away-players (db.team/list-team-players away db)
 
             ;; Base outfield players
-            outfield (concat (map (fn [p] {:match_id match-id :team_id home :player_id (:player-id p) :is_goalkeeper (if (:is-goalkeeper p) 1 0)}) home-players)
-                             (map (fn [p] {:match_id match-id :team_id away :player_id (:player-id p) :is_goalkeeper (if (:is-goalkeeper p) 1 0)}) away-players))
+            outfield (concat (map (fn [p] {:match_id match-id :team_id home :player_id (:player-id p) :is_goalkeeper (boolean (:is-goalkeeper p))}) home-players)
+                             (map (fn [p] {:match_id match-id :team_id away :player_id (:player-id p) :is_goalkeeper (boolean (:is-goalkeeper p))}) away-players))
 
             ;; Add fixed goalkeepers if enabled
             ;; Using a map keyed by player_id to ensure uniqueness
@@ -56,45 +64,55 @@
             final-lineup (cond-> lineup-map
                            (and (:fixed-goalkeepers pelada) (:home-fixed-goalkeeper-id pelada))
                            (assoc (:home-fixed-goalkeeper-id pelada)
-                                  {:match_id match-id :team_id home :player_id (:home-fixed-goalkeeper-id pelada) :is_goalkeeper 1})
+                                  {:match_id match-id :team_id home :player_id (:home-fixed-goalkeeper-id pelada) :is_goalkeeper true})
 
                            (and (:fixed-goalkeepers pelada) (:away-fixed-goalkeeper-id pelada))
                            (assoc (:away-fixed-goalkeeper-id pelada)
-                                  {:match_id match-id :team_id away :player_id (:away-fixed-goalkeeper-id pelada) :is_goalkeeper 1}))
+                                  {:match_id match-id :team_id away :player_id (:away-fixed-goalkeeper-id pelada) :is_goalkeeper true}))
 
             to-insert (vals final-lineup)]
         (if (empty? to-insert)
           0
           (try
-            (count (sql/insert-multi! db :matchlineups to-insert))
+            (let [query (-> (h/insert-into :matchlineups)
+                            (h/values to-insert))]
+              (count (jdbc/execute! db (hsql/format query))))
             (catch Exception _ 0)))))))
 
 (s/defn add-player :- s/Int
   [match-id :- s/Int team-id :- s/Int player-id :- s/Int db]
   (try
-    (affected-rows-count (sql/insert! db :matchlineups {:match_id match-id :team_id team-id :player_id player-id}))
+    (let [query (-> (h/insert-into :matchlineups)
+                    (h/values [{:match_id match-id :team_id team-id :player_id player-id}]))]
+      (affected-rows-count (jdbc/execute-one! db (hsql/format query))))
     (catch Exception _ 0)))
 
 (s/defn remove-player :- s/Int
   [match-id :- s/Int team-id :- s/Int player-id :- s/Int db]
-  (-> (sql/delete! db :matchlineups {:match_id match-id :team_id team-id :player_id player-id})
-      affected-rows-count))
+  (let [query (-> (h/delete-from :matchlineups)
+                  (h/where [:= :match_id match-id] [:= :team_id team-id] [:= :player_id player-id]))]
+    (:id (jdbc/execute-one! db (hsql/format query) opts))))
 
 (s/defn replace-player :- s/Int
   [match-id :- s/Int team-id :- s/Int out-player-id :- s/Int in-player-id :- s/Int db]
   (let [;; Find if the outgoing player was a goalkeeper
         out-player (first (filter #(= out-player-id (:player_id %)) (list-by-match match-id db)))
-        is-gk (and out-player (not= 0 (:is_goalkeeper out-player)))
+        is-gk (and out-player (if (boolean? (:is_goalkeeper out-player)) (:is_goalkeeper out-player) (not= 0 (:is_goalkeeper out-player))))
         rm (remove-player match-id team-id out-player-id db)
         ;; If they were a goalkeeper, the incoming player should also be one
-        ad (affected-rows-count (sql/insert! db :matchlineups {:match_id match-id :team_id team-id :player_id in-player-id :is_goalkeeper (if is-gk 1 0)}))]
+        ad (try
+             (let [query (-> (h/insert-into :matchlineups)
+                             (h/values [{:match_id match-id :team_id team-id :player_id in-player-id :is_goalkeeper (boolean is-gk)}]))]
+               (affected-rows-count (jdbc/execute-one! db (hsql/format query))))
+             (catch Exception _ 0))]
     (+ rm ad)))
 
 (s/defn list-match-lineups-by-pelada :- [s/Any]
   [pelada-id :- s/Int db]
-  (->> (sql/query db ["SELECT ml.*
-                        FROM MatchLineups ml
-                        JOIN Matches m ON ml.match_id = m.id
-                        WHERE m.pelada_id = ?" pelada-id])
-       (map unqualify-row)
-       vec))
+  (let [query (-> (h/select :ml.*)
+                  (h/from [:matchlineups :ml])
+                  (h/join [:Matches :m] [:= :ml.match_id :m.id])
+                  (h/where [:= :m.pelada_id pelada-id]))]
+    (->> (jdbc/execute! db (hsql/format query) opts)
+         (map unqualify-row)
+         vec)))

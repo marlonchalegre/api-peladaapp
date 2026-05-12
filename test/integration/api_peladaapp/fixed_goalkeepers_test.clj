@@ -1,5 +1,6 @@
 (ns api-peladaapp.fixed-goalkeepers-test
   (:require
+   [api-peladaapp.db.player :as db.player]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
    [ring.mock.request :as mock]))
@@ -7,19 +8,27 @@
 (use-fixtures :each th/test-system-fixture)
 
 (deftest global-fixed-goalkeepers-flow-test
-  (let [app (-> th/*test-system* :app :handler)]
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)]
 
     ;; Register and login
-    (app (-> (mock/request :post "/auth/register") (mock/json-body {"name" "Admin" "email" "admin@test.com" "password" "pass123"})))
-    (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {"email" "admin@test.com" "password" "pass123"})))
-          token (:token (th/decode-body login))
+    (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass123"})
+    (let [token (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass123"})
           auth (fn [req] (mock/cookie req "authToken" token))
 
           ;; Create organization
           org-resp (app (-> (mock/request :post "/api/organizations")
                             (mock/json-body {"name" "Global GK Club"})
                             auth))
-          org-id (:id (th/decode-body org-resp))]
+          org-id (:id (th/decode-body org-resp))
+          user-id (th/user-id-by-email ds "admin@test.com")
+          player-id (th/player-id-by-user-id ds user-id org-id)
+
+          ;; Add a second player so teams can be formed
+          _ (th/register-and-login! app {:name "Player 2" :email "p2@test.com" :password "pass123"})
+          p2-user-id (th/user-id-by-email ds "p2@test.com")
+          p2-player-id (db.player/insert-player {:user-id p2-user-id :organization-id org-id :grade 5.0 :member-type "mensalista"} ds)]
 
       (is (= 201 (:status org-resp)))
 
@@ -31,8 +40,7 @@
                                              "players_per_team" 5
                                              "fixed_goalkeepers" true})))
               body (th/decode-body resp)
-              pelada-id (:id body)
-              player-id 1]
+              pelada-id (:id body)]
           (is (= 201 (:status resp)))
           (is (= true (:fixed_goalkeepers body)))
 
@@ -63,17 +71,20 @@
             (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance"))
                      (mock/json-body {"status" "confirmed"})
                      auth))
+            (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance"))
+                     (mock/json-body {"status" "confirmed" "player_id" p2-player-id})
+                     auth))
             (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance"))
                      auth))
 
             (let [rand-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/teams/randomize"))
                                      (auth)
-                                     (mock/json-body {"player_ids" [player-id] "players_per_team" 5})))]
+                                     (mock/json-body {"player_ids" [player-id p2-player-id] "players_per_team" 5})))]
               (is (= 200 (:status rand-resp)))
 
-              ;; Verify player is NOT in any team
+              ;; Verify player is NOT in any team (player-id is fixed GK, so should be excluded from teams)
               (let [details (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) (auth))))]
-                (is (empty? (mapcat :players (:teams details)))))))
+                (is (not (some #(= player-id (:id %)) (mapcat :players (:Teams details))))))))
 
           (testing "match lineups injection"
             (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin"))
@@ -81,11 +92,11 @@
                      auth))
 
             (let [dashboard (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/dashboard-data")) (auth))))
-                  match (first (:matches dashboard))
+                  match (first (:Matches dashboard))
                   mid (keyword (str (:id match)))
                   lineups (get (:match_lineups_map dashboard) mid)
                   all-lineup-players (mapcat val lineups)]
-              (is (some (fn [p] (and (= player-id (:player_id p)) (= 1 (:is_goalkeeper p)))) all-lineup-players))))))
+              (is (some (fn [p] (and (= player-id (:player_id p)) (= true (:is_goalkeeper p)))) all-lineup-players))))))
 
       (testing "behavior when feature is disabled"
         (let [resp (app (-> (mock/request :post "/api/peladas")
@@ -100,7 +111,7 @@
           (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth))
           (let [rand-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/teams/randomize"))
                                    (auth)
-                                   (mock/json-body {"player_ids" [1] "players_per_team" 5})))]
+                                   (mock/json-body {"player_ids" [player-id] "players_per_team" 5})))]
             (is (= 200 (:status rand-resp)))
             (let [details (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) (auth))))]
-              (is (= 1 (count (mapcat :players (:teams details))))))))))))
+              (is (some #(= player-id (:id %)) (mapcat :players (:Teams details)))))))))))

@@ -84,8 +84,8 @@
 
 (defn get-statistics [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (get-in request [:params :id]))
-             year (Integer/parseInt (get-in request [:query-params "year"]))
+             id (Integer/parseInt (str (get-in request [:params :id])))
+             year (or (some-> (get-in request [:query-params "year"]) str Integer/parseInt) 0)
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-member! user-id id db)
          (-> (controller.organization/get-statistics id year db)

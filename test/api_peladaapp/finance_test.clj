@@ -7,7 +7,7 @@
 (use-fixtures :each th/test-system-fixture)
 
 (deftest test-finance-endpoints
-  (let [app (-> th/*test-system* :app :handler)
+  (let [app (-> th/*test-system* :app :app-handler)
         db-comp (:database th/*test-system*)
         db-val (:database db-comp)
         ds (if (fn? db-val) (db-val) db-val)

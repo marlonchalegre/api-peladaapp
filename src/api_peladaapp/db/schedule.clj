@@ -1,17 +1,29 @@
 (ns api-peladaapp.db.schedule
   (:require
-   [next.jdbc.sql :as sql]
+   [api-peladaapp.helpers.sql :as hsql]
+   [honey.sql.helpers :as h]
+   [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]
    [schema.core :as s]))
 
+(def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
+
 (s/defn list-match-plans-by-pelada [pelada-id db]
-  (->> (sql/find-by-keys db "PeladaMatchPlans" {:pelada_id pelada-id})
-       (sort-by :sequence)))
+  (let [query (-> (h/select :*)
+                  (h/from :PeladaMatchPlans)
+                  (h/where [:= :pelada_id pelada-id])
+                  (h/order-by :sequence))]
+    (->> (jdbc/execute! db (hsql/format query) opts))))
 
 (s/defn delete-match-plans-by-pelada [pelada-id db]
-  (sql/delete! db "PeladaMatchPlans" {:pelada_id pelada-id}))
+  (let [query (-> (h/delete-from :PeladaMatchPlans)
+                  (h/where [:= :pelada_id pelada-id]))]
+    (jdbc/execute-one! db (hsql/format query))))
 
 (s/defn insert-match-plan [{:keys [pelada-id home-team-id away-team-id sequence]} db]
-  (sql/insert! db "PeladaMatchPlans" {:pelada_id pelada-id
-                                      :home_team_id home-team-id
-                                      :away_team_id away-team-id
-                                      :sequence sequence}))
+  (let [query (-> (h/insert-into :PeladaMatchPlans)
+                  (h/values [{:pelada_id pelada-id
+                              :home_team_id home-team-id
+                              :away_team_id away-team-id
+                              :sequence sequence}]))]
+    (jdbc/execute-one! db (hsql/format query))))

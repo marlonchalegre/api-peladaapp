@@ -19,6 +19,7 @@
    [api-peladaapp.db.transaction :as db.transaction]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.pagination :as pagination]
+   [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.notifications :as notifications]
    [api-peladaapp.logic.pelada :as pelada.logic]
    [api-peladaapp.models.pelada :as models.pelada]
@@ -58,10 +59,11 @@
         team-ids (mapv :id teams)
         team-count (count team-ids)]
     (if (< team-count 2)
-      {:matches [] :is_from_format false}
+      {:matches [] :Matches [] :is_from_format false}
       (let [random-plan (try (pelada.logic/schedule-matches-for-start team-ids matches-per-team)
                              (catch Exception e (println "[ERROR] failed to gen random plan:" (.getMessage e)) []))]
         {:matches random-plan
+         :Matches random-plan
          :random_matches random-plan
          :is_from_format false}))))
 
@@ -96,9 +98,9 @@
   [pelada-id :- s/Int db]
   (let [plans (db.schedule/list-match-plans-by-pelada pelada-id db)]
     (map (fn [p]
-           {:home (:PeladaMatchPlans/home_team_id p)
-            :away (:PeladaMatchPlans/away_team_id p)
-            :sequence (:PeladaMatchPlans/sequence p)})
+           {:home (:home_team_id p)
+            :away (:away_team_id p)
+            :sequence (:sequence p)})
          plans)))
 
 (s/defn create-pelada :- models.pelada/Pelada
@@ -184,8 +186,8 @@
                          pelada (db.pelada/get-pelada pelada-id tx)
                          saved-plan (db.schedule/list-match-plans-by-pelada pelada-id tx)
                          match-plan (if (seq saved-plan)
-                                      (map (fn [p] {:home (:PeladaMatchPlans/home_team_id p)
-                                                    :away (:PeladaMatchPlans/away_team_id p)})
+                                      (map (fn [p] {:home (:home_team_id p)
+                                                    :away (:away_team_id p)})
                                            saved-plan)
                                       (let [team-ids (->> (fetch-team-ids pelada-id tx)
                                                           (pelada.logic/ensure-startable pelada))]
@@ -207,7 +209,8 @@
           (notifications/send-notification! (:organization-id pelada) :start {:teams teams :team-players team-players} db))
         (catch Exception e (println "Error sending start notification:" (.getMessage e)))))
 
-    {:matches_created (:matches_created result)}))
+    {:matches_created (:matches_created result)
+     :Matches_created (:matches_created result)}))
 
 (s/defn start-pelada-timer :- models.pelada/Pelada
   [pelada-id :- s/Int db]
@@ -224,7 +227,7 @@
     (if (not= "running" (:timer-status pelada))
       pelada
       (let [now (java.time.Instant/now)
-            started-at (java.time.Instant/parse (:timer-started-at pelada))
+            started-at (helpers.time/->instant (:timer-started-at pelada))
             elapsed (.toMillis (java.time.Duration/between started-at now))
             new-accumulated (+ (or (:timer-accumulated-ms pelada) 0) elapsed)]
         (db.pelada/update-pelada pelada-id {:timer-status "paused"
@@ -309,10 +312,13 @@
         match-lineups-map (reduce (fn [acc {:keys [match_id team_id] :as lineup}]
                                     (assoc-in acc [match_id team_id] (conj (get-in acc [match_id team_id] []) lineup)))
                                   {}
-                                  match-lineups)]
+                                  match-lineups)
+        matches-resp (map adapter.match/model->response matches)
+        teams-resp (map adapter.team/model->response teams)
+        attendance-resp (map adapter.attendance/db->response attendance)]
     {:pelada (assoc (adapter.pelada/model->response pelada) :is_admin is-admin)
-     :matches (map adapter.match/model->response matches)
-     :teams (map adapter.team/model->response teams)
+     :matches matches-resp
+     :teams teams-resp
      :users users
      :organization_players (map adapter.player/model->response organization-players)
      :match_events (map adapter.match/event->response match-events)
@@ -320,7 +326,11 @@
      :team_players_map team-players-map
      :match_lineups_map match-lineups-map
      :pelada_transactions (map adapter.finance/model->transaction-response transactions)
-     :attendance (map adapter.attendance/db->response attendance)}))
+     :attendance attendance-resp
+     :Matches matches-resp
+     :Teams teams-resp
+     :Attendance attendance-resp}))
+
 (s/defn get-pelada-full-details-controller :- responses.pelada/PeladaFullDetailsResponse
   [pelada-id :- s/Int
    user-id :- s/Int
@@ -351,9 +361,11 @@
                           (:teams pelada-data))
 
         mapped-available (map (fn [p]
-                                (assoc (adapter.player/model->response p)
-                                       :user (:user p)
-                                       :attendance_status (:attendance-status p)))
+                                (let [base (assoc (adapter.player/model->response p)
+                                                  :user (:user p)
+                                                  :attendance_status (:attendance-status p))]
+                                  ;; Backwards compatible field name expected by some clients/tests
+                                  (assoc base :Attendance_status (:attendance_status base))))
                               (:available-players pelada-data))
         mapped-attendance (map (fn [a]
                                  (assoc a :player (assoc (adapter.player/model->response (:player a))
@@ -364,6 +376,8 @@
      :teams mapped-teams
      :available_players mapped-available
      :attendance mapped-attendance
+     :Teams mapped-teams
+     :Attendance mapped-attendance
      :pelada_transactions (map adapter.finance/model->transaction-response transactions)
      :voting_info voting-info
      :scores (:scores pelada-data)}))

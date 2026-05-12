@@ -1,11 +1,17 @@
 (ns integration.api-peladaapp.manual-stats-test
   (:require
+   [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is use-fixtures]]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
+
+(defn- exec-one! [ds query]
+  (jdbc/execute-one! ds (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps}))
 
 (defn- setup-org-with-admin-and-player [app ds suffix]
   (let [admin-email (str "admin" suffix "@test.com")
@@ -14,18 +20,17 @@
         admin-id (th/user-id-by-email ds admin-email)
         player-token (th/register-and-login! app {:name "Player" :email player-email :password "pass123"})
         player-id (th/user-id-by-email ds player-email)
-        _ (jdbc/execute! ds ["INSERT INTO Organizations (name) VALUES (?)" (str "Org Test " suffix)])
-        org-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)
-        _ (jdbc/execute! ds ["INSERT INTO OrganizationAdmins (organization_id, user_id) VALUES (?, ?)" org-id admin-id])
-        _ (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, grade) VALUES (?, ?, 5.0)" org-id player-id])
-        org-player-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)]
+
+        org-id (:id (exec-one! ds (-> (h/insert-into :Organizations) (h/values [{:name (str "Org Test " suffix)}]) (h/returning :id))))
+        _ (exec-one! ds (-> (h/insert-into :OrganizationAdmins) (h/values [{:organization_id org-id :user_id admin-id}])))
+        org-player-id (:id (exec-one! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id player-id :grade 5.0}]) (h/returning :id))))]
     {:admin-token admin-token
      :player-token player-token
      :org-id org-id
      :org-player-id org-player-id}))
 
 (deftest upsert-manual-stats-as-admin-test
-  (let [app (-> th/*test-system* :app :handler)
+  (let [app (-> th/*test-system* :app :app-handler)
         db-val (-> th/*test-system* :database :database)
         ds (if (fn? db-val) (db-val) db-val)
         {:keys [admin-token org-id org-player-id]} (setup-org-with-admin-and-player app ds "admin")
@@ -37,7 +42,7 @@
     (is (= 1 (-> response th/decode-body :updated)))))
 
 (deftest upsert-manual-stats-as-non-admin-test
-  (let [app (-> th/*test-system* :app :handler)
+  (let [app (-> th/*test-system* :app :app-handler)
         db-val (-> th/*test-system* :database :database)
         ds (if (fn? db-val) (db-val) db-val)
         {:keys [player-token org-id org-player-id]} (setup-org-with-admin-and-player app ds "nonadmin")
@@ -48,7 +53,7 @@
     (is (= 403 (:status response)))))
 
 (deftest statistics-includes-manual-stats-test
-  (let [app (-> th/*test-system* :app :handler)
+  (let [app (-> th/*test-system* :app :app-handler)
         db-val (-> th/*test-system* :database :database)
         ds (if (fn? db-val) (db-val) db-val)
         {:keys [admin-token player-token org-id org-player-id]} (setup-org-with-admin-and-player app ds "stats")
@@ -59,17 +64,13 @@
                    ((th/auth-cookie admin-token))))
 
         ;; 2. Add Match and Event: 2 goals from matches
-        _ (jdbc/execute! ds ["INSERT INTO Peladas (organization_id, scheduled_at, status) VALUES (?, '2026-01-01 10:00:00', 'closed')" org-id])
-        pelada-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)
-        _ (jdbc/execute! ds ["INSERT INTO Teams (pelada_id, name) VALUES (?, 'Team A')" pelada-id])
-        team-a-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)
-        _ (jdbc/execute! ds ["INSERT INTO Teams (pelada_id, name) VALUES (?, 'Team B')" pelada-id])
-        team-b-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)
-        _ (jdbc/execute! ds ["INSERT INTO Matches (pelada_id, home_team_id, away_team_id, sequence, status) VALUES (?, ?, ?, 1, 'finished')" pelada-id team-a-id team-b-id])
-        match-id (-> (jdbc/execute-one! ds ["SELECT last_insert_rowid() as id"]) :id)
-        _ (jdbc/execute! ds ["INSERT INTO MatchLineups (match_id, player_id, team_id) VALUES (?, ?, 1)" match-id org-player-id])
-        _ (jdbc/execute! ds ["INSERT INTO MatchEvents (match_id, player_id, event_type) VALUES (?, ?, 'goal')" match-id org-player-id])
-        _ (jdbc/execute! ds ["INSERT INTO MatchEvents (match_id, player_id, event_type) VALUES (?, ?, 'goal')" match-id org-player-id])
+        pelada-id (:id (exec-one! ds (-> (h/insert-into :Peladas) (h/values [{:organization_id org-id :scheduled_at [[:cast "2026-01-01 10:00:00" :timestamp]] :status "closed"}]) (h/returning :id))))
+        team-a-id (:id (exec-one! ds (-> (h/insert-into :Teams) (h/values [{:pelada_id pelada-id :name "Team A"}]) (h/returning :id))))
+        team-b-id (:id (exec-one! ds (-> (h/insert-into :Teams) (h/values [{:pelada_id pelada-id :name "Team B"}]) (h/returning :id))))
+        match-id (:id (exec-one! ds (-> (h/insert-into :Matches) (h/values [{:pelada_id pelada-id :home_team_id team-a-id :away_team_id team-b-id :sequence 1 :status "finished"}]) (h/returning :id))))
+        _ (exec-one! ds (-> (h/insert-into :matchlineups) (h/values [{:match_id match-id :player_id org-player-id :team_id team-a-id}])))
+        _ (exec-one! ds (-> (h/insert-into :MatchEvents) (h/values [{:match_id match-id :player_id org-player-id :event_type "goal"}
+                                                                    {:match_id match-id :player_id org-player-id :event_type "goal"}])))
 
         ;; Fetch statistics (total should be 10 + 2 = 12 goals)
         response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
@@ -86,7 +87,7 @@
     (is (= 1 (:peladas_played stat)))))
 
 (deftest manual-stats-additive-aggregation-test
-  (let [app (-> th/*test-system* :app :handler)
+  (let [app (-> th/*test-system* :app :app-handler)
         db-val (-> th/*test-system* :database :database)
         ds (if (fn? db-val) (db-val) db-val)
         {:keys [admin-token player-token org-id org-player-id]} (setup-org-with-admin-and-player app ds "additive")

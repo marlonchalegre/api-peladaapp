@@ -136,8 +136,7 @@
 
         (jdbc/with-transaction [tx db]
           (when-not is-in-org?
-            (jdbc/execute! tx ["INSERT INTO OrganizationPlayers (user_id, organization_id, grade, member_type) VALUES (?, ?, 5.0, 'convidado')"
-                               user-id org-id]))
+            (db.player/insert-player {:user-id user-id :organization-id org-id :grade 5.0 :member-type "convidado"} tx))
 
           ;; Clean up all pending invitations for this user in this organization
           (let [identifiers (remove str/blank? [(:email user) (:username user)])]

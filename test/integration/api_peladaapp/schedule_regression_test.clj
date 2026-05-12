@@ -7,7 +7,7 @@
 (use-fixtures :each th/test-system-fixture)
 
 (deftest schedule-regression-test
-  (let [app (-> th/*test-system* :app :handler)]
+  (let [app (-> th/*test-system* :app :app-handler)]
     ;; Setup Admin and Org
     (app (-> (mock/request :post "/auth/register") (mock/json-body {"name" "Admin" "email" "admin@test.com" "password" "pass123"})))
     (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {"email" "admin@test.com" "password" "pass123"})))
@@ -25,7 +25,7 @@
           p2-resp (app (-> (mock/request :post "/api/peladas") (auth) (mock/json-body {"organization_id" org-id "num_teams" 2})))
           p2-id (:id (th/decode-body p2-resp))
           p2-details (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" p2-id "/full-details")) (auth))))
-          other-team-id (-> p2-details :teams first :id)]
+          other-team-id (-> p2-details :Teams first :id)]
 
       (testing "Prevent saving plan with invalid teams (Bug fix verification)"
         (let [save-resp (app (-> (mock/request :post (str "/api/peladas/" p1-id "/schedule"))

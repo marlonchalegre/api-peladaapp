@@ -3,6 +3,7 @@
    [api-peladaapp.config :as config]
    [api-peladaapp.db.password-reset :as db.password-reset]
    [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.helpers.time :as helpers.time]
    [buddy.hashers :as hashers]
    [postal.core :as postal])
   (:import
@@ -56,7 +57,7 @@
   (let [token-data (db.password-reset/find-token token db)
         now (Instant/now)]
     (if (and token-data
-             (.isAfter (Instant/parse (:expires_at token-data)) now))
+             (.isAfter (helpers.time/->instant (:expires_at token-data)) now))
       (let [user-id (:user_id token-data)
             hashed-password (hashers/encrypt new-password)]
         (db.user/update-user user-id {:password hashed-password} db)

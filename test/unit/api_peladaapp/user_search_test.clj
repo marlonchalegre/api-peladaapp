@@ -3,14 +3,13 @@
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.test-helpers :as th]
    [clojure.set :as set]
-   [clojure.test :refer [deftest is testing use-fixtures]]
-   [next.jdbc :as jdbc]))
+   [clojure.test :refer [deftest is testing use-fixtures]]))
 
 (use-fixtures :each th/test-system-fixture)
 
 (defn- get-ds []
   (let [db-file (:db-file th/*test-system*)]
-    (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})))
+    (api-peladaapp.test-helpers/get-test-datasource db-file)))
 
 (deftest search-users-test
   (let [ds (get-ds)]

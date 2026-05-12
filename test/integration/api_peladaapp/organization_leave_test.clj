@@ -1,18 +1,26 @@
 (ns integration.api-peladaapp.organization-leave-test
   (:require
-   [api-peladaapp.server :as server]
+   [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as helpers]
    [clojure.string :as str]
    [clojure.test :refer [deftest is use-fixtures]]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each helpers/test-system-fixture)
 
+(defn- exec-one! [ds query]
+  (jdbc/execute-one! ds (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps}))
+
+(defn- exec! [ds query]
+  (jdbc/execute! ds (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps}))
+
 (deftest leave-organization-test
-  (let [db-raw (-> helpers/*test-system* :database :database)
-        db (if (fn? db-raw) (db-raw) db-raw)
-        app (fn [req] (server/app (assoc req :database db)))
+  (let [db-val (-> helpers/*test-system* :database :database)
+        db (if (fn? db-val) (db-val) db-val)
+        app (-> helpers/*test-system* :app :app-handler)
 
         ;; Register user 1 (Admin)
         token1 (helpers/register-and-login! app {:name "Admin One" :email "admin1@test.com" :password "pass123"})
@@ -30,8 +38,7 @@
         user2-id (helpers/user-id-by-email db "player2@test.com")]
 
     ;; Add user 2 to org
-    (jdbc/execute! db ["INSERT INTO OrganizationPlayers (user_id, organization_id, grade) VALUES (?, ?, 5.0)"
-                       user2-id org-id])
+    (exec-one! db (-> (h/insert-into :OrganizationPlayers) (h/values [{:user_id user2-id :organization_id org-id :grade 5.0}])))
 
     ;; Verify initial state
     (is (= 200 (:status (app (-> (mock/request :get (str "/api/organizations/" org-id))
@@ -47,7 +54,7 @@
           "Player should no longer have access")
 
       ;; Verify in DB
-      (is (empty? (jdbc/execute! db ["SELECT * FROM OrganizationPlayers WHERE user_id = ? AND organization_id = ?" user2-id org-id]))))
+      (is (empty? (exec! db (-> (h/select :*) (h/from :OrganizationPlayers) (h/where [:= :user_id user2-id] [:= :organization_id org-id]))))))
 
     ;; 2. Last admin tries to leave
     (let [leave-resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/leave"))
@@ -63,8 +70,7 @@
                (helpers/auth-cookie token1)
                (mock/json-body {:user_id user3-id})))
       ;; Add as player too
-      (jdbc/execute! db ["INSERT INTO OrganizationPlayers (user_id, organization_id, grade) VALUES (?, ?, 5.0)"
-                         user3-id org-id])
+      (exec-one! db (-> (h/insert-into :OrganizationPlayers) (h/values [{:user_id user3-id :organization_id org-id :grade 5.0}])))
 
       ;; Now Admin 1 can leave
       (let [leave-resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/leave"))
@@ -75,5 +81,5 @@
             "Former admin should no longer have access")
 
         ;; Verify in DB
-        (is (empty? (jdbc/execute! db ["SELECT * FROM OrganizationAdmins WHERE user_id = ? AND organization_id = ?" user1-id org-id])))
-        (is (empty? (jdbc/execute! db ["SELECT * FROM OrganizationPlayers WHERE user_id = ? AND organization_id = ?" user1-id org-id])))))))
+        (is (empty? (exec! db (-> (h/select :*) (h/from :OrganizationAdmins) (h/where [:= :user_id user1-id] [:= :organization_id org-id])))))
+        (is (empty? (exec! db (-> (h/select :*) (h/from :OrganizationPlayers) (h/where [:= :user_id user1-id] [:= :organization_id org-id])))))))))

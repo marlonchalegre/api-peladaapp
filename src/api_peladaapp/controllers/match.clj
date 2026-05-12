@@ -3,6 +3,7 @@
    [api-peladaapp.db.match :as db.match]
    [api-peladaapp.db.match-event :as db.match-event]
    [api-peladaapp.db.match-lineup :as db.match-lineup]
+   [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.match :as match.logic]
    [api-peladaapp.logic.match-event :as match-event.logic]
    [api-peladaapp.models.match :as models.match]
@@ -34,7 +35,7 @@
     (if (not= "running" (:timer-status match))
       match
       (let [now (java.time.Instant/now)
-            started-at (java.time.Instant/parse (:timer-started-at match))
+            started-at (helpers.time/->instant (:timer-started-at match))
             elapsed (.toMillis (java.time.Duration/between started-at now))
             new-accumulated (+ (or (:timer-accumulated-ms match) 0) elapsed)]
         (db.match/update-match match-id {:timer-status "paused"

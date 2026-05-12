@@ -10,7 +10,7 @@
 (deftest login-rate-limit-test
   (testing "should return 429 when too many login attempts occur"
     (let [system *test-system*
-          handler (-> system :app :handler)
+          handler (-> system :app :app-handler)
           email "rate-limit@test.com"
           password "password123"]
       ;; Trigger 5 failed attempts (or just enough to hit the limit)

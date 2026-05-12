@@ -69,7 +69,7 @@
                             :num-teams (:num_teams p)
                             :players-per-team (:players_per_team p)
                             :fixed-goalkeepers (if (contains? p :fixed_goalkeepers)
-                                                 (= 1 (:fixed_goalkeepers p))
+                                                 (if (boolean? (:fixed_goalkeepers p)) (:fixed_goalkeepers p) (= 1 (:fixed_goalkeepers p)))
                                                  false)
                             :home-fixed-goalkeeper-id (:home_fixed_goalkeeper_id p)
                             :away-fixed-goalkeeper-id (:away_fixed_goalkeeper_id p)

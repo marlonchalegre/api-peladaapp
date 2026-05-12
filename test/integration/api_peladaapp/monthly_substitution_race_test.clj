@@ -3,7 +3,6 @@
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is use-fixtures]]
-   [next.jdbc :as jdbc]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
@@ -17,9 +16,9 @@
 
 (comment
   (deftest substitution-race-condition
-    (let [app (-> th/*test-system* :app :handler)
+    (let [app (-> th/*test-system* :app :app-handler)
           db-file (:db-file th/*test-system*)
-          ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+          ds (api-peladaapp.test-helpers/get-test-datasource db-file)
           token (th/register-and-login! app {:name "Admin" :email "admin@ex.com" :password "p"})
           p2-token (th/register-and-login! app {:name "Player 2" :email "p2@ex.com" :password "p"})
           auth (th/auth-cookie token)

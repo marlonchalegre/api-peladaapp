@@ -74,7 +74,6 @@
           (db.invitation/update-invitation-status (:id invitation) "accepted" tx)
           (let [org-id (:organization-id invitation)]
             (when-not (db.player/get-org-player-by-user-id (:id user-db) org-id tx)
-              (jdbc/execute! tx ["INSERT INTO OrganizationPlayers (user_id, organization_id, grade, member_type) VALUES (?, ?, 5.0, 'convidado')"
-                                 (:id user-db) org-id])))
+              (db.player/insert-player {:user-id (:id user-db) :organization-id org-id :grade 5.0 :member-type "convidado"} tx)))
           {:token (logic.user/build-token user-with-orgs secret)
            :user user-with-orgs})))))

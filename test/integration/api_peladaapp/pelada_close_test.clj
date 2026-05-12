@@ -1,11 +1,14 @@
 (ns api-peladaapp.pelada-close-test
   (:require
    [api-peladaapp.controllers.pelada :as pelada.controller]
+   [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [clojure.data.json :as json]
    [clojure.string :as str]
    [clojure.test :refer [deftest is use-fixtures]]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
@@ -23,10 +26,16 @@
                                                  (catch Exception _ nil))))
       :else nil)))
 
+(defn- exec-one! [ds query]
+  (jdbc/execute-one! ds (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps}))
+
+(defn- exec! [ds query]
+  (jdbc/execute! ds (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps}))
+
 (deftest pelada-close-test
-  (let [app (-> th/*test-system* :app :handler)
-        db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)]
     ;; Register and login user
     (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Test User" :email "test@user.com" :password "password"})))
     (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "test@user.com" :password "password"})))
@@ -61,11 +70,11 @@
       ;; Start pelada and match timers
       (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/timer/start")) auth)))))
 
-      (let [matches (jdbc/execute! ds ["SELECT id FROM matches WHERE pelada_id = ?" pelada-id])
-            match-id (-> matches first :Matches/id)]
+      (let [matches (exec! ds (-> (h/select :id) (h/from :Matches) (h/where [:= :pelada_id pelada-id])))
+            match-id (:id (first matches))]
         (is (= 200 (:status (app (-> (mock/request :post (str "/api/matches/" match-id "/timer/start")) auth)))))
 
-        ;; Wait a bit more to ensure elapsed time >= 1s for SQLite unixepoch
+        ;; Wait a bit more to ensure elapsed time >= 1s for Postgres epoch
         (Thread/sleep 1100)
 
         ;; Close pelada
@@ -81,7 +90,7 @@
             (is (pos? (:timer-accumulated-ms pelada))))
 
           ;; Verify match timer paused and has elapsed time
-          (let [match (jdbc/execute-one! ds ["SELECT * FROM matches WHERE id = ?" match-id])]
-            (is (= "finished" (:Matches/status match)))
-            (is (= "paused" (:Matches/timer_status match)))
-            (is (pos? (:Matches/timer_accumulated_ms match)))))))))
+          (let [match (exec-one! ds (-> (h/select :*) (h/from :Matches) (h/where [:= :id match-id])))]
+            (is (= "finished" (:status match)))
+            (is (= "paused" (:timer_status match)))
+            (is (pos? (:timer_accumulated_ms match)))))))))

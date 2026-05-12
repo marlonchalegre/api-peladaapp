@@ -1,94 +1,92 @@
 (ns api-peladaapp.db.organization-invitation
   (:require
    [api-peladaapp.adapters.invitation :as adapter.invitation]
+   [api-peladaapp.helpers.sql :as hsql]
    [clojure.string :as str]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
    [next.jdbc.result-set :as rs]
    [schema.core :as s]))
-
-(defn- affected-rows-count [result]
-  (-> result vals first))
 
 (def opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn insert-invitation :- s/Int
   [invitation db]
-  (let [row [(:organization-id invitation)
-             (:email invitation)
-             (:token invitation)
-             (:invited-by invitation)]
-        result (jdbc/execute! db ["INSERT INTO OrganizationInvitations (organization_id, email, token, invited_by) VALUES (?, ?, ?, ?)"
-                                  (nth row 0) (nth row 1) (nth row 2) (nth row 3)])]
-    (affected-rows-count (first result))))
+  (let [row {:organization_id (:organization-id invitation)
+             :email (:email invitation)
+             :token (:token invitation)
+             :invited_by (:invited-by invitation)}
+        query (-> (h/insert-into :OrganizationInvitations)
+                  (h/values [row]))]
+    (:id (jdbc/execute-one! db (hsql/format query) opts))))
 
 (s/defn get-invitation-by-token
   [token db]
-  (some-> (jdbc/execute! db ["SELECT i.*, o.name as organization_name 
-                              FROM OrganizationInvitations i
-                              JOIN Organizations o ON i.organization_id = o.id
-                              WHERE i.token = ?" token] opts)
-          first
-          adapter.invitation/db->model))
+  (let [query (-> (h/select :i.* [:o.name :organization_name])
+                  (h/from [:OrganizationInvitations :i])
+                  (h/join [:Organizations :o] [:= :i.organization_id :o.id])
+                  (h/where [:= :i.token token]))
+        result (jdbc/execute! db (hsql/format query) opts)]
+    (some-> result first adapter.invitation/db->model)))
 
 (s/defn list-pending-invitations-by-email
   [email db]
-  (->> (jdbc/execute! db ["SELECT i.*, o.name as organization_name 
-                      FROM OrganizationInvitations i
-                      JOIN Organizations o ON i.organization_id = o.id
-                      WHERE LOWER(i.email) = LOWER(?) AND i.status = 'pending'" email] opts)
-       (map adapter.invitation/db->model)))
+  (let [query (-> (h/select :i.* [:o.name :organization_name])
+                  (h/from [:OrganizationInvitations :i])
+                  (h/join [:Organizations :o] [:= :i.organization_id :o.id])
+                  (h/where [:and [:= [:lower :i.email] (str/lower-case email)] [:= :i.status "pending"]]))
+        result (jdbc/execute! db (hsql/format query) opts)]
+    (map adapter.invitation/db->model result)))
 
 (s/defn list-pending-invitations-by-identifiers
   [identifiers db]
-  (let [placeholders (clojure.string/join "," (repeat (count identifiers) "LOWER(?)"))
-        sql (str "SELECT i.*, o.name as organization_name 
-                  FROM OrganizationInvitations i
-                  JOIN Organizations o ON i.organization_id = o.id
-                  WHERE LOWER(i.email) IN (" placeholders ") AND i.status = 'pending'")]
-    (->> (jdbc/execute! db (into [sql] identifiers) opts)
-         (map adapter.invitation/db->model))))
+  (let [lower-ids (map str/lower-case identifiers)
+        query (-> (h/select :i.* [:o.name :organization_name])
+                  (h/from [:OrganizationInvitations :i])
+                  (h/join [:Organizations :o] [:= :i.organization_id :o.id])
+                  (h/where [:and [:in [:lower :i.email] lower-ids] [:= :i.status "pending"]]))
+        result (jdbc/execute! db (hsql/format query) opts)]
+    (map adapter.invitation/db->model result)))
 
 (s/defn update-invitation-status :- s/Int
   [id status db]
-  (let [result (jdbc/execute! db ["UPDATE OrganizationInvitations SET status = ? WHERE id = ?" status id])]
-    (affected-rows-count (first result))))
+  (let [query (-> (h/update :OrganizationInvitations)
+                  (h/set {:status status})
+                  (h/where [:= :id id]))]
+    (:id (jdbc/execute-one! db (hsql/format query) opts))))
 
 (s/defn mark-all-accepted :- s/Int
   [organization-id identifiers db]
-  (let [placeholders (str/join "," (repeat (count identifiers) "LOWER(?)"))
-        sql (str "UPDATE OrganizationInvitations SET status = 'accepted' 
-                  WHERE organization_id = ? AND status = 'pending' AND LOWER(email) IN (" placeholders ")")]
-    (-> (jdbc/execute! db (into [sql organization-id] identifiers))
-        first
-        affected-rows-count)))
+  (let [lower-ids (map str/lower-case identifiers)
+        query (-> (h/update :OrganizationInvitations)
+                  (h/set {:status "accepted"})
+                  (h/where [:and [:= :organization_id organization-id] [:= :status "pending"] [:in [:lower :email] lower-ids]]))]
+    (:id (jdbc/execute-one! db (hsql/format query) opts))))
 
 (s/defn get-invitation-by-id
   [id db]
-  (some-> (jdbc/execute! db ["SELECT * FROM OrganizationInvitations WHERE id = ?" id] opts)
-          first
-          adapter.invitation/db->model))
+  (let [query (-> (h/select :*) (h/from :OrganizationInvitations) (h/where [:= :id id]))
+        result (jdbc/execute-one! db (hsql/format query) opts)]
+    (some-> result adapter.invitation/db->model)))
 
 (s/defn find-link-invitation-by-org
   [org-id db]
-  (some-> (jdbc/execute! db ["SELECT * FROM OrganizationInvitations WHERE organization_id = ? AND email IS NULL" org-id] opts)
-          first
-          adapter.invitation/db->model))
+  (let [query (-> (h/select :*) (h/from :OrganizationInvitations) (h/where [:and [:= :organization_id org-id] [:is :email nil]]))
+        result (jdbc/execute-one! db (hsql/format query) opts)]
+    (some-> result adapter.invitation/db->model)))
 
 (s/defn delete-link-invitation-by-org :- s/Int
   [org-id db]
-  (-> (jdbc/execute! db ["DELETE FROM OrganizationInvitations WHERE organization_id = ? AND email IS NULL" org-id])
-      first
-      affected-rows-count))
+  (let [query (-> (h/delete-from :OrganizationInvitations) (h/where [:and [:= :organization_id org-id] [:is :email nil]]))]
+    (:id (jdbc/execute-one! db (hsql/format query) opts))))
 
 (s/defn list-invitations-by-organization
   [organization-id db]
-  (->> (jdbc/execute! db ["SELECT * FROM OrganizationInvitations 
-                           WHERE organization_id = ? AND status = 'pending' 
-                           ORDER BY created_at DESC" organization-id] opts)
-       (map adapter.invitation/db->model)))
+  (let [query (-> (h/select :*) (h/from :OrganizationInvitations) (h/where [:and [:= :organization_id organization-id] [:= :status "pending"]]) (h/order-by [:created_at :desc]))
+        result (jdbc/execute! db (hsql/format query) opts)]
+    (map adapter.invitation/db->model result)))
 
 (s/defn delete-invitation :- s/Int
   [id db]
-  (-> (jdbc/execute! db ["DELETE FROM OrganizationInvitations WHERE id = ?" id])
-      first
-      affected-rows-count))
+  (let [query (-> (h/delete-from :OrganizationInvitations) (h/where [:= :id id]))]
+    (:id (jdbc/execute-one! db (hsql/format query) opts))))

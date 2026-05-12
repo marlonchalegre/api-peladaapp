@@ -7,7 +7,7 @@
 (use-fixtures :each th/test-system-fixture)
 
 (deftest test-finance-reversal-scenarios
-  (let [app (-> th/*test-system* :app :handler)
+  (let [app (-> th/*test-system* :app :app-handler)
         admin-token (th/register-and-login! app {:name "Admin User" :email "admin@test.com" :password "test1234"})
 
         ;; Create Organization via admin

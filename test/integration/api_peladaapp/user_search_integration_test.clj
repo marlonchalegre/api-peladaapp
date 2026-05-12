@@ -1,36 +1,40 @@
 (ns api-peladaapp.user-search-integration-test
   (:require
    [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 
-(defn- get-ds []
-  (let [db-file (:db-file th/*test-system*)]
-    (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})))
+(defn- exec-one! [ds query]
+  (jdbc/execute-one! ds (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps}))
+
+(defn- exec! [ds query]
+  (jdbc/execute! ds (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps}))
 
 (deftest user-search-api-test
-  (let [app (-> th/*test-system* :app :handler)
-        ds (get-ds)
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
         admin-token (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "admin123"})
         admin-user-id (th/user-id-by-email ds "admin@test.com")]
 
     ;; Setup: Create organization and add all users to it
-    (let [org-id (-> (jdbc/execute! ds ["INSERT INTO Organizations (name) VALUES (?)" "Test Org"])
-                     first
-                     ((fn [row] (or (:id row) (get row "id") (first (vals row))))))]
+    (let [org-id (:id (exec-one! ds (-> (h/insert-into :Organizations) (h/values [{:name "Test Org"}]) (h/returning :id))))]
       ;; Add admin to org
-      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, grade) VALUES (?, ?, ?)" org-id admin-user-id 5.0])
+      (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id admin-user-id :grade 5.0}])))
 
       ;; Seed data and add to org
       (doseq [user [{:name "Cristiano Ronaldo" :email "cr7@test.com"}
                     {:name "Lionel Messi" :email "leo@test.com"}
                     {:name "Neymar Jr" :email "ney@gmail.com"}]]
         (let [user-id (db.user/insert-user (assoc user :password "pass") ds)]
-          (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id, grade) VALUES (?, ?, ?)" org-id user-id 5.0]))))
+          (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :grade 5.0}]))))))
 
     (testing "GET /api/users/search - search by name"
       (let [resp (app (-> (mock/request :get "/api/users/search")

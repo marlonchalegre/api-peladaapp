@@ -11,7 +11,7 @@
         user-no-email {:name "No Email" :username "noemail" :password "pass"}]
 
     (testing "Create user with all fields"
-      (with-redefs [db.user/find-user-by-username (fn [_ _] nil)
+      (with-redefs [db.user/find-user-by-identifier (fn [_ _] nil)
                     db.user/find-user-by-email (fn [_ _] nil)
                     db.user/insert-user (fn [_ _] 100)
                     logic.user/encrypt-password (fn [u] u)]
@@ -20,7 +20,7 @@
           (is (= "newuser" (:username result))))))
 
     (testing "Create user without email"
-      (with-redefs [db.user/find-user-by-username (fn [_ _] nil)
+      (with-redefs [db.user/find-user-by-identifier (fn [_ _] nil)
                     db.user/find-user-by-email (fn [_ _] nil)
                     db.user/insert-user (fn [_ _] 101)
                     logic.user/encrypt-password (fn [u] u)]
@@ -29,13 +29,13 @@
           (is (nil? (:email result))))))
 
     (testing "Fails if username already exists"
-      (with-redefs [db.user/find-user-by-username (fn [_ _] {:id 1 :username "newuser" :password "hash"})
+      (with-redefs [db.user/find-user-by-identifier (fn [_ _] {:id 1 :username "newuser" :password "hash"})
                     db.user/find-user-by-email (fn [_ _] nil)]
         (is (thrown-with-msg? Exception #"Username already exists"
                               (controller.user/create-user new-user db)))))
 
     (testing "Fails if email already exists"
-      (with-redefs [db.user/find-user-by-username (fn [_ _] nil)
+      (with-redefs [db.user/find-user-by-identifier (fn [_ _] nil)
                     db.user/find-user-by-email (fn [_ _] {:id 1 :email "new@e.com" :password "hash"})]
         (is (thrown-with-msg? Exception #"Email already exists"
                               (controller.user/create-user new-user db)))))))

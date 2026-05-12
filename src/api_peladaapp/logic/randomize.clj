@@ -21,8 +21,8 @@
     []
     (jdbc/execute! db
                    (into [(str "SELECT op.id as id, op.grade as grade, u.position as position
-                                FROM OrganizationPlayers op
-                                JOIN Users u ON op.user_id = u.id
+                                FROM \"OrganizationPlayers\" op
+                                JOIN \"Users\" u ON op.user_id = u.id
                                 WHERE op.organization_id = ? AND op.id IN (" (str/join "," (repeat (count player-ids) "?")) ")")
                           org-id]
                          player-ids)
@@ -116,7 +116,7 @@
                             (if-let [player (first remaining)]
                               (let [[team-id new-states] (assign-player-to-best-team player states)]
                                 (if team-id
-                                  (recur (rest remaining) new-states (conj acc {:team_id team-id :player_id (:id player) :is_goalkeeper 0}))
+                                  (recur (rest remaining) new-states (conj acc {:team_id team-id :player_id (:id player) :is_goalkeeper false}))
                                   (recur (rest remaining) states acc)))
                               acc))]
           (when (seq assignments)

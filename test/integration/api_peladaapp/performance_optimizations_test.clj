@@ -11,14 +11,13 @@
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.db.vote :as db.vote]
    [api-peladaapp.test-helpers :as h]
-   [clojure.test :refer [deftest is use-fixtures]]
-   [next.jdbc :as jdbc]))
+   [clojure.test :refer [deftest is use-fixtures]]))
 
 (use-fixtures :each h/test-system-fixture)
 
 (defn get-test-db []
   (let [db-file (:db-file h/*test-system*)]
-    (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})))
+    (api-peladaapp.test-helpers/get-test-datasource db-file)))
 
 (deftest test-list-user-organizations-optimization
   (let [db (get-test-db)

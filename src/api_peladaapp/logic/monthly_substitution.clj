@@ -28,7 +28,7 @@
         :permanent_player_id permanent-player-id
         :temporary_player_id temporary-player-id
         :start_date start-date
-        :active 1}
+        :active true}
        tx)
 
       ;; Update statuses
@@ -44,7 +44,7 @@
       (when-not sub
         (throw (ex-info "Substitution not found" {:type :not-found})))
 
-      (when (zero? (:active sub))
+      (when (not (:active sub))
         (throw (ex-info "Substitution already ended" {:type :bad-request})))
 
       ;; End substitution record

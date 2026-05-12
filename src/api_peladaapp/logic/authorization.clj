@@ -12,8 +12,9 @@
 (s/defn user-is-in-organization? :- s/Bool
   "Check if user is part of an organization (as player or admin)"
   [user-id organization-id db]
-  (or (db.admin/is-user-admin-of-organization? user-id organization-id db)
-      (boolean (db.player/get-org-player-by-user-id user-id organization-id db))))
+  (let [admin? (db.admin/is-user-admin-of-organization? user-id organization-id db)
+        player? (boolean (db.player/get-org-player-by-user-id user-id organization-id db))]
+    (or admin? player?)))
 
 (s/defn require-organization-admin!
   "Throws exception if user is not an admin of the organization"
