@@ -178,3 +178,11 @@
          (map (fn [m]
                 (assoc m :is_goalkeeper (if (boolean? (:is_goalkeeper m)) (:is_goalkeeper m) (not= 0 (:is_goalkeeper m))))))
          vec)))
+
+(s/defn did-player-participate-in-pelada? :- s/Bool
+  [pelada-id :- s/Int player-id :- s/Int db]
+  (let [query (-> (h/select 1)
+                  (h/from [:TeamPlayers :tp])
+                  (h/join [:Teams :t] [:= :t.id :tp.team_id])
+                  (h/where [:= :t.pelada_id pelada-id] [:= :tp.player_id player-id]))]
+    (some? (jdbc/execute-one! db (hsql/format query) opts))))

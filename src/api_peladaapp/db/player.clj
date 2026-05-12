@@ -95,3 +95,26 @@
                   row)))
          (map adapter.player/db->model)
          vec)))
+
+(s/defn get-players-grades :- [{:id s/Int :grade s/Num}]
+  [player-ids :- [s/Int]
+   db]
+  (if (empty? player-ids)
+    []
+    (let [query (-> (h/select :id :grade)
+                    (h/from :OrganizationPlayers)
+                    (h/where [:in :id player-ids]))]
+      (jdbc/execute! db (hsql/format query) opts))))
+
+(s/defn get-players-details-for-balance :- [s/Any]
+  [player-ids :- [s/Int]
+   organization-id :- s/Int
+   db]
+  (if (empty? player-ids)
+    []
+    (let [query (-> (h/select [:op.id :id] [:op.grade :grade] [:u.position :position])
+                    (h/from [:OrganizationPlayers :op])
+                    (h/join [:Users :u] [:= :op.user_id :u.id])
+                    (h/where [:= :op.organization_id organization-id]
+                             [:in :op.id player-ids]))]
+      (jdbc/execute! db (hsql/format query) opts))))

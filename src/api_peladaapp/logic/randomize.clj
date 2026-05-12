@@ -1,10 +1,9 @@
 (ns api-peladaapp.logic.randomize
   (:require
    [api-peladaapp.db.pelada :as db.pelada]
+   [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.team :as db.team]
-   [clojure.string :as str]
-   [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]))
+   [next.jdbc :as jdbc]))
 
 (def position-priority
   {"Goalkeeper" 0
@@ -13,20 +12,6 @@
    "Striker" 3
    nil 4
    "" 4})
-
-(defn- get-player-details
-  "Fetches grade and position for the given player-ids within the organization."
-  [player-ids org-id db]
-  (if (empty? player-ids)
-    []
-    (jdbc/execute! db
-                   (into [(str "SELECT op.id as id, op.grade as grade, u.position as position
-                                FROM \"OrganizationPlayers\" op
-                                JOIN \"Users\" u ON op.user_id = u.id
-                                WHERE op.organization_id = ? AND op.id IN (" (str/join "," (repeat (count player-ids) "?")) ")")
-                          org-id]
-                         player-ids)
-                   {:builder-fn rs/as-unqualified-lower-maps})))
 
 (defn- sort-players-for-balance
   [players num-teams]
@@ -47,7 +32,7 @@
           (let [current-players (db.team/list-team-players (:id team) tx)
                 ;; We need grades and positions for current players
                 details (if (seq current-players)
-                          (get-player-details (map :player-id current-players) org-id tx)
+                          (db.player/get-players-details-for-balance (map :player-id current-players) org-id tx)
                           [])
                 current-grades (->> details (map :grade) (remove nil?) (reduce + 0))
                 pos-counts (frequencies (map :position details))]
@@ -98,7 +83,7 @@
               remaining-player-ids (remove global-gk-ids player-ids)
 
               ;; Fetch details for players (verifies they belong to org)
-              players-details (get-player-details remaining-player-ids org-id tx)
+              players-details (db.player/get-players-details-for-balance remaining-player-ids org-id tx)
 
               teams (db.team/list-pelada-teams pelada-id tx)
               num-teams (count teams)

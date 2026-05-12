@@ -126,3 +126,37 @@
                                              (h/where [:= :v.pelada_id :pa.pelada_id] [:= :v.voter_id :pa.player_id]))]]))
         results (jdbc/execute! db (hsql/format query) opts)]
     (map (fn [r] {:player-id (:player_id r) :player-name (:player_name r) :phone (:phone r)}) results)))
+
+(s/defn list-eligible-players-for-voting
+  [pelada-id voter-player-id db]
+  (let [where-clause (cond-> [:and [:in :op.id (-> (h/select :player_id)
+                                                   (h/from [:TeamPlayers :sub_tp])
+                                                   (h/join [:Teams :sub_t] [:= :sub_t.id :sub_tp.team_id])
+                                                   (h/where [:= :sub_t.pelada_id pelada-id]))]]
+                       voter-player-id (conj [:!= :op.id voter-player-id]))
+        query (-> (h/select [:op.id :player_id] [:u.id :user_id] :u.name :u.position :u.avatar_filename
+                            [[:coalesce :pa.voting_enabled true] :voting_enabled]
+                            [[:coalesce :s.goals 0] :goals]
+                            [[:coalesce :s.assists 0] :assists]
+                            [[:coalesce :s.own_goals 0] :own_goals])
+                  (h/from [:OrganizationPlayers :op])
+                  (h/join [:Users :u] [:= :u.id :op.user_id])
+                  (h/left-join [:Attendance :pa] [:and [:= :pa.player_id :op.id] [:= :pa.pelada_id pelada-id]])
+                  (h/left-join [:PeladaPlayerStats :s] [:and [:= :s.player_id :op.id] [:= :s.pelada_id pelada-id]])
+                  (h/where where-clause))]
+    (jdbc/execute! db (hsql/format query) opts)))
+
+(s/defn list-pelada-participants
+  [pelada-id db]
+  (let [query (-> (h/select [:op.id :player_id] [:u.id :user_id] :u.name :u.position :u.avatar_filename
+                            [[:coalesce :s.goals 0] :goals]
+                            [[:coalesce :s.assists 0] :assists]
+                            [[:coalesce :s.own_goals 0] :own_goals])
+                  (h/from [:OrganizationPlayers :op])
+                  (h/join [:Users :u] [:= :u.id :op.user_id])
+                  (h/left-join [:PeladaPlayerStats :s] [:and [:= :s.player_id :op.id] [:= :s.pelada_id pelada-id]])
+                  (h/where [:in :op.id (-> (h/select :player_id)
+                                           (h/from [:TeamPlayers :sub_tp])
+                                           (h/join [:Teams :sub_t] [:= :sub_t.id :sub_tp.team_id])
+                                           (h/where [:= :sub_t.pelada_id pelada-id]))]))]
+    (jdbc/execute! db (hsql/format query) opts)))
