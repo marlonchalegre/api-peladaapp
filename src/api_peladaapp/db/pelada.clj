@@ -20,9 +20,15 @@
 
 (def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
-(s/defn insert-pelada :- s/Int
+(s/defn insert-pelada :- s/Uuid
   [{:keys [organization-id scheduled-at num-teams players-per-team fixed-goalkeepers
-           home-fixed-goalkeeper-id away-fixed-goalkeeper-id]}
+           home-fixed-goalkeeper-id away-fixed-goalkeeper-id]} :- {:organization-id s/Uuid
+                                                                   (s/optional-key :scheduled-at) (s/maybe s/Str)
+                                                                   (s/optional-key :num-teams) (s/maybe s/Int)
+                                                                   (s/optional-key :players-per-team) (s/maybe s/Int)
+                                                                   (s/optional-key :fixed-goalkeepers) (s/maybe s/Bool)
+                                                                   (s/optional-key :home-fixed-goalkeeper-id) (s/maybe s/Uuid)
+                                                                   (s/optional-key :away-fixed-goalkeeper-id) (s/maybe s/Uuid)}
    db]
   (let [row (cond-> {:organization_id organization-id :status "attendance"}
               scheduled-at (assoc :scheduled_at [[:cast scheduled-at :timestamp]])
@@ -37,7 +43,7 @@
     (:id (jdbc/execute-one! db (hsql/format query) opts))))
 
 (s/defn get-pelada :- s/Any
-  [id :- s/Int
+  [id :- s/Uuid
    db]
   (let [query (-> (h/select :p.* [:o.name :organization_name])
                   (h/from [:Peladas :p])
@@ -47,7 +53,7 @@
         adapter.pelada/db->model)))
 
 (s/defn update-pelada :- s/Int
-  [id :- s/Int
+  [id :- s/Uuid
    pelada
    db]
   (let [db-row (cond-> (medley.core/assoc-some {}
@@ -73,7 +79,7 @@
             affected-rows-count)))))
 
 (s/defn delete-pelada :- s/Int
-  [id :- s/Int
+  [id :- s/Uuid
    db]
   (let [query (-> (h/delete-from :Peladas)
                   (h/where [:= :id id]))]
@@ -81,7 +87,7 @@
         affected-rows-count)))
 
 (s/defn list-peladas :- [s/Any]
-  [organization-id :- s/Int
+  [organization-id :- s/Uuid
    limit :- s/Int
    offset :- s/Int
    db]
@@ -96,7 +102,7 @@
          (map adapter.pelada/db->model))))
 
 (s/defn count-peladas :- s/Int
-  [organization-id :- s/Int
+  [organization-id :- s/Uuid
    db]
   (let [query (-> (h/select [[:count :*] :count])
                   (h/from :Peladas)
@@ -106,7 +112,7 @@
         int)))
 
 (s/defn list-peladas-by-user :- [s/Any]
-  [user-id :- s/Int
+  [user-id :- s/Uuid
    limit :- s/Int
    offset :- s/Int
    db]
@@ -132,7 +138,7 @@
          (map adapter.pelada/db->model))))
 
 (s/defn count-peladas-by-user :- s/Int
-  [user-id :- s/Int
+  [user-id :- s/Uuid
    db]
   (let [query (-> (h/select [[:count :*] :count])
                   (h/from [:Peladas :p])
@@ -187,7 +193,7 @@
             (fetch-reminders :vote_23h rem-23h-start rem-23h-end))))
 
 (s/defn get-pelada-full-details :- s/Any
-  [pelada-id :- s/Int
+  [pelada-id :- s/Uuid
    db]
   (if-let [pelada (get-pelada pelada-id db)]
     (let [organization-id (:organization-id pelada)

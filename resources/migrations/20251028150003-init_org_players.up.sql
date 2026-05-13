@@ -1,9 +1,9 @@
 CREATE TABLE IF NOT EXISTS "OrganizationPlayers" (
-  id SERIAL PRIMARY KEY,
-  organization_id INTEGER NOT NULL,
-  user_id INTEGER NOT NULL,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL,
+  user_id UUID NOT NULL,
   grade REAL,
-  position_id INTEGER,
+  position_id UUID,
   member_type VARCHAR NOT NULL DEFAULT 'diarista',
   FOREIGN KEY (organization_id) REFERENCES "Organizations"(id),
   FOREIGN KEY (user_id) REFERENCES "Users"(id),

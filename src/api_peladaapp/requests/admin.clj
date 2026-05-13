@@ -3,4 +3,4 @@
    [schema.core :as s]))
 
 (s/defschema AddAdminRequest
-  {:user_id s/Int})
+  {:user_id s/Uuid})

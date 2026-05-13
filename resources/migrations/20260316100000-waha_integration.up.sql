@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS "OrganizationWahaConfigs" (
-    id SERIAL PRIMARY KEY,
-    organization_id INTEGER NOT NULL UNIQUE,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL UNIQUE,
     api_url TEXT,
     instance TEXT,
     group_id TEXT,

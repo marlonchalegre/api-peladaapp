@@ -6,6 +6,7 @@
    [api-peladaapp.db.reminder :as db.reminder]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.db.vote :as db.vote]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.logic.scheduler :as scheduler]
    [api-peladaapp.test-helpers :as th]
@@ -41,11 +42,11 @@
 
         (jdbc/execute! db (hsql/format (-> (h/update :Peladas)
                                            (h/set {:status "closed" :closed_at [[:cast old-date :timestamp]]})
-                                           (h/where [:= :id pelada-id]))))
+                                           (h/where [:= :id (misc/as-uuid pelada-id)]))))
 
         (jdbc/execute! db (hsql/format (-> (h/insert-into :Attendance)
-                                           (h/values [{:pelada_id pelada-id :player_id target-player-id :status "confirmed" :voting_enabled true}
-                                                      {:pelada_id pelada-id :player_id voter-player-id :status "confirmed" :voting_enabled true}]))))
+                                           (h/values [{:pelada_id (misc/as-uuid pelada-id) :player_id (misc/as-uuid target-player-id) :status "confirmed" :voting_enabled true}
+                                                      {:pelada_id (misc/as-uuid pelada-id) :player_id (misc/as-uuid voter-player-id) :status "confirmed" :voting_enabled true}]))))
 
     ;; 4. Add a vote for the target player (e.g., 1 star to drastically change grade)
         (db.vote/insert-vote {:pelada-id pelada-id :voter-id voter-player-id :target-id target-player-id :stars 1} db)
@@ -79,7 +80,7 @@
                                   p-id (db.pelada/insert-pelada {:organization-id org-id :status "closed"} db)]
                               (jdbc/execute! db (hsql/format (-> (h/update :Peladas)
                                                                  (h/set {:status "closed" :closed_at [[:cast d :timestamp]]})
-                                                                 (h/where [:= :id p-id]))))
+                                                                 (h/where [:= :id (misc/as-uuid p-id)]))))
                               p-id))
             ;; Inside windows
             p-30m-in (create-pelada (java.time.Duration/ofMinutes 45))

@@ -3,9 +3,9 @@
    [schema.core :as s]))
 
 (s/defschema Vote
-  {:id s/Int
-   :pelada-id s/Int
-   :voter-id s/Int
-   :target-id s/Int
+  {:id s/Uuid
+   :pelada-id s/Uuid
+   :voter-id s/Uuid
+   :target-id s/Uuid
    :stars s/Int
    :created-at (s/maybe s/Any)})

@@ -1,5 +1,6 @@
 (ns api-peladaapp.peladas-pagination-test
   (:require
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is use-fixtures]]
@@ -25,7 +26,7 @@
       ;; Create 25 peladas directly in DB to be faster
     (dotimes [i 25]
       (jdbc/execute! ds (hsql/format (-> (h/insert-into :Peladas)
-                                         (h/values [{:organization_id org-id
+                                         (h/values [{:organization_id (misc/as-uuid org-id)
                                                      :scheduled_at [[:cast (format "2025-01-%02d 00:00:00" (inc i)) :timestamp]]
                                                      :num_teams 2}])))))
 

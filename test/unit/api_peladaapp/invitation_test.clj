@@ -14,12 +14,14 @@
 
 (def opts {:builder-fn rs/as-unqualified-lower-maps})
 
+(def admin-id (parse-uuid "00000000-0000-0000-0000-000000000099"))
+
 (deftest invite-player-test
   (let [db-val (get-in helpers/*test-system* [:database :database])
         db (if (fn? db-val) (db-val) db-val)
         ;; Create admin user to satisfy foreign key constraints
         _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
-                                             (h/values [{:id 99 :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
+                                             (h/values [{:id admin-id :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
         org-name "Test Invitation Org"
         _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Organizations)
                                              (h/values [{:name org-name}]))) opts)
@@ -30,7 +32,7 @@
         email "new-player@example.com"]
 
     (testing "Inviting a non-existent user creates a partial user and DOES NOT add to org yet"
-      (let [result (controller.organization/invite-player-improved org-id email nil 99 db)]
+      (let [result (controller.organization/invite-player-improved org-id email nil admin-id db)]
         (is (= email (:email result)))
         (is (:is-new-user result))
         (is (= org-id (:organization-id result)))
@@ -54,7 +56,7 @@
             _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
                                                  (h/values [{:email existing-email :name "Existing" :password "hashed-pass"}]))) opts)
             user-id (helpers/user-id-by-email db existing-email)
-            result (controller.organization/invite-player-improved org-id existing-email nil 99 db)]
+            result (controller.organization/invite-player-improved org-id existing-email nil admin-id db)]
         (is (= existing-email (:email result)))
         (is (not (:is-new-user result)))
         (is (= user-id (:user-id result)))
@@ -68,7 +70,7 @@
 
     (testing "Inviting by name only DOES NOT add user to org automatically (requires acceptance)"
       (let [name "Guest Player"
-            result (controller.organization/invite-player-improved org-id nil name 99 db)]
+            result (controller.organization/invite-player-improved org-id nil name admin-id db)]
         (is (= name (:name result)))
         (is (nil? (:email result)))
 
@@ -90,7 +92,7 @@
         db (if (fn? db-val) (db-val) db-val)
         ;; Create admin user to satisfy foreign key constraints
         _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
-                                             (h/values [{:id 99 :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
+                                             (h/values [{:id admin-id :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
         email "invited@example.com"
         _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Organizations)
                                              (h/values [{:name "First Access Org"}]))) opts)
@@ -99,7 +101,7 @@
                                                           (h/where [:= :name "First Access Org"]))) opts)
                    :id)
         ;; Use controller to create invite (which also creates partial user)
-        _ (controller.organization/invite-player-improved org-id email nil 99 db)
+        _ (controller.organization/invite-player-improved org-id email nil admin-id db)
         token (:token (first (controller.organization/list-organization-invitations org-id db)))
         user-id (helpers/user-id-by-email db email)]
 
@@ -137,7 +139,7 @@
                                                                 (h/from :Organizations)
                                                                 (h/where [:= :name "First Access Org 2"]))) opts)
                          :id)
-            _ (controller.organization/invite-player-improved org-id-2 email nil 99 db)
+            _ (controller.organization/invite-player-improved org-id-2 email nil admin-id db)
             token-2 (:token (first (controller.organization/list-organization-invitations org-id-2 db)))
             payload {:email email
                      :username "otheruser"
@@ -157,7 +159,7 @@
         db (if (fn? db-val) (db-val) db-val)
         ;; Create admin user to satisfy foreign key constraints
         _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
-                                             (h/values [{:id 99 :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
+                                             (h/values [{:id admin-id :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
         org-name "Link Org"
         _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Organizations)
                                              (h/values [{:name org-name}]))) opts)
@@ -165,7 +167,7 @@
                                                           (h/from :Organizations)
                                                           (h/where [:= :name org-name]))) opts)
                    :id)
-        user-id 99] ;; Mock admin id
+        user-id admin-id] ;; Mock admin id
 
     (testing "Creating/Getting a link invitation"
       (let [token (controller.organization/get-or-create-organization-link org-id user-id db)]
@@ -179,7 +181,7 @@
 
     (testing "Accepting a link invitation"
       (let [token (controller.organization/get-or-create-organization-link org-id user-id db)
-            new-user-id 100
+            new-user-id (parse-uuid "00000000-0000-0000-0000-000000000100")
             _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
                                                  (h/values [{:id new-user-id :email "tester@test.com" :username "testeruser" :name "Tester"}]))) opts)
             result (controller.organization/accept-invitation token new-user-id db)]
@@ -211,7 +213,7 @@
         db (if (fn? db-val) (db-val) db-val)
         ;; Create admin user to satisfy foreign key constraints
         _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
-                                             (h/values [{:id 99 :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
+                                             (h/values [{:id admin-id :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
         org-name "Manage Invites Org"
         _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Organizations)
                                              (h/values [{:name org-name}]))) opts)
@@ -219,7 +221,7 @@
                                                           (h/from :Organizations)
                                                           (h/where [:= :name org-name]))) opts)
                    :id)
-        user-id 99]
+        user-id admin-id]
 
     (testing "Listing and revoking invitations"
       (controller.organization/invite-player org-id "to-revoke@test.com" user-id db)
@@ -236,7 +238,7 @@
         db (if (fn? db-val) (db-val) db-val)
         ;; Create admin user to satisfy foreign key constraints
         _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
-                                             (h/values [{:id 99 :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
+                                             (h/values [{:id admin-id :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
         org-name "Edge Case Org"
         _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Organizations)
                                              (h/values [{:name org-name}]))) opts)
@@ -244,7 +246,7 @@
                                                           (h/from :Organizations)
                                                           (h/where [:= :name org-name]))) opts)
                    :id)
-        user-id 99]
+        user-id admin-id]
 
     (testing "Accepting invalid token throws exception"
       (is (thrown-with-msg? Exception #"Invitation not found"
@@ -304,7 +306,7 @@
         db (if (fn? db-val) (db-val) db-val)
         ;; Create admin user to satisfy foreign key constraints
         _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Users)
-                                             (h/values [{:id 99 :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
+                                             (h/values [{:id admin-id :email "admin@test.com" :username "admin" :name "Admin"}]))) opts)
         org-name "Reset Link Org"
         _ (jdbc/execute! db (hsql/format (-> (h/insert-into :Organizations)
                                              (h/values [{:name org-name}]))) opts)
@@ -312,7 +314,7 @@
                                                           (h/from :Organizations)
                                                           (h/where [:= :name org-name]))) opts)
                    :id)
-        user-id 99]
+        user-id admin-id]
 
     (testing "Resetting a link invitation replaces the old token"
       (let [token1 (controller.organization/get-or-create-organization-link org-id user-id db)

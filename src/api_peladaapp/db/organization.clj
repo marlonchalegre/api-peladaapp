@@ -14,7 +14,7 @@
 
 (def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
-(s/defn insert-organization :- s/Int
+(s/defn insert-organization :- s/Uuid
   [org db]
   (let [row (adapter.organization/model->db org)
         query (-> (h/insert-into :Organizations)
@@ -22,7 +22,7 @@
                   (h/returning :id))]
     (:id (jdbc/execute-one! db (hsql/format query) opts))))
 
-(s/defn get-organization [id db]
+(s/defn get-organization [id :- s/Uuid db]
   (let [query (-> (h/select :o.*
                             [:wc.api_url :waha_api_url]
                             [:wc.instance :waha_instance]
@@ -41,7 +41,7 @@
     (some-> result first adapter.organization/db->model)))
 
 (s/defn update-organization :- s/Int
-  [id org db]
+  [id :- s/Uuid org db]
   (jdbc/with-transaction [tx db]
     (let [org-row (select-keys org [:name])
           waha-row (-> org
@@ -71,7 +71,7 @@
       1)))
 
 (s/defn delete-organization :- s/Int
-  [id db]
+  [id :- s/Uuid db]
   (let [query (-> (h/delete-from :Organizations)
                   (h/where [:= :id id]))]
     (-> (jdbc/execute-one! db (hsql/format query) opts)
@@ -99,7 +99,7 @@
     (->> (jdbc/execute! db (hsql/format query) opts)
          (map adapter.organization/db->model))))
 
-(s/defn list-by-user [user-id db]
+(s/defn list-by-user [user-id :- s/Uuid db]
   (let [query (-> (h/select :id :name :role)
                   (h/from [(h/union
                             (-> (h/select :o.id :o.name [[:raw "'admin'"] :role] [1 :priority])
@@ -118,22 +118,23 @@
          (map adapter.organization/db->model))))
 
 (s/defn get-statistics
-  [id :- s/Int
+  [id :- s/Uuid
    year :- s/Int
    db]
-  (let [where-year (if (pos? year) [[:= [:to_char :p.scheduled_at "YYYY"] (str year)]] [])
+  (let [id-uuid [:cast id :uuid]
+        where-year (if (pos? year) [[:= [:to_char :p.scheduled_at "YYYY"] (str year)]] [])
         raw-participation (h/union
                            (-> (h/select :ml.player_id :m.pelada_id)
                                (h/from [:matchlineups :ml])
                                (h/join [:Matches :m] [:= :ml.match_id :m.id])
                                (h/join [:Peladas :p] [:= :m.pelada_id :p.id])
-                               (h/where (into [:and [:= :p.organization_id id]] where-year)))
+                               (h/where (into [:and [:= :p.organization_id id-uuid]] where-year)))
                            (-> (h/select :tp.player_id :m.pelada_id)
                                (h/from [:TeamPlayers :tp])
                                (h/join [:Teams :t] [:= :tp.team_id :t.id])
                                (h/join [:Matches :m] [:or [:= :m.home_team_id :t.id] [:= :m.away_team_id :t.id]])
                                (h/join [:Peladas :p] [:= :m.pelada_id :p.id])
-                               (h/where (into [:and [:= :p.organization_id id] [:not-exists (-> (h/select 1)
+                               (h/where (into [:and [:= :p.organization_id id-uuid] [:not-exists (-> (h/select 1)
                                                                                                 (h/from [:matchlineups :sub_ml])
                                                                                                 (h/where [:= :sub_ml.match_id :m.id]))]] where-year))))
         player-participation (-> (h/select :player_id [[:count [:distinct :pelada_id]] :peladas_count])
@@ -144,27 +145,27 @@
                            (h/from [:MatchEvents :me])
                            (h/join [:Matches :m] [:= :me.match_id :m.id])
                            (h/join [:Peladas :p] [:= :m.pelada_id :p.id])
-                           (h/where (into [:and [:= :p.organization_id id]] where-year))
+                           (h/where (into [:and [:= :p.organization_id id-uuid]] where-year))
                            (h/group-by :me.player_id :me.event_type))
                        (-> (h/select :ms.player_id [[:raw "'goal'"] :event_type] [:ms.goals :event_count])
                            (h/from [:ManualStats :ms])
-                           (h/where (cond-> [:and [:= :ms.organization_id id] [:> :ms.goals 0]]
+                           (h/where (cond-> [:and [:= :ms.organization_id id-uuid] [:> :ms.goals 0]]
                                       (pos? year) (conj [:= :ms.year year]))))
                        (-> (h/select :ms.player_id [[:raw "'assist'"] :event_type] [:ms.assists :event_count])
                            (h/from [:ManualStats :ms])
-                           (h/where (cond-> [:and [:= :ms.organization_id id] [:> :ms.assists 0]]
+                           (h/where (cond-> [:and [:= :ms.organization_id id-uuid] [:> :ms.assists 0]]
                                       (pos? year) (conj [:= :ms.year year]))))
                        (-> (h/select :ms.player_id [[:raw "'own_goal'"] :event_type] [:ms.own_goals :event_count])
                            (h/from [:ManualStats :ms])
-                           (h/where (cond-> [:and [:= :ms.organization_id id] [:> :ms.own_goals 0]]
+                           (h/where (cond-> [:and [:= :ms.organization_id id-uuid] [:> :ms.own_goals 0]]
                                       (pos? year) (conj [:= :ms.year year])))))
         all-players (h/union
                      (-> (h/select :player_id) (h/from :PlayerParticipation))
-                     (-> (h/select :player_id) (h/from :ManualStats) (h/where (cond-> [:and [:= :organization_id id]] (pos? year) (conj [:= :year year])))))
+                     (-> (h/select :player_id) (h/from :ManualStats) (h/where (cond-> [:and [:= :organization_id id-uuid]] (pos? year) (conj [:= :year year])))))
         player-ratings (-> (h/select [:v.target_id :player_id] [[:avg :v.stars] :avg_rating])
                            (h/from [:Votes :v])
                            (h/join [:Peladas :p] [:= :v.pelada_id :p.id])
-                           (h/where (into [:and [:= :p.organization_id id]] where-year))
+                           (h/where (into [:and [:= :p.organization_id id-uuid]] where-year))
                            (h/group-by :v.target_id))
         final-query (-> (h/with [:RawParticipation raw-participation]
                                 [:PlayerParticipation player-participation]

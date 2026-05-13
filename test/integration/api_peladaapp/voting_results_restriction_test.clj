@@ -1,5 +1,6 @@
 (ns api-peladaapp.voting-results-restriction-test
   (:require
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
@@ -38,7 +39,7 @@
     ;; Add players to org
     (doseq [email ["p1@test.com" "p2@test.com" "p3@test.com"]]
       (let [uid (th/user-id-by-email ds email)]
-        (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id uid}])))))
+        (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id (misc/as-uuid org-id) :user_id (misc/as-uuid uid)}])))))
 
     (let [pelada-id (:id (th/decode-body (app (-> (mock/request :post "/api/peladas")
                                                   (mock/json-body {:organization_id org-id :num_teams 2})
@@ -53,7 +54,7 @@
 
       ;; Only Admin, P1 and P2 participated
       (doseq [pid [p-admin-id p1-id p2-id]]
-        (exec! ds (-> (h/insert-into :TeamPlayers) (h/values [{:team_id t1-id :player_id pid}]))))
+        (exec! ds (-> (h/insert-into :TeamPlayers) (h/values [{:team_id (misc/as-uuid t1-id) :player_id (misc/as-uuid pid)}]))))
 
       (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth-admin))
       (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin")) auth-admin))
@@ -67,7 +68,8 @@
 
       ;; Force voting window to close
       (let [old-date (.minus (java.time.OffsetDateTime/now) (java.time.Duration/ofHours 26))]
-        (exec! ds (-> (h/update :Peladas) (h/set {:closed_at [[:cast old-date :timestamp]]}) (h/where [:= :id pelada-id]))))
+        (exec! ds (-> (h/update :Peladas) (h/set {:closed_at [[:cast old-date :timestamp]]}) (h/where [:= :id (misc/as-uuid pelada-id)]))))
+
 
       (testing "Admin can access results even if didn't vote"
         (let [resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/voting-results")) auth-admin))]

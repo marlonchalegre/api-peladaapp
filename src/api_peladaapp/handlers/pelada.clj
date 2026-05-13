@@ -4,6 +4,7 @@
    [api-peladaapp.adapters.pelada :as adapter.pelada]
    [api-peladaapp.controllers.pelada :as controller.pelada]
    [api-peladaapp.helpers.exception :as exception]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.helpers.responses :refer [created deleted ok]]
    [api-peladaapp.logic.authorization :as auth]))
@@ -23,7 +24,7 @@
 
 (defn get-full-details [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)
              pelada-data (controller.pelada/get-pelada-full-details-controller id user-id db)
              pelada (:pelada pelada-data)
@@ -36,7 +37,7 @@
 
 (defn delete [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
              org-id (:organization-id pelada)]
@@ -47,7 +48,7 @@
 
 (defn list-by-org [request]
   (try (let [db (:database request)
-             org-id (Integer/parseInt (str (get-in request [:params :organization_id])))
+             org-id (misc/as-uuid (get-in request [:params :organization_id]))
              user-id (auth/get-user-id-from-request request)
              query-params (:query-params request)
              pagination (pagination/parse-pagination-params query-params)]
@@ -61,7 +62,7 @@
 
 (defn list-by-user [request]
   (try (let [db (:database request)
-             user-id-param (Integer/parseInt (str (get-in request [:params :user_id])))
+             user-id-param (misc/as-uuid (get-in request [:params :user_id]))
              auth-user-id (auth/get-user-id-from-request request)
              query-params (:query-params request)
              pagination (pagination/parse-pagination-params query-params)]
@@ -77,7 +78,7 @@
 
 (defn begin [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              body (:body request)
              matches-per-team (some-> (:matches_per_team body) int)
              user-id (auth/get-user-id-from-request request)
@@ -92,7 +93,7 @@
 
 (defn close [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
              org-id (:organization-id pelada)]
@@ -105,7 +106,7 @@
 
 (defn start-timer [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
              org-id (:organization-id pelada)]
@@ -117,7 +118,7 @@
 
 (defn pause-timer [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
              org-id (:organization-id pelada)]
@@ -129,7 +130,7 @@
 
 (defn reset-timer [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
              org-id (:organization-id pelada)]
@@ -141,7 +142,7 @@
 
 (defn get-schedule-preview [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              matches-per-team (Integer/parseInt (str (or (get-in request [:params :matches_per_team])
                                                          (get-in request [:params "matches_per_team"])
                                                          "2")))
@@ -154,9 +155,9 @@
 
 (defn save-schedule-plan [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              body (:body request)
-             matches (:matches body)
+             matches (map (fn [m] (assoc m :home (misc/as-uuid (:home m)) :away (misc/as-uuid (:away m)))) (:matches body))
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
              org-id (:organization-id pelada)]
@@ -166,7 +167,7 @@
 
 (defn get-schedule-plan [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
              org-id (:organization-id pelada)]
@@ -176,7 +177,7 @@
 
 (defn get-dashboard-data [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
              org-id (:organization-id pelada)]
@@ -187,7 +188,7 @@
 
 (defn update [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              body (:body request)
              pelada-update (adapter.pelada/update-request->model body)
              user-id (auth/get-user-id-from-request request)

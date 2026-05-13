@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS "PeladaPlayerStats" (
-  pelada_id INTEGER NOT NULL,
-  player_id INTEGER NOT NULL,
+  pelada_id UUID NOT NULL,
+  player_id UUID NOT NULL,
   goals INTEGER DEFAULT 0,
   assists INTEGER DEFAULT 0,
   own_goals INTEGER DEFAULT 0,
@@ -14,7 +14,7 @@ CREATE INDEX IF NOT EXISTS peladaplayerstats_index_pelada ON "PeladaPlayerStats"
 CREATE OR REPLACE FUNCTION update_pelada_player_stats_on_insert()
 RETURNS TRIGGER AS $$
 DECLARE
-  v_pelada_id INTEGER;
+  v_pelada_id UUID;
 BEGIN
   SELECT pelada_id INTO v_pelada_id FROM "Matches" WHERE id = NEW.match_id;
 
@@ -41,7 +41,7 @@ FOR EACH ROW EXECUTE FUNCTION update_pelada_player_stats_on_insert();
 CREATE OR REPLACE FUNCTION update_pelada_player_stats_on_delete()
 RETURNS TRIGGER AS $$
 DECLARE
-  v_pelada_id INTEGER;
+  v_pelada_id UUID;
 BEGIN
   SELECT pelada_id INTO v_pelada_id FROM "Matches" WHERE id = OLD.match_id;
 

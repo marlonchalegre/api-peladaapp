@@ -10,13 +10,13 @@
 (s/defn create-request->model :- models.team/Team
   [request :- requests.team/CreateTeamRequest]
   (medley.core/assoc-some {}
-                          :pelada-id (:pelada_id request)
+                          :pelada-id (misc/as-uuid (:pelada_id request))
                           :name (:name request)))
 
 (s/defn update-request->model :- models.team/Team
   [request :- requests.team/UpdateTeamRequest]
   (medley.core/assoc-some {}
-                          :pelada-id (:pelada_id request)
+                          :pelada-id (misc/as-uuid (:pelada_id request))
                           :name (:name request)))
 
 (s/defn model->response :- responses.team/TeamResponse

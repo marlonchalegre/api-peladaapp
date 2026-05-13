@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS "PeladaMatchPlans" (
-    id SERIAL PRIMARY KEY,
-    pelada_id INTEGER NOT NULL,
-    home_team_id INTEGER NOT NULL,
-    away_team_id INTEGER NOT NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    pelada_id UUID NOT NULL,
+    home_team_id UUID NOT NULL,
+    away_team_id UUID NOT NULL,
     sequence INTEGER NOT NULL,
     UNIQUE (pelada_id, sequence),
     FOREIGN KEY (pelada_id) REFERENCES "Peladas"(id) ON DELETE CASCADE,
@@ -11,8 +11,8 @@ CREATE TABLE IF NOT EXISTS "PeladaMatchPlans" (
 );
 --;;
 CREATE TABLE IF NOT EXISTS "OrganizationScheduleFormats" (
-    id SERIAL PRIMARY KEY,
-    organization_id INTEGER NOT NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL,
     team_count INTEGER NOT NULL,
     matches_per_team INTEGER NOT NULL,
     format_data TEXT NOT NULL,

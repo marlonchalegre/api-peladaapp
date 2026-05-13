@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS "TeamPlayers" (
-  id SERIAL PRIMARY KEY,
-  team_id INTEGER NOT NULL,
-  player_id INTEGER NOT NULL,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  team_id UUID NOT NULL,
+  player_id UUID NOT NULL,
   is_goalkeeper BOOLEAN DEFAULT FALSE,
   FOREIGN KEY (team_id) REFERENCES "Teams"(id),
   FOREIGN KEY (player_id) REFERENCES "OrganizationPlayers"(id)

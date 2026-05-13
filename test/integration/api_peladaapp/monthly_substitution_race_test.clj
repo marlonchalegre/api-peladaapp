@@ -1,6 +1,7 @@
 (ns integration.api-peladaapp.monthly-substitution-race-test
   (:require
    [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is use-fixtures]]
    [ring.mock.request :as mock]))
@@ -13,7 +14,7 @@
 ;; Note: This concurrency/race test should now be reliable with PostgreSQL.
 (deftest substitution-race-condition
   (let [app (-> th/*test-system* :app :app-handler)
-        ds (api-peladaapp.test-helpers/get-test-datasource)
+        ds (th/get-test-datasource)
         token (th/register-and-login! app {:name "Admin" :email "admin@ex.com" :password "p"})
         p2-token (th/register-and-login! app {:name "Player 2" :email "p2@ex.com" :password "p"})
         auth (th/auth-cookie token)
@@ -24,7 +25,7 @@
         org-resp (app (-> (mock/request :post "/api/organizations")
                           (mock/json-body {:name "Race Club"})
                           auth))
-        org-id (:id (decode-body org-resp))]
+        org-id (misc/as-uuid (:id (decode-body org-resp)))]
 
     (is (= 201 (:status org-resp)))
 
@@ -38,10 +39,10 @@
 
       ;; Make admin mensalista
     (let [players (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/players")) auth)))
-          admin-player (first (filter #(= (:user_id %) admin-id) players))
-          admin-player-id (:id admin-player)
-          p2-player (first (filter #(= (:user_id %) p2-id) players))
-          p2-player-id (:id p2-player)]
+          admin-player (first (filter #(= (misc/as-uuid (:user_id %)) admin-id) players))
+          admin-player-id (misc/as-uuid (:id admin-player))
+          p2-player (first (filter #(= (misc/as-uuid (:user_id %)) p2-id) players))
+          p2-player-id (misc/as-uuid (:id p2-player))]
       (db.player/update-player admin-player-id {:member-type "mensalista"} ds)
 
         ;; Fire two concurrent requests attempting to make p2 substitute admin

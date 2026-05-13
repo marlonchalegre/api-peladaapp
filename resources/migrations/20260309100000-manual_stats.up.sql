@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS "ManualStats" (
-  id SERIAL PRIMARY KEY,
-  organization_id INTEGER NOT NULL,
-  player_id INTEGER NOT NULL,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL,
+  player_id UUID NOT NULL,
   year INTEGER NOT NULL,
   goals INTEGER DEFAULT 0,
   assists INTEGER DEFAULT 0,

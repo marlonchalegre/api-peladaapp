@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS "MatchEvents" (
-  id SERIAL PRIMARY KEY,
-  match_id INTEGER NOT NULL,
-  player_id INTEGER NOT NULL,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  match_id UUID NOT NULL,
+  player_id UUID NOT NULL,
   event_type VARCHAR NOT NULL CHECK (event_type IN ('assist','goal','own_goal')),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   session_time_ms INTEGER,

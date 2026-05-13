@@ -3,17 +3,17 @@
    [schema.core :as s]))
 
 (s/defschema UserResponse
-  {:id s/Int
+  {:id s/Uuid
    :name s/Str
    :username s/Str
    (s/optional-key :email) s/Str
    (s/optional-key :phone) (s/maybe s/Str)
    (s/optional-key :position) (s/maybe s/Str)
-   (s/optional-key :admin_orgs) [s/Int]
+   (s/optional-key :admin_orgs) [s/Uuid]
    (s/optional-key :avatar_filename) (s/maybe s/Str)})
 
 (s/defschema PublicUserResponse
-  {:id s/Int
+  {:id s/Uuid
    :name s/Str
    :username s/Str
    (s/optional-key :phone) (s/maybe s/Str)

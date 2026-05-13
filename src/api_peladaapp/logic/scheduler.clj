@@ -67,7 +67,7 @@
                   current-player (db.player/get-player player-id db)
                   current-grade (or (:grade current-player) 5.0)
                   new-grade (logic.grade/calculate-new-grade current-grade performance)]
-              (log/info (format "Updating player %d grade: %.2f -> %.2f (perf: %.2f)"
+              (log/info (format "Updating player %s grade: %.2f -> %.2f (perf: %.2f)"
                                 player-id current-grade new-grade performance))
               (db.player/update-player-grade player-id new-grade db)))
 

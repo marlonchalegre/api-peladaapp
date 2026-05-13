@@ -48,6 +48,9 @@
             (recur (inc i)))))
       token)))
 
+(defn- ensure-uuid [x]
+  (if (string? x) (parse-uuid x) x))
+
 (defn user-id-by-email [ds email]
   (let [query (-> (h/select :*)
                   (h/from :Users)
@@ -57,7 +60,9 @@
     (:id row)))
 
 (defn player-id-by-user-id [ds user-id org-id]
-  (let [query (-> (h/select :id)
+  (let [user-id (ensure-uuid user-id)
+        org-id (ensure-uuid org-id)
+        query (-> (h/select :id)
                   (h/from :OrganizationPlayers)
                   (h/where [:= :user_id user-id] [:= :organization_id org-id]))
         row (jdbc/execute-one! ds (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps})]
@@ -105,10 +110,10 @@
   (jdbc/execute! ds ["GRANT ALL ON SCHEMA public TO public"]))
 
 (defn- seed-positions [ds]
-  (let [positions [{:id 1 :name "Goleiro" :short_name "G"}
-                   {:id 2 :name "Zagueiro" :short_name "Z"}
-                   {:id 3 :name "Meio-campo" :short_name "M"}
-                   {:id 4 :name "Atacante" :short_name "A"}]]
+  (let [positions [{:value "Goalkeeper"}
+                   {:value "Defender"}
+                   {:value "Midfielder"}
+                   {:value "Striker"}]]
     (doseq [pos positions]
       (try
         (jdbc/execute! ds (hsql/format (-> (h/insert-into :Positions) (h/values [pos]))))
@@ -118,11 +123,15 @@
 
 (defn test-system-fixture [f]
   (let [ds (get-test-datasource)]
-    (reset-postgres-schema ds)
-    (let [config {:store :database
-                  :migration-dir "migrations"
-                  :db {:datasource ds}}]
-      (migratus/migrate config))
+    (locking migrations-run?
+      (when-not @migrations-run?
+        (reset-postgres-schema ds)
+        (let [config {:store :database
+                      :migration-dir "migrations"
+                      :db {:datasource ds}}]
+          (migratus/migrate config))
+        (reset! migrations-run? true)))
+    (truncate-tables ds)
     (seed-positions ds)
     (binding [*test-system* (let [sys (components/system {:db-spec {:datasource ds} :skip-migrations true})]
                               (-> sys

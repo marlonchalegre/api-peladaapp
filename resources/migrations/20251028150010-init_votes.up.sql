@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS "Votes" (
-  id SERIAL PRIMARY KEY,
-  pelada_id INTEGER NOT NULL,
-  voter_id INTEGER NOT NULL,
-  target_id INTEGER NOT NULL,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pelada_id UUID NOT NULL,
+  voter_id UUID NOT NULL,
+  target_id UUID NOT NULL,
   stars INTEGER NOT NULL CHECK (stars >= 1 AND stars <= 5),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (pelada_id, voter_id, target_id),

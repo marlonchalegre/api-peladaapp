@@ -1,19 +1,19 @@
 (ns api-peladaapp.handlers.manual-stats
   (:require
+   [api-peladaapp.adapters.manual-stats :as adapter.manual-stats]
    [api-peladaapp.controllers.manual-stats :as controller.manual-stats]
    [api-peladaapp.helpers.exception :as exception]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.responses :refer [ok]]
+   [api-peladaapp.logic.authorization :as auth]
    [clojure.string :as str]))
-
-(defn- sanitize-keys [m]
-  (into {} (map (fn [[k v]] [(keyword (str/replace (name k) "_" "-")) v]) m)))
 
 (defn upsert-manual-stats [request]
   (try
     (let [db (:database request)
-          user-id (get-in request [:identity :id])
-          organization-id (Integer/parseInt (str (get-in request [:params :id])))
-          stats (map sanitize-keys (:body request))]
+          user-id (auth/get-user-id-from-request request)
+          organization-id (misc/as-uuid (get-in request [:params :id]))
+          stats (map adapter.manual-stats/payload->manual-stats (:body request))]
       (ok {:updated (controller.manual-stats/upsert-manual-stats user-id organization-id stats db)}))
     (catch Exception e
       (exception/api-exception-handler e))))
@@ -21,7 +21,7 @@
 (defn list-manual-stats [request]
   (try
     (let [db (:database request)
-          organization-id (Integer/parseInt (str (get-in request [:params :id])))
+          organization-id (misc/as-uuid (get-in request [:params :id]))
           year (Integer/parseInt (str (get-in request [:query-params "year"])))]
       (ok (controller.manual-stats/list-manual-stats organization-id year db)))
     (catch Exception e

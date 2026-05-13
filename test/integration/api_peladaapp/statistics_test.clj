@@ -178,7 +178,7 @@
                             (mock/query-string {:year 2026})
                             ((th/auth-cookie token))))
           body (th/decode-body response)
-          stat (first (filter #(= player-id (:player_id %)) body))]
+          stat (first (filter #(= (str player-id) (str (:player_id %))) body))]
       (is (= 200 (:status response)))
       (is (= 1 (:peladas_played stat)) "Should count peladas via participation even without events"))))
 

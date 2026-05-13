@@ -60,7 +60,7 @@
 
         ;; 1. Add Manual Stats: 10 goals, 5 assists
         _ (app (-> (mock/request :post (str "/api/organizations/" org-id "/manual-stats"))
-                   (mock/json-body [{:player-id org-player-id :year 2026 :goals 10 :assists 5 :own-goals 1}])
+                   (mock/json-body [{:player-id org-player-id :year 2026 :goals 10 :assists 5 :own_goals 1}])
                    ((th/auth-cookie admin-token))))
 
         ;; 2. Add Match and Event: 2 goals from matches

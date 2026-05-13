@@ -1,6 +1,7 @@
 (ns api-peladaapp.waha-scheduler-test
   (:require
    [api-peladaapp.db.pelada :as db.pelada]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
@@ -28,20 +29,20 @@
         (let [p1-id (db.pelada/insert-pelada {:organization-id org-id} ds)]
           (exec! ds (-> (h/update :Peladas)
                         (h/set {:status "closed" :closed_at old-date})
-                        (h/where [:= :id p1-id]))))
+                        (h/where [:= :id (misc/as-uuid p1-id)]))))
 
         ;; Pelada 2: Closed 23h ago, message NOT sent -> SHOULD NOT be returned
         (let [p2-id (db.pelada/insert-pelada {:organization-id org-id} ds)]
           (exec! ds (-> (h/update :Peladas)
                         (h/set {:status "closed" :closed_at recent-date})
-                        (h/where [:= :id p2-id]))))
+                        (h/where [:= :id (misc/as-uuid p2-id)]))))
 
         ;; Pelada 3: Closed 25h ago, message ALREADY sent -> SHOULD NOT be returned
         (let [p3-id (db.pelada/insert-pelada {:organization-id org-id} ds)]
           (exec! ds (-> (h/update :Peladas)
                         (h/set {:status "closed" :closed_at old-date})
-                        (h/where [:= :id p3-id])))
-          (exec! ds (-> (h/insert-into :PeladaReminders) (h/values [{:pelada_id p3-id :type "vote_ended"}]))))
+                        (h/where [:= :id (misc/as-uuid p3-id)])))
+          (exec! ds (-> (h/insert-into :PeladaReminders) (h/values [{:pelada_id (misc/as-uuid p3-id) :type "vote_ended"}]))))
 
         (let [results (db.pelada/list-peladas-for-vote-notification ds)]
           (is (= 1 (count results)))
@@ -58,22 +59,23 @@
         (let [p4-id (db.pelada/insert-pelada {:organization-id org-id} ds)]
           (exec! ds (-> (h/update :Peladas)
                         (h/set {:status "closed" :closed_at date-12-5h})
-                        (h/where [:= :id p4-id])))
-          (exec! ds (-> (h/insert-into :PeladaReminders) (h/values [{:pelada_id p4-id :type "vote_30m"}]))))
+                        (h/where [:= :id (misc/as-uuid p4-id)])))
+          (exec! ds (-> (h/insert-into :PeladaReminders) (h/values [{:pelada_id (misc/as-uuid p4-id) :type "vote_30m"}]))))
 
         ;; Pelada 5: Closed 23.5h ago, 23h reminder NOT sent -> SHOULD be returned as :vote_23h
         (let [p5-id (db.pelada/insert-pelada {:organization-id org-id} ds)]
           (exec! ds (-> (h/update :Peladas)
                         (h/set {:status "closed" :closed_at date-23-5h})
-                        (h/where [:= :id p5-id])))
-          (exec! ds (-> (h/insert-into :PeladaReminders) (h/values [{:pelada_id p5-id :type "vote_30m"}
-                                                                    {:pelada_id p5-id :type "vote_12h"}]))))
+                        (h/where [:= :id (misc/as-uuid p5-id)])))
+          (exec! ds (-> (h/insert-into :PeladaReminders) (h/values [{:pelada_id (misc/as-uuid p5-id) :type "vote_30m"}
+                                                                    {:pelada_id (misc/as-uuid p5-id) :type "vote_12h"}]))))
 
         ;; Pelada 6: Closed 31m ago, 30m reminder NOT sent -> SHOULD be returned as :vote_30m
         (let [p6-id (db.pelada/insert-pelada {:organization-id org-id} ds)]
           (exec! ds (-> (h/update :Peladas)
                         (h/set {:status "closed" :closed_at date-31m})
-                        (h/where [:= :id p6-id]))))
+                        (h/where [:= :id (misc/as-uuid p6-id)]))))
+
 
         (let [results (db.pelada/list-peladas-for-vote-reminders ds)
               p4-rem (first (filter #(and (= "Org 2" (:organization-name (:pelada %))) (= :vote_12h (:type %))) results))

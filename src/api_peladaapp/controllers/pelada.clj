@@ -54,7 +54,7 @@
        (run! #(db.match-lineup/ensure-seeded % db))))
 
 (s/defn get-schedule-preview
-  [pelada-id :- s/Int matches-per-team :- s/Int db]
+  [pelada-id :- s/Uuid matches-per-team :- s/Int db]
   (let [teams (db.team/list-pelada-teams pelada-id db)
         team-ids (mapv :id teams)
         team-count (count team-ids)]
@@ -68,7 +68,7 @@
          :is_from_format false}))))
 
 (s/defn save-schedule-plan
-  [pelada-id :- s/Int matches db]
+  [pelada-id :- s/Uuid matches db]
   (jdbc/with-transaction [tx db]
     (let [teams (db.team/list-pelada-teams pelada-id tx)
           team-ids (mapv :id teams)
@@ -95,7 +95,7 @@
       {:status "success"})))
 
 (s/defn get-schedule-plan
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (let [plans (db.schedule/list-match-plans-by-pelada pelada-id db)]
     (map (fn [p]
            {:home (:home_team_id p)
@@ -114,7 +114,7 @@
       (db.pelada/get-pelada pelada-id tx))))
 
 (s/defn get-pelada :- models.pelada/Pelada
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (let [pelada (db.pelada/get-pelada pelada-id db)]
     (if (nil? pelada)
       (throw (ex-info nil {:type :not-found :message "Pelada not found"}))
@@ -137,7 +137,7 @@
               (db.team/remove-player-from-team (:team_id p) (:player_id p) db))))))))
 
 (s/defn update-pelada :- models.pelada/Pelada
-  [pelada-id :- s/Int pelada :- models.pelada/Pelada db]
+  [pelada-id :- s/Uuid pelada :- models.pelada/Pelada db]
   (jdbc/with-transaction [tx db]
     (let [old-pelada (db.pelada/get-pelada pelada-id tx)
           rows (db.pelada/update-pelada pelada-id pelada tx)]
@@ -153,14 +153,14 @@
       (db.pelada/get-pelada pelada-id tx))))
 
 (s/defn delete-pelada :- s/Int
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (let [rows (db.pelada/delete-pelada pelada-id db)]
     (if (zero? rows)
       (throw (ex-info nil {:type :not-found :message "Pelada not found"}))
       rows)))
 
 (s/defn list-peladas
-  [organization-id :- s/Int db pagination]
+  [organization-id :- s/Uuid db pagination]
   (let [page (or (:page pagination) 1)
         per-page (or (:per-page pagination) 20)
         offset (* (- page 1) per-page)
@@ -169,7 +169,7 @@
     (pagination/with-pagination-headers peladas total-count page per-page)))
 
 (s/defn list-peladas-by-user
-  [user-id :- s/Int db pagination]
+  [user-id :- s/Uuid db pagination]
   (let [page (or (:page pagination) 1)
         per-page (or (:per-page pagination) 20)
         offset (* (- page 1) per-page)
@@ -179,7 +179,7 @@
 
 (s/defn begin-pelada :- responses.pelada/PeladaBeginResponse
   "Generate matches for a pelada, transition it to running, and seed lineups."
-  [pelada-id :- s/Int db & [opts]]
+  [pelada-id :- s/Uuid db & [opts]]
   (let [result (try
                  (jdbc/with-transaction [tx db]
                    (let [matches-per-team (:matches_per_team (or opts {}))
@@ -213,7 +213,7 @@
      :Matches_created (:matches_created result)}))
 
 (s/defn start-pelada-timer :- models.pelada/Pelada
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (let [pelada (db.pelada/get-pelada pelada-id db)]
     (if (= "running" (:timer-status pelada))
       pelada
@@ -222,7 +222,7 @@
         (db.pelada/get-pelada pelada-id db)))))
 
 (s/defn pause-pelada-timer :- models.pelada/Pelada
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (let [pelada (db.pelada/get-pelada pelada-id db)]
     (if (not= "running" (:timer-status pelada))
       pelada
@@ -236,14 +236,14 @@
         (db.pelada/get-pelada pelada-id db)))))
 
 (s/defn reset-pelada-timer :- models.pelada/Pelada
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (db.pelada/update-pelada pelada-id {:timer-status "stopped"
                                       :timer-started-at nil
                                       :timer-accumulated-ms 0} db)
   (db.pelada/get-pelada pelada-id db))
 
 (s/defn close-pelada :- models.pelada/Pelada
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (let [pelada (try
                  (jdbc/with-transaction [tx db]
                    (db.match/finish-all-by-pelada pelada-id tx)
@@ -275,8 +275,8 @@
     pelada))
 
 (s/defn get-pelada-dashboard-data :- responses.pelada/PeladaDashboardResponse
-  [pelada-id :- s/Int
-   user-id :- s/Int
+  [pelada-id :- s/Uuid
+   user-id :- s/Uuid
    db]
   (let [pelada (db.pelada/get-pelada pelada-id db)
         organization-id (:organization-id pelada)
@@ -332,8 +332,8 @@
      :Attendance attendance-resp}))
 
 (s/defn get-pelada-full-details-controller :- responses.pelada/PeladaFullDetailsResponse
-  [pelada-id :- s/Int
-   user-id :- s/Int
+  [pelada-id :- s/Uuid
+   user-id :- s/Uuid
    db]
   (let [pelada-data (db.pelada/get-pelada-full-details pelada-id db)
         pelada (:pelada pelada-data)

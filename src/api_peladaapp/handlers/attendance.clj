@@ -4,15 +4,16 @@
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.helpers.exception :as exception]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.responses :refer [ok updated]]
    [api-peladaapp.logic.authorization :as auth]))
 
 (defn update-attendance [request]
   (try (let [db (:database request)
-             pelada-id (Integer/parseInt (str (get-in request [:params :id])))
+             pelada-id (misc/as-uuid (get-in request [:params :id]))
              body (:body request)
              status (:status body)
-             target-player-id (some-> (:player_id body) str Integer/parseInt)
+             target-player-id (misc/as-uuid (:player_id body))
              user-id (auth/get-user-id-from-request request)
              pelada (db.pelada/get-pelada pelada-id db)
              org-id (:organization-id pelada)
@@ -39,10 +40,10 @@
 
 (defn batch-update-attendance [request]
   (try (let [db (:database request)
-             pelada-id (Integer/parseInt (str (get-in request [:params :id])))
+             pelada-id (misc/as-uuid (get-in request [:params :id]))
              body (:body request)
              status (:status body)
-             player-ids (:player_ids body)
+             player-ids (map misc/as-uuid (:player_ids body))
              user-id (auth/get-user-id-from-request request)
              pelada (db.pelada/get-pelada pelada-id db)
              org-id (:organization-id pelada)]
@@ -53,7 +54,7 @@
 (defn close-attendance [request]
 
   (try (let [db (:database request)
-             pelada-id (Integer/parseInt (str (get-in request [:params :id])))
+             pelada-id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)
              pelada (db.pelada/get-pelada pelada-id db)
              org-id (:organization-id pelada)]
@@ -63,10 +64,10 @@
 
 (defn update-voting-enabled [request]
   (try (let [db (:database request)
-             pelada-id (Integer/parseInt (str (get-in request [:params :id])))
+             pelada-id (misc/as-uuid (get-in request [:params :id]))
              body (:body request)
              enabled? (:enabled body)
-             player-id (:player_id body)
+             player-id (misc/as-uuid (:player_id body))
              user-id (auth/get-user-id-from-request request)
              pelada (db.pelada/get-pelada pelada-id db)
              org-id (:organization-id pelada)]

@@ -10,21 +10,29 @@
    [api-peladaapp.db.team :as db.team]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.db.vote :as db.vote]
+   [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as h]
-   [clojure.test :refer [deftest is use-fixtures]]))
+   [clojure.test :refer [deftest is use-fixtures]]
+   [honey.sql.helpers :as h.sql]
+   [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]))
 
 (use-fixtures :each h/test-system-fixture)
+
+(defn- get-first-position-id [db]
+  (:id (jdbc/execute-one! db (hsql/format (-> (h.sql/select :id) (h.sql/from :Positions) (h.sql/limit 1))) {:builder-fn rs/as-unqualified-lower-maps})))
 
 (deftest test-list-user-organizations-optimization
   (let [db (h/get-test-datasource)
         u-id (db.user/insert-user {:name "User" :email "u@test.com" :password "p"} db)
         org1-id (db.organization/insert-organization {:name "Admin Org"} db)
-        org2-id (db.organization/insert-organization {:name "Player Org"} db)]
+        org2-id (db.organization/insert-organization {:name "Player Org"} db)
+        pos-id (get-first-position-id db)]
     ;; Setup Admin Role
     (db.admin/insert-organization-admin {:organization-id org1-id :user-id u-id} db)
 
     ;; Setup Player Role
-    (db.player/insert-player {:user-id u-id :organization-id org2-id :grade 5.0 :position-id 1} db)
+    (db.player/insert-player {:user-id u-id :organization-id org2-id :grade 5.0 :position-id pos-id} db)
 
     (let [orgs (db.organization/list-by-user u-id db)
           org-map (group-by :id orgs)]
@@ -36,7 +44,8 @@
   (let [db (h/get-test-datasource)
         u-id (db.user/insert-user {:name "User" :email "u@test.com" :password "p"} db)
         org-id (db.organization/insert-organization {:name "Org"} db)
-        p-id (db.player/insert-player {:user-id u-id :organization-id org-id :grade 5.0 :position-id 1} db)
+        pos-id (get-first-position-id db)
+        p-id (db.player/insert-player {:user-id u-id :organization-id org-id :grade 5.0 :position-id pos-id} db)
         pelada-id (db.pelada/insert-pelada {:organization-id org-id :scheduled-at "2023-01-01T10:00:00"} db)]
 
     ;; First insert
@@ -54,7 +63,8 @@
   (let [db (h/get-test-datasource)
         u-id (db.user/insert-user {:name "User" :email "u@test.com" :password "p"} db)
         org-id (db.organization/insert-organization {:name "Org"} db)
-        p-id (db.player/insert-player {:user-id u-id :organization-id org-id :grade 5.0 :position-id 1} db)
+        pos-id (get-first-position-id db)
+        p-id (db.player/insert-player {:user-id u-id :organization-id org-id :grade 5.0 :position-id pos-id} db)
         pelada-id (db.pelada/insert-pelada {:organization-id org-id :scheduled-at "2023-01-01T10:00:00"} db)
         team1-id (db.team/insert-team {:pelada-id pelada-id :name "T1"} db)
         team2-id (db.team/insert-team {:pelada-id pelada-id :name "T2"} db)
@@ -85,9 +95,10 @@
         u2 (db.user/insert-user {:name "Target1" :email "t1@t.com" :password "p"} db)
         u3 (db.user/insert-user {:name "Target2" :email "t2@t.com" :password "p"} db)
         org (db.organization/insert-organization {:name "Org"} db)
-        voter (db.player/insert-player {:user-id u1 :organization-id org :grade 5.0 :position-id 1} db)
-        target1 (db.player/insert-player {:user-id u2 :organization-id org :grade 5.0 :position-id 1} db)
-        target2 (db.player/insert-player {:user-id u3 :organization-id org :grade 5.0 :position-id 1} db)
+        pos-id (get-first-position-id db)
+        voter (db.player/insert-player {:user-id u1 :organization-id org :grade 5.0 :position-id pos-id} db)
+        target1 (db.player/insert-player {:user-id u2 :organization-id org :grade 5.0 :position-id pos-id} db)
+        target2 (db.player/insert-player {:user-id u3 :organization-id org :grade 5.0 :position-id pos-id} db)
         pelada-id (db.pelada/insert-pelada {:organization-id org :scheduled-at "2023-01-01T10:00:00"} db)]
 
     (db.vote/insert-votes-batch [{:pelada-id pelada-id :voter-id voter :target-id target1 :stars 5}

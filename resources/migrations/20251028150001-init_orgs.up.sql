@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS "Organizations" (
-  id SERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR,
-  owner_id INTEGER REFERENCES "Users"(id)
+  owner_id UUID REFERENCES "Users"(id)
 );

@@ -1,5 +1,6 @@
 (ns api-peladaapp.randomize-test
   (:require
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.logic.randomize :as logic.randomize]
    [api-peladaapp.test-helpers :as th]
@@ -19,16 +20,16 @@
                                                                (h/returning :id)))
                                            {:builder-fn rs/as-unqualified-lower-maps}))
             pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas)
-                                                                  (h/values [{:organization_id org-id
+                                                                  (h/values [{:organization_id (misc/as-uuid org-id)
                                                                               :scheduled_at [:raw "CURRENT_TIMESTAMP"]}])
                                                                   (h/returning :id)))
                                               {:builder-fn rs/as-unqualified-lower-maps}))
             t1-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams)
-                                                              (h/values [{:pelada_id pelada-id :name "T1"}])
+                                                              (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "T1"}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             t2-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams)
-                                                              (h/values [{:pelada_id pelada-id :name "T2"}])
+                                                              (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "T2"}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             org-player-ids (doall (for [i (range 6)]
@@ -40,22 +41,22 @@
                                                                                               (h/returning :id)))
                                                                           {:builder-fn rs/as-unqualified-lower-maps}))]
                                       (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
-                                                                                  (h/values [{:user_id user-id
-                                                                                              :organization_id org-id}])
+                                                                                  (h/values [{:user_id (misc/as-uuid user-id)
+                                                                                              :organization_id (misc/as-uuid org-id)}])
                                                                                   (h/returning :id)))
                                                               {:builder-fn rs/as-unqualified-lower-maps})))))]
         (logic.randomize/randomize-teams! pelada-id org-player-ids 3 ds)
         (let [t1-players (jdbc/execute! ds (hsql/format (-> (h/select :player_id)
                                                             (h/from :TeamPlayers)
-                                                            (h/where [:= :team_id t1-id])))
+                                                            (h/where [:= :team_id (misc/as-uuid t1-id)])))
                                         {:builder-fn rs/as-unqualified-lower-maps})
               t2-players (jdbc/execute! ds (hsql/format (-> (h/select :player_id)
                                                             (h/from :TeamPlayers)
-                                                            (h/where [:= :team_id t2-id])))
+                                                            (h/where [:= :team_id (misc/as-uuid t2-id)])))
                                         {:builder-fn rs/as-unqualified-lower-maps})]
           (is (= 3 (count t1-players)))
           (is (= 3 (count t2-players)))
-          (is (= (set org-player-ids) (set (map :player_id (concat t1-players t2-players))))))))
+          (is (= (set (map misc/as-uuid org-player-ids)) (set (map (comp misc/as-uuid :player_id) (concat t1-players t2-players))))))))
 
     (testing "Balances teams by position and score"
       (jdbc/execute! ds (hsql/format (h/delete-from :TeamPlayers)))
@@ -70,16 +71,16 @@
                                                                (h/returning :id)))
                                            {:builder-fn rs/as-unqualified-lower-maps}))
             pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas)
-                                                                  (h/values [{:organization_id org-id
+                                                                  (h/values [{:organization_id (misc/as-uuid org-id)
                                                                               :scheduled_at [:raw "CURRENT_TIMESTAMP"]}])
                                                                   (h/returning :id)))
                                               {:builder-fn rs/as-unqualified-lower-maps}))
             ta-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams)
-                                                              (h/values [{:pelada_id pelada-id :name "TA"}])
+                                                              (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "TA"}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             tb-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams)
-                                                              (h/values [{:pelada_id pelada-id :name "TB"}])
+                                                              (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "TB"}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             ;; P1: GK, score 10
@@ -88,7 +89,7 @@
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             p1-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
-                                                              (h/values [{:user_id u1-id :organization_id org-id :grade 10.0}])
+                                                              (h/values [{:user_id (misc/as-uuid u1-id) :organization_id (misc/as-uuid org-id) :grade 10.0}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             ;; P4: Defender, score 7
@@ -97,7 +98,7 @@
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             p4-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
-                                                              (h/values [{:user_id u4-id :organization_id org-id :grade 7.0}])
+                                                              (h/values [{:user_id (misc/as-uuid u4-id) :organization_id (misc/as-uuid org-id) :grade 7.0}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             ;; P3: Striker, score 8
@@ -106,7 +107,7 @@
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             p3-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
-                                                              (h/values [{:user_id u3-id :organization_id org-id :grade 8.0}])
+                                                              (h/values [{:user_id (misc/as-uuid u3-id) :organization_id (misc/as-uuid org-id) :grade 8.0}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             ;; P2: Striker, score 5
@@ -115,37 +116,37 @@
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             p2-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
-                                                              (h/values [{:user_id u2-id :organization_id org-id :grade 5.0}])
+                                                              (h/values [{:user_id (misc/as-uuid u2-id) :organization_id (misc/as-uuid org-id) :grade 5.0}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))]
         (logic.randomize/randomize-teams! pelada-id [p1-id p2-id p3-id p4-id] 2 ds)
         (let [t1-players (->> (jdbc/execute! ds (hsql/format (-> (h/select :player_id)
                                                                  (h/from :TeamPlayers)
-                                                                 (h/where [:= :team_id ta-id])))
+                                                                 (h/where [:= :team_id (misc/as-uuid ta-id)])))
                                              {:builder-fn rs/as-unqualified-lower-maps})
-                              (map :player_id) set)
+                              (map (comp misc/as-uuid :player_id)) set)
               t2-players (->> (jdbc/execute! ds (hsql/format (-> (h/select :player_id)
                                                                  (h/from :TeamPlayers)
-                                                                 (h/where [:= :team_id tb-id])))
+                                                                 (h/where [:= :team_id (misc/as-uuid tb-id)])))
                                              {:builder-fn rs/as-unqualified-lower-maps})
-                              (map :player_id) set)]
-          (let [gk-team-id (if (contains? t1-players p1-id) ta-id tb-id)
-                def-team-id (if (contains? t1-players p4-id) ta-id tb-id)]
+                              (map (comp misc/as-uuid :player_id)) set)]
+          (let [gk-team-id (if (contains? t1-players (misc/as-uuid p1-id)) ta-id tb-id)
+                def-team-id (if (contains? t1-players (misc/as-uuid p4-id)) ta-id tb-id)]
             (is (not= gk-team-id def-team-id) "GK and Defender should be in different teams"))
-          (let [t1-strikers (clojure.set/intersection t1-players #{p2-id p3-id})
-                t2-strikers (clojure.set/intersection t2-players #{p2-id p3-id})]
+          (let [t1-strikers (clojure.set/intersection t1-players #{(misc/as-uuid p2-id) (misc/as-uuid p3-id)})
+                t2-strikers (clojure.set/intersection t2-players #{(misc/as-uuid p2-id) (misc/as-uuid p3-id)})]
             (is (= 1 (count t1-strikers)))
             (is (= 1 (count t2-strikers))))
           (let [t1-score (->> (jdbc/execute! ds (hsql/format (-> (h/select :op.grade)
                                                                  (h/from [:TeamPlayers :tp])
                                                                  (h/join [:OrganizationPlayers :op] [:= :tp.player_id :op.id])
-                                                                 (h/where [:= :tp.team_id ta-id])))
+                                                                 (h/where [:= :tp.team_id (misc/as-uuid ta-id)])))
                                              {:builder-fn rs/as-unqualified-lower-maps})
                               (map :grade) (reduce + 0))
                 t2-score (->> (jdbc/execute! ds (hsql/format (-> (h/select :op.grade)
                                                                  (h/from [:TeamPlayers :tp])
                                                                  (h/join [:OrganizationPlayers :op] [:= :tp.player_id :op.id])
-                                                                 (h/where [:= :tp.team_id tb-id])))
+                                                                 (h/where [:= :tp.team_id (misc/as-uuid tb-id)])))
                                              {:builder-fn rs/as-unqualified-lower-maps})
                               (map :grade) (reduce + 0))]
             (is (<= (abs (- t1-score t2-score)) 6.0))))))
@@ -162,13 +163,13 @@
                                                                (h/returning :id)))
                                            {:builder-fn rs/as-unqualified-lower-maps}))
             pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas)
-                                                                  (h/values [{:organization_id org-id
+                                                                  (h/values [{:organization_id (misc/as-uuid org-id)
                                                                               :scheduled_at [:raw "CURRENT_TIMESTAMP"]}])
                                                                   (h/returning :id)))
                                               {:builder-fn rs/as-unqualified-lower-maps}))]
         (doall (for [i (range 4)]
                  (jdbc/execute! ds (hsql/format (-> (h/insert-into :Teams)
-                                                    (h/values [{:pelada_id pelada-id :name (str "T" i)}]))))))
+                                                    (h/values [{:pelada_id (misc/as-uuid pelada-id) :name (str "T" i)}]))))))
         (let [player-ids (doall (for [i (range 20)]
                                   (let [user-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users)
                                                                                             (h/values [{:name (str "P" i)
@@ -178,8 +179,8 @@
                                                                                             (h/returning :id)))
                                                                         {:builder-fn rs/as-unqualified-lower-maps}))]
                                     (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
-                                                                                (h/values [{:user_id user-id
-                                                                                            :organization_id org-id
+                                                                                (h/values [{:user_id (misc/as-uuid user-id)
+                                                                                            :organization_id (misc/as-uuid org-id)
                                                                                             :grade 5.0}])
                                                                                 (h/returning :id)))
                                                             {:builder-fn rs/as-unqualified-lower-maps})))))]
@@ -203,16 +204,16 @@
                                                                (h/returning :id)))
                                            {:builder-fn rs/as-unqualified-lower-maps}))
             pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas)
-                                                                  (h/values [{:organization_id org-id
+                                                                  (h/values [{:organization_id (misc/as-uuid org-id)
                                                                               :scheduled_at [:raw "CURRENT_TIMESTAMP"]}])
                                                                   (h/returning :id)))
                                               {:builder-fn rs/as-unqualified-lower-maps}))
             t1-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams)
-                                                              (h/values [{:pelada_id pelada-id :name "T1"}])
+                                                              (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "T1"}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             t2-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams)
-                                                              (h/values [{:pelada_id pelada-id :name "T2"}])
+                                                              (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "T2"}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             player-ids (doall (for [i (range 4)]
@@ -224,21 +225,21 @@
                                                                                           (h/returning :id)))
                                                                       {:builder-fn rs/as-unqualified-lower-maps}))]
                                   (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
-                                                                              (h/values [{:user_id user-id
-                                                                                          :organization_id org-id
+                                                                              (h/values [{:user_id (misc/as-uuid user-id)
+                                                                                          :organization_id (misc/as-uuid org-id)
                                                                                           :grade 5.0}])
                                                                               (h/returning :id)))
                                                           {:builder-fn rs/as-unqualified-lower-maps})))))]
         (jdbc/execute! ds (hsql/format (-> (h/insert-into :TeamPlayers)
-                                           (h/values [{:team_id t1-id :player_id (first player-ids)}]))))
+                                           (h/values [{:team_id (misc/as-uuid t1-id) :player_id (misc/as-uuid (first player-ids))}]))))
         (logic.randomize/randomize-teams! pelada-id player-ids 2 ds)
         (let [t1-count (:c (jdbc/execute-one! ds (hsql/format (-> (h/select [[:count :*] :c])
                                                                   (h/from :TeamPlayers)
-                                                                  (h/where [:= :team_id t1-id])))
+                                                                  (h/where [:= :team_id (misc/as-uuid t1-id)])))
                                               {:builder-fn rs/as-unqualified-lower-maps}))
               t2-count (:c (jdbc/execute-one! ds (hsql/format (-> (h/select [[:count :*] :c])
                                                                   (h/from :TeamPlayers)
-                                                                  (h/where [:= :team_id t2-id])))
+                                                                  (h/where [:= :team_id (misc/as-uuid t2-id)])))
                                               {:builder-fn rs/as-unqualified-lower-maps}))]
           (is (= 2 t1-count))
           (is (= 2 t2-count)))))
@@ -255,16 +256,16 @@
                                                                (h/returning :id)))
                                            {:builder-fn rs/as-unqualified-lower-maps}))
             pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas)
-                                                                  (h/values [{:organization_id org-id
+                                                                  (h/values [{:organization_id (misc/as-uuid org-id)
                                                                               :scheduled_at [:raw "CURRENT_TIMESTAMP"]}])
                                                                   (h/returning :id)))
                                               {:builder-fn rs/as-unqualified-lower-maps}))
             t1-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams)
-                                                              (h/values [{:pelada_id pelada-id :name "T1"}])
+                                                              (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "T1"}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             t2-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams)
-                                                              (h/values [{:pelada_id pelada-id :name "T2"}])
+                                                              (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "T2"}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             gk-ids (doall (for [i (range 1 3)]
@@ -276,8 +277,8 @@
                                                                                       (h/returning :id)))
                                                                   {:builder-fn rs/as-unqualified-lower-maps}))]
                               (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
-                                                                          (h/values [{:user_id user-id
-                                                                                      :organization_id org-id
+                                                                          (h/values [{:user_id (misc/as-uuid user-id)
+                                                                                      :organization_id (misc/as-uuid org-id)
                                                                                       :grade 10.0}])
                                                                           (h/returning :id)))
                                                       {:builder-fn rs/as-unqualified-lower-maps})))))
@@ -290,27 +291,27 @@
                                                                                       (h/returning :id)))
                                                                   {:builder-fn rs/as-unqualified-lower-maps}))]
                               (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
-                                                                          (h/values [{:user_id user-id
-                                                                                      :organization_id org-id
+                                                                          (h/values [{:user_id (misc/as-uuid user-id)
+                                                                                      :organization_id (misc/as-uuid org-id)
                                                                                       :grade 5.0}])
                                                                           (h/returning :id)))
                                                       {:builder-fn rs/as-unqualified-lower-maps})))))
             player-ids (concat gk-ids df-ids)]
         (logic.randomize/randomize-teams! pelada-id player-ids 2 ds)
-        (let [t1-players (set (map :player_id (jdbc/execute! ds (hsql/format (-> (h/select :player_id)
+        (let [t1-players (set (map (comp misc/as-uuid :player_id) (jdbc/execute! ds (hsql/format (-> (h/select :player_id)
                                                                                  (h/from :TeamPlayers)
-                                                                                 (h/where [:= :team_id t1-id])))
+                                                                                 (h/where [:= :team_id (misc/as-uuid t1-id)])))
                                                              {:builder-fn rs/as-unqualified-lower-maps})))
-              t2-players (set (map :player_id (jdbc/execute! ds (hsql/format (-> (h/select :player_id)
+              t2-players (set (map (comp misc/as-uuid :player_id) (jdbc/execute! ds (hsql/format (-> (h/select :player_id)
                                                                                  (h/from :TeamPlayers)
-                                                                                 (h/where [:= :team_id t2-id])))
+                                                                                 (h/where [:= :team_id (misc/as-uuid t2-id)])))
                                                              {:builder-fn rs/as-unqualified-lower-maps})))]
-          (is (= 1 (count (clojure.set/intersection t1-players (set gk-ids)))))
-          (is (= 1 (count (clojure.set/intersection t2-players (set gk-ids))))))))
+          (is (= 1 (count (clojure.set/intersection t1-players (set (map misc/as-uuid gk-ids))))))
+          (is (= 1 (count (clojure.set/intersection t2-players (set (map misc/as-uuid gk-ids))))))))
 
     (testing "Handles empty player list gracefully"
       (let [org-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Organizations) (h/values [{:name "O"}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
-            pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas) (h/values [{:organization_id org-id}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))]
+            pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas) (h/values [{:organization_id (misc/as-uuid org-id)}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))]
         (is (nil? (logic.randomize/randomize-teams! pelada-id [] 6 ds)))))
 
     (testing "Handles players with no position"
@@ -321,10 +322,11 @@
       (jdbc/execute! ds (hsql/format (h/delete-from :Peladas)))
       (jdbc/execute! ds (hsql/format (h/delete-from :Organizations)))
       (let [org-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Organizations) (h/values [{:name "O"}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
-            pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas) (h/values [{:organization_id org-id}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
-            t1-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams) (h/values [{:pelada_id pelada-id :name "T1"}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
+            pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas) (h/values [{:organization_id (misc/as-uuid org-id)}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
+            t1-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams) (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "T1"}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
             user-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users) (h/values [{:name "NP" :email "n@p.c" :password "p" :position nil}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
-            player-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers) (h/values [{:user_id user-id :organization_id org-id :grade 5.0}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))]
+            player-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers) (h/values [{:user_id (misc/as-uuid user-id) :organization_id (misc/as-uuid org-id) :grade 5.0}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))]
         (logic.randomize/randomize-teams! pelada-id [player-id] 2 ds)
-        (let [t1-players (jdbc/execute! ds (hsql/format (-> (h/select :player_id) (h/from :TeamPlayers) (h/where [:= :team_id t1-id]))) {:builder-fn rs/as-unqualified-lower-maps})]
+        (let [t1-players (jdbc/execute! ds (hsql/format (-> (h/select :player_id) (h/from :TeamPlayers) (h/where [:= :team_id (misc/as-uuid t1-id)]))) {:builder-fn rs/as-unqualified-lower-maps})]
           (is (= 1 (count t1-players))))))))
+)

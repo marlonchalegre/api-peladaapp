@@ -3,11 +3,11 @@
    [schema.core :as s]))
 
 (s/defschema TeamResponse
-  {:id s/Int
-   :pelada_id s/Int
+  {:id s/Uuid
+   :pelada_id s/Uuid
    (s/optional-key :name) (s/maybe s/Str)})
 
 (s/defschema TeamPlayerResponse
-  {:team_id s/Int
-   :player_id s/Int
+  {:team_id s/Uuid
+   :player_id s/Uuid
    (s/optional-key :is_goalkeeper) s/Bool})

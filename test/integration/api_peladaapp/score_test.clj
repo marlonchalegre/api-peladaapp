@@ -1,5 +1,6 @@
 (ns api-peladaapp.score-test
   (:require
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.logic.score :as logic.score]
    [api-peladaapp.test-helpers :as th]
@@ -36,7 +37,7 @@
                         (h/values [{:name name :email email :password "p"}])))
         (let [user-id (th/user-id-by-email ds email)]
           (insert! ds (-> (h/insert-into :OrganizationPlayers)
-                          (h/values [{:organization_id org-id :user_id user-id}])))))
+                          (h/values [{:organization_id (misc/as-uuid org-id) :user_id (misc/as-uuid user-id)}])))))
 
       (let [ana-id (th/user-id-by-email ds "ana@example.com")
             bob-id (th/user-id-by-email ds "bob@example.com")
@@ -49,22 +50,22 @@
 
         ;; Setup Pelada
         (insert! ds (-> (h/insert-into :Peladas)
-                        (h/values [{:organization_id org-id
+                        (h/values [{:organization_id (misc/as-uuid org-id)
                                     :scheduled_at scheduled-at
                                     :status "closed"
                                     :closed_at closed-at}])))
 
         (let [pelada-id (-> (jdbc/execute-one! ds (hsql/format (-> (h/select :id)
                                                                    (h/from :Peladas)
-                                                                   (h/where [:= :organization_id org-id])))
+                                                                   (h/where [:= :organization_id (misc/as-uuid org-id)])))
                                                {:builder-fn rs/as-unqualified-lower-maps})
                             :id)]
 
           ;; Setup Votes
           (insert! ds (-> (h/insert-into :Votes)
-                          (h/values [{:pelada_id pelada-id :voter_id bob-player-id :target_id ana-player-id :stars 5}
-                                     {:pelada_id pelada-id :voter_id cid-player-id :target_id ana-player-id :stars 3}
-                                     {:pelada_id pelada-id :voter_id ana-player-id :target_id bob-player-id :stars 4}])))
+                          (h/values [{:pelada_id (misc/as-uuid pelada-id) :voter_id (misc/as-uuid bob-player-id) :target_id (misc/as-uuid ana-player-id) :stars 5}
+                                     {:pelada_id (misc/as-uuid pelada-id) :voter_id (misc/as-uuid cid-player-id) :target_id (misc/as-uuid ana-player-id) :stars 3}
+                                     {:pelada_id (misc/as-uuid pelada-id) :voter_id (misc/as-uuid ana-player-id) :target_id (misc/as-uuid bob-player-id) :stars 4}])))
 
           (testing "Fetches grades for given player IDs"
             (let [player-ids [ana-player-id bob-player-id cid-player-id]
@@ -78,7 +79,7 @@
                             (h/values [{:name "Dani" :email "dani@e.com" :password "p"}])))
             (let [dani-id (th/user-id-by-email ds "dani@e.com")]
               (insert! ds (-> (h/insert-into :OrganizationPlayers)
-                              (h/values [{:organization_id org-id :user_id dani-id :grade 7.5}])))
+                              (h/values [{:organization_id (misc/as-uuid org-id) :user_id (misc/as-uuid dani-id) :grade 7.5}])))
               (let [dani-player-id (th/player-id-by-user-id ds dani-id org-id)
                     scores (logic.score/get-normalized-scores [dani-player-id] ds)]
                 (is (= 7.5 (get scores dani-player-id)))))))))))

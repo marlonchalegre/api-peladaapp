@@ -14,7 +14,12 @@
 (def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn upsert-manual-stats :- s/Int
-  [{:keys [organization-id player-id year goals assists own-goals]}
+  [{:keys [organization-id player-id year goals assists own-goals]} :- {:organization-id s/Uuid
+                                                                        :player-id s/Uuid
+                                                                        :year s/Int
+                                                                        (s/optional-key :goals) (s/maybe s/Int)
+                                                                        (s/optional-key :assists) (s/maybe s/Int)
+                                                                        (s/optional-key :own-goals) (s/maybe s/Int)}
    db]
   (let [query (-> (h/insert-into :ManualStats)
                   (h/values [{:organization_id organization-id
@@ -32,7 +37,7 @@
         affected-rows-count)))
 
 (s/defn delete-manual-stats :- s/Int
-  [organization-id player-id year db]
+  [organization-id :- s/Uuid player-id :- s/Uuid year :- s/Int db]
   (let [query (-> (h/delete-from :ManualStats)
                   (h/where [:= :organization_id organization-id]
                            [:= :player_id player-id]
@@ -41,7 +46,7 @@
         affected-rows-count)))
 
 (s/defn list-manual-stats-by-org-and-year
-  [organization-id year db]
+  [organization-id :- s/Uuid year :- s/Int db]
   (let [query (-> (h/select :*)
                   (h/from :ManualStats)
                   (h/where [:= :organization_id organization-id]

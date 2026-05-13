@@ -27,7 +27,11 @@
     (if-let [token (extract-token request)]
       (try
         (let [secret (config/get-key :jwt-secret)
-              claims (jwt/unsign token secret {:alg :hs512})]
+              claims (jwt/unsign token secret {:alg :hs512})
+              ;; Ensure UUIDs are parsed back to objects
+              claims (cond-> claims
+                       (string? (:id claims)) (update :id parse-uuid)
+                       (:admin_orgs claims) (update :admin_orgs #(map (fn [id] (if (string? id) (parse-uuid id) id)) %)))]
           (handler (assoc request :identity claims)))
         (catch Exception _
           (handler request)))

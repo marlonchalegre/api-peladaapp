@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS "Matches" (
-  id SERIAL PRIMARY KEY,
-  pelada_id INTEGER NOT NULL,
-  home_team_id INTEGER NOT NULL,
-  away_team_id INTEGER NOT NULL,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pelada_id UUID NOT NULL,
+  home_team_id UUID NOT NULL,
+  away_team_id UUID NOT NULL,
   sequence INTEGER NOT NULL,
   status VARCHAR DEFAULT 'scheduled',
   home_score INTEGER DEFAULT 0,

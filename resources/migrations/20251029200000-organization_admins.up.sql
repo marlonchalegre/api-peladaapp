@@ -1,7 +1,7 @@
 CREATE TABLE IF NOT EXISTS "OrganizationAdmins" (
-  id SERIAL PRIMARY KEY,
-  organization_id INTEGER NOT NULL,
-  user_id INTEGER NOT NULL,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL,
+  user_id UUID NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   UNIQUE (organization_id, user_id),
   FOREIGN KEY (organization_id) REFERENCES "Organizations"(id) ON DELETE CASCADE,

@@ -13,8 +13,8 @@
 (def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn upsert-attendance :- s/Int
-  [pelada-id :- s/Int
-   player-id :- s/Int
+  [pelada-id :- s/Uuid
+   player-id :- s/Uuid
    status :- s/Str
    db]
   (let [now (java.sql.Timestamp/from (java.time.Instant/now))
@@ -26,8 +26,8 @@
         affected-rows-count)))
 
 (s/defn batch-upsert-attendance :- s/Int
-  [pelada-id :- s/Int
-   player-ids :- [s/Int]
+  [pelada-id :- s/Uuid
+   player-ids :- [s/Uuid]
    status :- s/Str
    db]
   (if (empty? player-ids)
@@ -44,14 +44,14 @@
             affected-rows-count)))))
 
 (s/defn list-attendance-by-pelada :- [s/Any]
-  [pelada-id :- s/Int
+  [pelada-id :- s/Uuid
    db]
   (let [query (-> (h/select :*)
                   (h/from :Attendance)
                   (h/where [:= :pelada_id pelada-id]))]
     (jdbc/execute! db (hsql/format query) opts)))
 
-(s/defn list-pending-attendance-by-pelada [pelada-id db]
+(s/defn list-pending-attendance-by-pelada [pelada-id :- s/Uuid db]
   (let [query (-> (h/select [:op.id :player_id] [:u.name :player_name] :u.phone)
                   (h/from [:OrganizationPlayers :op])
                   (h/join [:Users :u] [:= :op.user_id :u.id])
@@ -64,7 +64,7 @@
         results (jdbc/execute! db (hsql/format query) opts)]
     (map (fn [r] {:player-id (:player_id r) :player-name (:player_name r) :phone (:phone r)}) results)))
 
-(s/defn list-pending-mensalistas-by-pelada [pelada-id db]
+(s/defn list-pending-mensalistas-by-pelada [pelada-id :- s/Uuid db]
   (let [query (-> (h/select [:op.id :player_id] [:u.name :player_name] :u.phone)
                   (h/from [:OrganizationPlayers :op])
                   (h/join [:Users :u] [:= :op.user_id :u.id])
@@ -82,8 +82,8 @@
     (map (fn [r] {:player-id (:player_id r) :player-name (:player_name r) :phone (:phone r)}) results)))
 
 (s/defn delete-attendance :- s/Int
-  [pelada-id :- s/Int
-   player-id :- s/Int
+  [pelada-id :- s/Uuid
+   player-id :- s/Uuid
    db]
   (let [query (-> (h/delete-from :Attendance)
                   (h/where [:and [:= :pelada_id pelada-id] [:= :player_id player-id]]))]
@@ -91,8 +91,8 @@
         affected-rows-count)))
 
 (s/defn update-voting-enabled :- s/Int
-  [pelada-id :- s/Int
-   player-id :- s/Int
+  [pelada-id :- s/Uuid
+   player-id :- s/Uuid
    enabled? :- s/Bool
    db]
   (let [query (-> (h/update :Attendance)

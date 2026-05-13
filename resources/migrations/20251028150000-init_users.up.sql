@@ -1,7 +1,7 @@
 CREATE EXTENSION IF NOT EXISTS hstore;--;;
 -- "Users"
 CREATE TABLE IF NOT EXISTS "Users" (
-  id SERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email VARCHAR UNIQUE,
   password VARCHAR,
   name VARCHAR,

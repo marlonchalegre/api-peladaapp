@@ -5,7 +5,7 @@
    [schema.core :as s]))
 
 (s/defn list-transactions-by-pelada
-  [pelada-id db]
+  [pelada-id :- s/Uuid db]
   (let [query "SELECT t.*, u.name as player_name 
                FROM \"Transactions\" t
                LEFT JOIN \"OrganizationPlayers\" op ON t.player_id = op.id

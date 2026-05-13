@@ -3,9 +3,9 @@
    [schema.core :as s]))
 
 (s/defschema AdminResponse
-  {:id s/Int
-   :organization_id s/Int
-   :user_id s/Int
+  {:id s/Uuid
+   :organization_id s/Uuid
+   :user_id s/Uuid
    (s/optional-key :user_name) s/Str
    (s/optional-key :user_username) s/Str
    (s/optional-key :user_position) (s/maybe s/Str)

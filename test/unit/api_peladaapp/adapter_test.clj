@@ -6,11 +6,11 @@
 
 (deftest player-adapter-test
   (testing "db->model with user-position"
-    (let [db-row {:id 1
-                  :user_id 2
-                  :organization_id 3
+    (let [db-row {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                  :user_id (parse-uuid "00000000-0000-0000-0000-000000000002")
+                  :organization_id (parse-uuid "00000000-0000-0000-0000-000000000003")
                   :grade 5.0
-                  :position_id 1
+                  :position_id (parse-uuid "00000000-0000-0000-0000-000000000004")
                   :member_type "mensalista"
                   :user_name "John Doe"
                   :user_username "johndoe"
@@ -22,11 +22,11 @@
       (is (= "johndoe" (:user-username model)))))
 
   (testing "model->response with user-position"
-    (let [model {:id 1
-                 :user-id 2
-                 :organization-id 3
+    (let [model {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                 :user-id (parse-uuid "00000000-0000-0000-0000-000000000002")
+                 :organization-id (parse-uuid "00000000-0000-0000-0000-000000000003")
                  :grade 5.0
-                 :position-id 1
+                 :position-id (parse-uuid "00000000-0000-0000-0000-000000000004")
                  :member-type "mensalista"
                  :user-name "John Doe"
                  :user-username "johndoe"
@@ -39,9 +39,9 @@
 
 (deftest admin-adapter-test
   (testing "db->model with user-position"
-    (let [db-row {:id 1
-                  :organization_id 10
-                  :user_id 20
+    (let [db-row {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                  :organization_id (parse-uuid "00000000-0000-0000-0000-000000000010")
+                  :user_id (parse-uuid "00000000-0000-0000-0000-000000000020")
                   :user_name "Admin User"
                   :user_username "adminuser"
                   :user_email "admin@example.com"
@@ -52,9 +52,9 @@
       (is (= "adminuser" (:user-username model)))))
 
   (testing "model->response with user-position"
-    (let [model {:id 1
-                 :organization-id 10
-                 :user-id 20
+    (let [model {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                 :organization-id (parse-uuid "00000000-0000-0000-0000-000000000010")
+                 :user-id (parse-uuid "00000000-0000-0000-0000-000000000020")
                  :user-name "Admin User"
                  :user-username "adminuser"
                  :user-email "admin@example.com"

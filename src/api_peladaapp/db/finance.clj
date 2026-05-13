@@ -10,7 +10,7 @@
 (def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn get-organization-finance
-  [org-id db]
+  [org-id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :OrganizationFinances)
                   (h/where [:= :organization_id org-id]))
@@ -25,7 +25,7 @@
        :currency "BRL"})))
 
 (s/defn upsert-organization-finance
-  [org-id finance db]
+  [org-id :- s/Uuid finance db]
   (let [row (assoc (adapter.finance/finance->db finance) :organization_id org-id)
         exists-query (-> (h/select 1)
                          (h/from :OrganizationFinances)
@@ -46,7 +46,7 @@
     1))
 
 (s/defn add-transaction
-  [transaction db]
+  [transaction :- s/Any db]
   (let [row (adapter.finance/transaction->db transaction)
         insert-query (-> (h/insert-into :Transactions)
                          (h/values [row])
@@ -56,7 +56,7 @@
     (adapter.finance/db->transaction (jdbc/execute-one! db (hsql/format (-> (h/select :*) (h/from :Transactions) (h/where [:= :id new-id]))) opts))))
 
 (s/defn reverse-transaction
-  [transaction-id db]
+  [transaction-id :- s/Uuid db]
   (jdbc/with-transaction [tx db]
     (let [q1 (-> (h/update :Transactions) (h/set {:status "reversed"}) (h/where [:= :id transaction-id]))
           q2 (-> (h/update :MonthlyPayments) (h/set {:paid false :transaction_id nil}) (h/where [:= :transaction_id transaction-id]))
@@ -68,7 +68,7 @@
       (jdbc/execute! tx (hsql/format q3)))))
 
 (s/defn count-transactions
-  [org-id db]
+  [org-id :- s/Uuid db]
   (let [query (-> (h/select [[:count :*] :count])
                   (h/from :Transactions)
                   (h/where [:= :organization_id org-id]))]
@@ -77,7 +77,7 @@
         int)))
 
 (s/defn list-transactions
-  [org-id limit offset db]
+  [org-id :- s/Uuid limit offset db]
   (let [query (-> (h/select :t.* [:u.name :player_name] [:uc.name :creator_name])
                   (h/from [:Transactions :t])
                   (h/left-join [:OrganizationPlayers :op] [:= :t.player_id :op.id])
@@ -91,7 +91,7 @@
     (map adapter.finance/db->transaction result)))
 
 (s/defn get-monthly-payments
-  [org-id year month db]
+  [org-id :- s/Uuid year month db]
   (let [query (-> (h/select :mp.id [:op.id :player_id] [:u.name :player_name] :op.member_type
                             :mp.year :mp.month :mp.transaction_id :mp.fine_transaction_id :mp.paid
                             :t.amount :t.fine_amount
@@ -107,7 +107,7 @@
     (map adapter.finance/db->monthly-payment result)))
 
 (s/defn mark-monthly-payment
-  [payment db]
+  [payment :- s/Any db]
   (let [row (adapter.finance/monthly-payment->db payment)
         exists-query (-> (h/select :id)
                          (h/from :MonthlyPayments)
@@ -123,7 +123,7 @@
     1))
 
 (s/defn get-summary
-  [org-id db]
+  [org-id :- s/Uuid db]
   (let [income-query (-> (h/select [[:sum :amount] :total])
                          (h/from :Transactions)
                          (h/where [:and [:= :organization_id org-id] [:= :type "income"] [:= :status "paid"]]))

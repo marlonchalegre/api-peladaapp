@@ -25,7 +25,7 @@
           resp (app (-> (mock/request :post "/api/organizations")
                         (mock/json-body {:name "Org 1"})
                         auth1))
-          org1-id (:id (th/decode-body resp))]
+          org1-id (parse-uuid (:id (th/decode-body resp)))]
       (is (= 201 (:status resp)))
 
       ;; Verify User 1 sees it in their organizations
@@ -71,5 +71,5 @@
         (is (= 0 (count (th/decode-body list-resp)))))
 
       ;; 5. Edge case: Non-existent user (should return 403 because it's not self and not global admin)
-      (let [list-resp (app (-> (mock/request :get "/api/users/9999/organizations") auth1))]
+      (let [list-resp (app (-> (mock/request :get "/api/users/00000000-0000-0000-0000-000000009999/organizations") auth1))]
         (is (= 403 (:status list-resp)))))))

@@ -1,6 +1,7 @@
 (ns api-peladaapp.fixed-goalkeepers-test
   (:require
    [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
    [ring.mock.request :as mock]))
@@ -21,7 +22,7 @@
           org-resp (app (-> (mock/request :post "/api/organizations")
                             (mock/json-body {"name" "Global GK Club"})
                             auth))
-          org-id (:id (th/decode-body org-resp))
+          org-id (misc/as-uuid (:id (th/decode-body org-resp)))
           user-id (th/user-id-by-email ds "admin@test.com")
           player-id (th/player-id-by-user-id ds user-id org-id)
 
@@ -40,7 +41,7 @@
                                              "players_per_team" 5
                                              "fixed_goalkeepers" true})))
               body (th/decode-body resp)
-              pelada-id (:id body)]
+              pelada-id (misc/as-uuid (:id body))]
           (is (= 201 (:status resp)))
           (is (= true (:fixed_goalkeepers body)))
 
@@ -49,7 +50,7 @@
                                     (auth)
                                     (mock/json-body {"home_fixed_goalkeeper_id" player-id})))]
               (is (= 200 (:status set-resp)))
-              (is (= player-id (:home_fixed_goalkeeper_id (th/decode-body set-resp)))))
+              (is (= (str player-id) (str (:home_fixed_goalkeeper_id (th/decode-body set-resp))))))
 
             ;; Swap to away
             (let [swap-resp (app (-> (mock/request :put (str "/api/peladas/" pelada-id))
@@ -59,7 +60,7 @@
               (is (= 200 (:status swap-resp)))
               (let [b (th/decode-body swap-resp)]
                 (is (nil? (:home_fixed_goalkeeper_id b)))
-                (is (= player-id (:away_fixed_goalkeeper_id b))))))
+                (is (= (str player-id) (str (:away_fixed_goalkeeper_id b)))))))
 
           (testing "randomization ignores global fixed goalkeeper"
             ;; Put it back to home for test
@@ -84,7 +85,7 @@
 
               ;; Verify player is NOT in any team (player-id is fixed GK, so should be excluded from teams)
               (let [details (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) (auth))))]
-                (is (not (some #(= player-id (:id %)) (mapcat :players (:Teams details))))))))
+                (is (not (some #(= (str player-id) (str (:id %))) (mapcat :players (:Teams details))))))))
 
           (testing "match lineups injection"
             (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin"))
@@ -96,7 +97,7 @@
                   mid (keyword (str (:id match)))
                   lineups (get (:match_lineups_map dashboard) mid)
                   all-lineup-players (mapcat val lineups)]
-              (is (some (fn [p] (and (= player-id (:player_id p)) (= true (:is_goalkeeper p)))) all-lineup-players))))))
+              (is (some (fn [p] (and (= (str player-id) (str (:player_id p))) (= true (:is_goalkeeper p)))) all-lineup-players))))))
 
       (testing "behavior when feature is disabled"
         (let [resp (app (-> (mock/request :post "/api/peladas")
@@ -105,7 +106,7 @@
                                              "num_teams" 2
                                              "players_per_team" 5
                                              "fixed_goalkeepers" false})))
-              pelada-id (:id (th/decode-body resp))]
+              pelada-id (misc/as-uuid (:id (th/decode-body resp)))]
 
           ;; Randomization should NOT ignore the player if they are passed in player_ids
           (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth))
@@ -114,4 +115,4 @@
                                    (mock/json-body {"player_ids" [player-id] "players_per_team" 5})))]
             (is (= 200 (:status rand-resp)))
             (let [details (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) (auth))))]
-              (is (some #(= player-id (:id %)) (mapcat :players (:Teams details)))))))))))
+              (is (some #(= (str player-id) (str (:id %))) (mapcat :players (:Teams details)))))))))))

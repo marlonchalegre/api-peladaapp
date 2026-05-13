@@ -3,11 +3,11 @@
    [schema.core :as s]))
 
 (s/defschema Player
-  {:id s/Int
-   :user-id s/Int
-   :organization-id s/Int
+  {:id s/Uuid
+   :user-id s/Uuid
+   :organization-id s/Uuid
    :grade (s/maybe s/Num)
-   :position-id (s/maybe s/Int)
+   :position-id (s/maybe s/Uuid)
    (s/optional-key :member-type) s/Str
    (s/optional-key :user-name) s/Str
    (s/optional-key :user-username) s/Str

@@ -1,6 +1,7 @@
 (ns integration.api-peladaapp.monthly-substitution-edgecases-test
   (:require
    [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is use-fixtures]]
    [ring.mock.request :as mock]))
@@ -27,7 +28,7 @@
         org-resp (app (-> (mock/request :post "/api/organizations")
                           (mock/json-body {:name "Sub Club"})
                           auth))
-        org-id (:id (decode-body org-resp))]
+        org-id (misc/as-uuid (:id (decode-body org-resp)))]
 
     (is (= 201 (:status org-resp)))
 
@@ -49,12 +50,12 @@
 
     ;; Fetch organization players and ids
     (let [players (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/players")) auth)))
-          admin-player (first (filter #(= (:user_id %) admin-id) players))
-          admin-player-id (:id admin-player)
-          p2-player (first (filter #(= (:user_id %) p2-id) players))
-          p2-player-id (:id p2-player)
-          p3-player (first (filter #(= (:user_id %) p3-id) players))
-          p3-player-id (:id p3-player)]
+          admin-player (first (filter #(= (misc/as-uuid (:user_id %)) admin-id) players))
+          admin-player-id (misc/as-uuid (:id admin-player))
+          p2-player (first (filter #(= (misc/as-uuid (:user_id %)) p2-id) players))
+          p2-player-id (misc/as-uuid (:id p2-player))
+          p3-player (first (filter #(= (misc/as-uuid (:user_id %)) p3-id) players))
+          p3-player-id (misc/as-uuid (:id p3-player))]
 
       ;; 1) Cannot create substitution if permanent is not mensalista
       ;; Force admin to non-mensalista and verify API rejects
@@ -96,7 +97,7 @@
 
       ;; 4) Ending an already ended substitution should return bad request
       (let [subs (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/substitutions")) auth)))
-            sub-id (:id (first subs))
+            sub-id (misc/as-uuid (:id (first subs)))
             end-resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/substitutions/" sub-id "/end"))
                               (mock/json-body {:end_date "2026-06-06"})
                               auth))]

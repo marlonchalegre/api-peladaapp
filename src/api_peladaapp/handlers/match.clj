@@ -11,7 +11,7 @@
 
 (defn update-score [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (clojure.core/str (get-in request [:params :id])))
+             id (parse-uuid (clojure.core/str (get-in request [:params :id])))
              body (:body request)
              user-id (auth/get-user-id-from-request request)
              match (db.match/get-match id db)
@@ -27,7 +27,7 @@
 
 (defn start-timer [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (clojure.core/str (get-in request [:params :id])))
+             id (parse-uuid (clojure.core/str (get-in request [:params :id])))
              user-id (auth/get-user-id-from-request request)
              match (db.match/get-match id db)
              pelada (pelada-controller/get-pelada (:pelada-id match) db)
@@ -40,7 +40,7 @@
 
 (defn pause-timer [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (clojure.core/str (get-in request [:params :id])))
+             id (parse-uuid (clojure.core/str (get-in request [:params :id])))
              user-id (auth/get-user-id-from-request request)
              match (db.match/get-match id db)
              pelada (pelada-controller/get-pelada (:pelada-id match) db)
@@ -53,7 +53,7 @@
 
 (defn reset-timer [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (clojure.core/str (get-in request [:params :id])))
+             id (parse-uuid (clojure.core/str (get-in request [:params :id])))
              user-id (auth/get-user-id-from-request request)
              match (db.match/get-match id db)
              pelada (pelada-controller/get-pelada (:pelada-id match) db)
@@ -66,7 +66,7 @@
 
 (defn create-event [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (clojure.core/str (get-in request [:params :id])))
+             id (parse-uuid (clojure.core/str (get-in request [:params :id])))
              body (:body request)
              user-id (auth/get-user-id-from-request request)
              match (db.match/get-match id db)
@@ -83,7 +83,7 @@
 (defn delete-event [request]
   (try
     (let [db (:database request)
-          id (Integer/parseInt (clojure.core/str (get-in request [:params :id])))
+          id (parse-uuid (clojure.core/str (get-in request [:params :id])))
           body (:body request)
           user-id (auth/get-user-id-from-request request)
           match (db.match/get-match id db)
@@ -100,7 +100,7 @@
 (defn add-lineup-player [request]
   (try
     (let [db (:database request)
-          id (Integer/parseInt (clojure.core/str (get-in request [:params :id])))
+          id (parse-uuid (clojure.core/str (get-in request [:params :id])))
           body (:body request)
           user-id (auth/get-user-id-from-request request)
           match (db.match/get-match id db)
@@ -115,7 +115,7 @@
 (defn replace-lineup-player [request]
   (try
     (let [db (:database request)
-          id (Integer/parseInt (clojure.core/str (get-in request [:params :id])))
+          id (parse-uuid (clojure.core/str (get-in request [:params :id])))
           body (:body request)
           user-id (auth/get-user-id-from-request request)
           match (db.match/get-match id db)

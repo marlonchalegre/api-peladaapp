@@ -15,8 +15,12 @@
 
 (def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
-(s/defn insert-player :- s/Int
-  [{:keys [user-id organization-id grade position-id member-type]}
+(s/defn insert-player :- s/Uuid
+  [{:keys [user-id organization-id grade position-id member-type]} :- {:user-id s/Uuid
+                                                                       :organization-id s/Uuid
+                                                                       (s/optional-key :grade) (s/maybe s/Num)
+                                                                       (s/optional-key :position-id) (s/maybe s/Uuid)
+                                                                       (s/optional-key :member-type) (s/maybe s/Str)}
    db]
   (let [row (medley.core/assoc-some
              {:user_id user-id
@@ -30,7 +34,7 @@
     (:id (jdbc/execute-one! db (hsql/format query) opts))))
 
 (s/defn update-player :- s/Int
-  [id player db]
+  [id :- s/Uuid player db]
   (let [row (medley.core/assoc-some {}
                                     :grade (:grade player)
                                     :position_id (:position-id player)
@@ -43,7 +47,7 @@
 
 (s/defn update-player-grade :- s/Int
   "Surgically update a player's grade."
-  [id grade db]
+  [id :- s/Uuid grade db]
   (let [query (-> (h/update :OrganizationPlayers)
                   (h/set {:grade grade})
                   (h/where [:= :id id]))]
@@ -51,15 +55,15 @@
         affected-rows-count)))
 
 (s/defn delete-player :- s/Int
-  [id db]
+  [id :- s/Uuid db]
   (let [query (-> (h/delete-from :OrganizationPlayers)
                   (h/where [:= :id id]))]
     (-> (jdbc/execute-one! db (hsql/format query) opts)
         affected-rows-count)))
 
 (s/defn get-player
-  ([id db] (get-player id db false))
-  ([id db for-update?]
+  ([id :- s/Uuid db] (get-player id db false))
+  ([id :- s/Uuid db for-update?]
    (let [query (cond-> (-> (h/select :*)
                            (h/from :OrganizationPlayers)
                            (h/where [:= :id id]))
@@ -68,36 +72,24 @@
          adapter.player/db->model))))
 
 (s/defn get-org-player-by-user-id :- s/Any
-  [user-id organization-id db]
+  [user-id :- s/Uuid organization-id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :OrganizationPlayers)
-                  (h/where [:= :user_id user-id] [:= :organization_id organization-id]))]
+                  (h/where [:= :user_id [:cast user-id :uuid]] [:= :organization_id [:cast organization-id :uuid]]))]
     (some-> (jdbc/execute-one! db (hsql/format query) opts)
             adapter.player/db->model)))
 
-(defn- position-string->id [pos]
-  (case (some-> pos str/lower-case)
-    "goalkeeper" 1
-    "defender" 2
-    "midfielder" 3
-    "striker" 4
-    nil))
-
-(s/defn list-players-by-organization [organization-id db]
+(s/defn list-players-by-organization [organization-id :- s/Uuid db]
   (let [query (-> (h/select :op.* [:u.name :user_name] [:u.username :user_username] [:u.position :user_position] [:u.avatar_filename :avatar_filename])
                   (h/from [:OrganizationPlayers :op])
                   (h/join [:Users :u] [:= :op.user_id :u.id])
                   (h/where [:= :op.organization_id organization-id]))]
     (->> (jdbc/execute! db (hsql/format query) opts)
-         (map (fn [row]
-                (if (nil? (:position_id row))
-                  (assoc row :position_id (position-string->id (:user_position row)))
-                  row)))
          (map adapter.player/db->model)
          vec)))
 
-(s/defn get-players-grades :- [{:id s/Int :grade s/Num}]
-  [player-ids :- [s/Int]
+(s/defn get-players-grades :- [{:id s/Uuid :grade s/Num}]
+  [player-ids :- [s/Uuid]
    db]
   (if (empty? player-ids)
     []
@@ -107,8 +99,8 @@
       (jdbc/execute! db (hsql/format query) opts))))
 
 (s/defn get-players-details-for-balance :- [s/Any]
-  [player-ids :- [s/Int]
-   organization-id :- s/Int
+  [player-ids :- [s/Uuid]
+   organization-id :- s/Uuid
    db]
   (if (empty? player-ids)
     []

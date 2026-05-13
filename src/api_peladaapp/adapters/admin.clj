@@ -8,9 +8,9 @@
 
 (s/defn create-request->model :- models.admin/NewOrganizationAdmin
   [request :- requests.admin/AddAdminRequest
-   organization-id :- s/Int]
-  {:organization-id organization-id
-   :user-id (:user_id request)})
+   organization-id :- s/Any]
+  {:organization-id (misc/as-uuid organization-id)
+   :user-id (misc/as-uuid (:user_id request))})
 
 (s/defn model->response :- responses.admin/AdminResponse
   [{:keys [id organization-id user-id created-at user-name user-username user-position user-avatar-filename organization-name]}]

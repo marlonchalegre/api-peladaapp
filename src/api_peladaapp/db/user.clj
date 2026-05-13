@@ -43,7 +43,7 @@
 
 (s/defn find-user-by-id :- (s/maybe models.user/User)
   "Find a user by id"
-  [id :- s/Int
+  [id :- s/Uuid
    db]
   (let [query (-> (h/select :*)
                   (h/from :Users)
@@ -52,7 +52,7 @@
         first
         adapter.user/db->model)))
 
-(s/defn insert-user :- s/Int
+(s/defn insert-user :- s/Uuid
   "Insert a user and return its generated id"
   [{:keys [name username email password position phone]} :- models.user/NewUser
    db]
@@ -62,7 +62,7 @@
                   (h/returning :id))]
     (:id (jdbc/execute-one! db (hsql/format query) opts))))
 
-(s/defn insert-guest-user :- s/Int
+(s/defn insert-guest-user :- s/Uuid
   "Insert a user with only name (for guests)"
   [name :- s/Str
    db]
@@ -71,7 +71,7 @@
                   (h/returning :id))]
     (:id (jdbc/execute-one! db (hsql/format query) opts))))
 
-(s/defn insert-partial-user :- s/Int
+(s/defn insert-partial-user :- s/Uuid
   "Insert a user with only email (for invitations)"
   [email :- s/Str
    db]
@@ -80,7 +80,7 @@
                   (h/returning :id))]
     (:id (jdbc/execute-one! db (hsql/format query) opts))))
 
-(s/defn insert-user-by-name :- s/Int
+(s/defn insert-user-by-name :- s/Uuid
   "Insert a user with only name and return its generated id"
   [name :- s/Str
    db]
@@ -91,7 +91,7 @@
 
 (s/defn update-user :- s/Int
   "Update a user in the database"
-  [id :- s/Int
+  [id :- s/Uuid
    user :- models.user/User
    db]
   (let [row (medley.core/assoc-some {}
@@ -109,7 +109,7 @@
 
 (s/defn update-user-profile :- s/Int
   "Update only specific fields of a user's profile"
-  [id :- s/Int
+  [id :- s/Uuid
    user :- s/Any
    db]
   (let [row (medley.core/assoc-some {}
@@ -127,7 +127,7 @@
 
 (s/defn get-users-by-ids :- [models.user/User]
   "Get users by a list of ids"
-  [db ids]
+  [db ids :- [s/Uuid]]
   (if (empty? ids)
     []
     (let [query (-> (h/select :*)
@@ -138,7 +138,7 @@
 
 (s/defn delete-user :- s/Int
   "Delete a user from the database"
-  [id :- s/Int
+  [id :- s/Uuid
    db]
   (let [query (-> (h/delete-from :Users)
                   (h/where [:= :id id]))]
@@ -203,7 +203,7 @@
 
 (s/defn search-users-in-shared-orgs :- [models.user/User]
   "Search users that share at least one organization with the current user"
-  [db current-user-id query offset limit]
+  [db current-user-id :- s/Uuid query offset limit]
   (let [lower-pattern (str "%" (str/lower-case query) "%")
         hsql-query (-> (h/select-distinct :u.*)
                        (h/from [:Users :u])
@@ -226,7 +226,7 @@
 
 (s/defn count-searched-users-in-shared-orgs :- s/Int
   "Count users matching the search query within shared organizations"
-  [db current-user-id query]
+  [db current-user-id :- s/Uuid query]
   (let [lower-pattern (str "%" (str/lower-case query) "%")
         hsql-query (-> (h/select [[:count [:distinct :u.id]] :count])
                        (h/from [:Users :u])
@@ -245,7 +245,7 @@
 
 (s/defn count-users-in-organization :- s/Int
   "Count users in a specific organization"
-  [organization-id :- s/Int
+  [organization-id :- s/Uuid
    db]
   (let [query (-> (h/select [[:count :*] :total])
                   (h/from :Users)
@@ -255,7 +255,7 @@
 
 (s/defn list-users-in-organization :- [[s/Any]]
   "List users in a specific organization with pagination"
-  [organization-id :- s/Int
+  [organization-id :- s/Uuid
    offset :- s/Int
    per-page :- s/Int
    db]

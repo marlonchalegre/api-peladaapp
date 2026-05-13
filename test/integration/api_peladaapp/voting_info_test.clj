@@ -1,5 +1,6 @@
 (ns api-peladaapp.voting-info-test
   (:require
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is use-fixtures]]
@@ -37,7 +38,7 @@
     ;; Add User 2 and User 3 to org
     (doseq [email ["u2@test.com" "u3@test.com"]]
       (let [uid (th/user-id-by-email ds email)]
-        (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id uid}])))))
+        (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id (misc/as-uuid org-id) :user_id (misc/as-uuid uid)}])))))
 
     (let [pelada-id (:id (th/decode-body (app (-> (mock/request :post "/api/peladas")
                                                   (mock/json-body {:organization_id org-id :num_teams 2})
@@ -48,11 +49,11 @@
       (app (-> (mock/request :post "/api/teams") (mock/json-body {:pelada_id pelada-id :name "Team B"}) auth1))
 
       ;; Add User 1 and User 2 to teams (User 3 is NOT in a team)
-      (let [p1-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (th/user-id-by-email ds "u1@test.com")]))))
-            p2-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (th/user-id-by-email ds "u2@test.com")]))))
-            t1-id (:id (exec-one! ds (-> (h/select :id) (h/from :Teams) (h/where [:= :pelada_id pelada-id]))))]
-        (exec! ds (-> (h/insert-into :TeamPlayers) (h/values [{:team_id t1-id :player_id p1-id}
-                                                              {:team_id t1-id :player_id p2-id}]))))
+      (let [p1-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (misc/as-uuid (th/user-id-by-email ds "u1@test.com"))]))))
+            p2-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (misc/as-uuid (th/user-id-by-email ds "u2@test.com"))]))))
+            t1-id (:id (exec-one! ds (-> (h/select :id) (h/from :Teams) (h/where [:= :pelada_id (misc/as-uuid pelada-id)]))))]
+        (exec! ds (-> (h/insert-into :TeamPlayers) (h/values [{:team_id (misc/as-uuid t1-id) :player_id (misc/as-uuid p1-id)}
+                                                              {:team_id (misc/as-uuid t1-id) :player_id (misc/as-uuid p2-id)}]))))
 
       (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth1))
       (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin")) auth1))

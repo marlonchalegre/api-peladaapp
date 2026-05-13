@@ -1,5 +1,6 @@
 (ns integration.api-peladaapp.organization-leave-test
   (:require
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as helpers]
    [clojure.string :as str]
@@ -31,7 +32,7 @@
                              (helpers/auth-cookie token1)
                              (mock/json-body {:name "Test Org"})))
         org (helpers/decode-body create-resp)
-        org-id (:id org)
+        org-id (misc/as-uuid (:id org))
 
         ;; Register user 2 (Player)
         token2 (helpers/register-and-login! app {:name "Player Two" :email "player2@test.com" :password "pass123"})

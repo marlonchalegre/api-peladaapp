@@ -5,5 +5,5 @@
 
 (s/defschema AuthResponse
   {:token s/Str
-   :user (assoc models.user/PublicUser (s/optional-key :admin-orgs) [s/Int])})
+   :user (assoc models.user/PublicUser (s/optional-key :admin-orgs) [s/Uuid])})
 

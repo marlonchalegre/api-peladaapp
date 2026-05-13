@@ -8,8 +8,14 @@
 
 (def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
-(s/defn create-substitution!
-  [substitution db]
+(s/defn create-substitution! :- s/Uuid
+  [substitution :- {:organization_id s/Uuid
+                    :permanent_player_id s/Uuid
+                    :temporary_player_id s/Uuid
+                    (s/optional-key :start_date) s/Str
+                    (s/optional-key :end_date) s/Str
+                    :active s/Bool}
+   db]
   (let [row (cond-> substitution
               (:start_date substitution) (assoc :start_date [[:cast (:start_date substitution) :date]])
               (:end_date substitution)   (assoc :end_date [[:cast (:end_date substitution) :date]]))
@@ -20,21 +26,21 @@
     (:id res)))
 
 (s/defn get-active-substitution-by-permanent-player
-  [player-id db]
+  [player-id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :MonthlyPlayerSubstitutions)
                   (h/where [:and [:= :permanent_player_id player-id] [:= :active true]]))]
     (jdbc/execute-one! db (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps})))
 
 (s/defn get-active-substitution-by-temporary-player
-  [player-id db]
+  [player-id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :MonthlyPlayerSubstitutions)
                   (h/where [:and [:= :temporary_player_id player-id] [:= :active true]]))]
     (jdbc/execute-one! db (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps})))
 
 (s/defn list-substitutions-by-org
-  [org-id db]
+  [org-id :- s/Uuid db]
   (let [query (-> (h/select :ms.* [:up.name :permanent_player_name] [:ut.name :temporary_player_name])
                   (h/from [:MonthlyPlayerSubstitutions :ms])
                   (h/join [:OrganizationPlayers :op] [:= :ms.permanent_player_id :op.id])
@@ -45,15 +51,16 @@
                   (h/order-by [:ms.created_at :desc]))]
     (jdbc/execute! db (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps})))
 
-(s/defn end-substitution!
-  [sub-id end-date db]
+(s/defn end-substitution! :- s/Uuid
+  [sub-id :- s/Uuid end-date db]
   (let [query (-> (h/update :MonthlyPlayerSubstitutions)
                   (h/set {:active false :end_date [[:cast end-date :date]]})
-                  (h/where [:= :id sub-id]))]
+                  (h/where [:= :id sub-id])
+                  (h/returning :id))]
     (:id (jdbc/execute-one! db (hsql/format query) opts))))
 
 (s/defn get-substitution-by-id
-  [sub-id db]
+  [sub-id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :MonthlyPlayerSubstitutions)
                   (h/where [:= :id sub-id]))]

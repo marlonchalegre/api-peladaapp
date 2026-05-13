@@ -17,8 +17,8 @@
 
 (s/defn get-or-create-organization-link :- s/Str
   "Returns the existing public link token or creates a new one"
-  [organization-id :- s/Int
-   user-id :- s/Int
+  [organization-id :- s/Uuid
+   user-id :- s/Uuid
    db]
   (if-let [existing (db.invitation/find-link-invitation-by-org organization-id db)]
     (:token existing)
@@ -31,8 +31,8 @@
 
 (s/defn reset-organization-link :- s/Str
   "Deletes any existing public link and creates a new one"
-  [organization-id :- s/Int
-   user-id :- s/Int
+  [organization-id :- s/Uuid
+   user-id :- s/Uuid
    db]
   (jdbc/with-transaction [tx db]
     (db.invitation/delete-link-invitation-by-org organization-id tx)
@@ -49,10 +49,10 @@
    If only name is provided, creates a user with just a name.
    Returns invitation info including token for automation.
    Prevents duplicate pending invitations."
-  [organization-id :- s/Int
+  [organization-id :- s/Uuid
    email :- (s/maybe s/Str)
    name :- (s/maybe s/Str)
-   invited-by :- (s/maybe s/Int)
+   invited-by :- (s/maybe s/Uuid)
    db]
   (let [user (when-not (str/blank? email) (db.user/find-user-by-identifier email db))
         user-id (cond
@@ -89,9 +89,9 @@
 
 (s/defn invite-player
   "Legacy invite-player wrapper"
-  [organization-id :- s/Int
+  [organization-id :- s/Uuid
    email :- s/Str
-   invited-by :- (s/maybe s/Int)
+   invited-by :- (s/maybe s/Uuid)
    db]
   (invite-player-improved organization-id email nil invited-by db))
 
@@ -113,7 +113,7 @@
     (throw (ex-info "Invitation not found" {:type :not-found :message "Invitation not found"}))))
 
 (s/defn accept-invitation
-  [token :- s/Str user-id :- s/Int db]
+  [token :- s/Str user-id :- s/Uuid db]
   (let [inv (db.invitation/get-invitation-by-token token db)]
     (if (nil? inv)
       (throw (ex-info "Invitation not found" {:type :not-found}))
@@ -126,7 +126,7 @@
           (when (and identifier
                      (if (str/starts-with? identifier "guest-")
                        ;; For guest invitations, ensure the current user ID matches the guest user ID
-                       (let [guest-user-id (try (Integer/parseInt (subs identifier 6)) (catch Exception _ -1))]
+                       (let [guest-user-id (try (parse-uuid (subs identifier 6)) (catch Exception _ nil))]
                          (not= guest-user-id user-id))
                        ;; For email invitations, ensure email or username matches
                        (and (not= identifier (:email user))
@@ -145,18 +145,18 @@
         {:organization-id org-id}))))
 
 (s/defn list-organization-invitations
-  [organization-id :- s/Int db]
+  [organization-id :- s/Uuid db]
   (db.invitation/list-invitations-by-organization organization-id db))
 
 (s/defn revoke-invitation
-  [invitation-id :- s/Int organization-id :- s/Int db]
+  [invitation-id :- s/Uuid organization-id :- s/Uuid db]
   (let [inv (db.invitation/get-invitation-by-id invitation-id db)]
     (when (and inv (= (:organization-id inv) organization-id))
       (db.invitation/delete-invitation invitation-id db))))
 
 (s/defn create-organization :- models.organization/Organization
   [org :- models.organization/Organization
-   user-id :- (s/maybe s/Int)
+   user-id :- (s/maybe s/Uuid)
    db]
   (jdbc/with-transaction [tx db]
     (let [org-with-owner (if user-id (assoc org :owner-id user-id) org)
@@ -168,7 +168,7 @@
       (db.organization/get-organization id tx))))
 
 (s/defn get-organization :- models.organization/Organization
-  [id :- s/Int
+  [id :- s/Uuid
    db]
   (let [org (db.organization/get-organization id db)]
     (if (nil? org)
@@ -176,7 +176,7 @@
       org)))
 
 (s/defn update-organization :- models.organization/Organization
-  [id :- s/Int
+  [id :- s/Uuid
    org :- models.organization/Organization
    db]
   (let [rows (db.organization/update-organization id org db)]
@@ -185,7 +185,7 @@
       (db.organization/get-organization id db))))
 
 (s/defn test-waha-connection
-  [id :- s/Int db]
+  [id :- s/Uuid db]
   (let [org (db.organization/get-organization id db)]
     (if (and org (:waha-enabled org))
       (let [result (waha/send-message org "PeladaApp: Teste de conexão WAHA realizado com sucesso! ⚽")]
@@ -195,7 +195,7 @@
       (throw (ex-info "WAHA not enabled" {:type :bad-request :message "WAHA não está habilitado para esta organização."})))))
 
 (s/defn delete-organization
-  [id :- s/Int
+  [id :- s/Uuid
    db]
   (let [rows (db.organization/delete-organization id db)]
     (if (zero? rows)
@@ -212,11 +212,11 @@
     (pagination/with-pagination-headers orgs total page per-page)))
 
 (s/defn list-user-organizations
-  [user-id :- s/Int db]
+  [user-id :- s/Uuid db]
   (db.organization/list-by-user user-id db))
 
 (s/defn get-statistics
-  [id :- s/Int
+  [id :- s/Uuid
    year :- s/Int
    db]
   (let [rows (db.organization/get-statistics id year db)]

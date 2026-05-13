@@ -4,6 +4,7 @@
    [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [clojure.data.json :as json]
@@ -47,12 +48,12 @@
           org-resp (app (-> (mock/request :post "/api/organizations")
                             (mock/json-body {:name "Attendance Club"})
                             auth))
-          org-id (:id (decode-body org-resp))]
+          org-id (misc/as-uuid (:id (decode-body org-resp)))]
       (is (= 201 (:status org-resp)))
 
       ;; Get admin player id and make them mensalista so they skip waitlist
       (let [players (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/players")) auth)))
-            p1-id (:id (first (filter #(= (:user_id %) user-id) players)))]
+            p1-id (misc/as-uuid (:id (first (filter #(= (misc/as-uuid (:user_id %)) user-id) players))))]
         (app (-> (mock/request :put (str "/api/players/" p1-id))
                  (mock/json-body {:member_type "mensalista"})
                  auth)))
@@ -61,7 +62,7 @@
       (let [pelada-resp (app (-> (mock/request :post "/api/peladas")
                                  (mock/json-body {:organization_id org-id})
                                  auth))
-            pelada-id (:id (decode-body pelada-resp))]
+            pelada-id (misc/as-uuid (:id (decode-body pelada-resp)))]
         (is (= 201 (:status pelada-resp)))
 
           ;; Update attendance (this was causing 500 error)
@@ -84,11 +85,11 @@
 
               ;; Check attendance list
             (is (some (fn [a] (and (= (:status a) "confirmed")
-                                   (= (get-in a [:player :user_id]) user-id)))
+                                   (= (str (get-in a [:player :user_id])) (str user-id))))
                       attendance))
               ;; Check available_players list (which is what the frontend uses)
             (is (some (fn [p] (and (= (:Attendance_status p) "confirmed")
-                                   (= (:user_id p) user-id)))
+                                   (= (str (:user_id p)) (str user-id))))
                       available))))
 
           ;; Close attendance
@@ -101,9 +102,9 @@
         db-val (-> th/*test-system* :database :database)
         ds (if (fn? db-val) (db-val) db-val)]
     ;; 1. Register admin and 2 more users
-    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Admin" :email "admin@ex.com" :password "p"})))
-    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "User 2" :email "u2@ex.com" :password "p"})))
-    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "User 3" :email "u3@ex.com" :password "p"})))
+    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Admin" :username "admin" :email "admin@ex.com" :password "p"})))
+    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "User 2" :username "user2" :email "u2@ex.com" :password "p"})))
+    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "User 3" :username "user3" :email "u3@ex.com" :password "p"})))
 
     (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "admin@ex.com" :password "p"})))
           token (:token (decode-body login))
@@ -116,24 +117,24 @@
           org-resp (app (-> (mock/request :post "/api/organizations")
                             (mock/json-body {:name "Batch Club"})
                             auth))
-          org-id (:id (decode-body org-resp))
+          org-id (misc/as-uuid (:id (decode-body org-resp)))
 
           ;; 3. Create players for other users in this org
           p2-resp (app (-> (mock/request :post "/api/players") (mock/json-body {:organization_id org-id :user_id u2-id}) auth))
           p3-resp (app (-> (mock/request :post "/api/players") (mock/json-body {:organization_id org-id :user_id u3-id}) auth))
 
-          p2-id (:id (decode-body p2-resp))
-          p3-id (:id (decode-body p3-resp))
+          p2-id (misc/as-uuid (:id (decode-body p2-resp)))
+          p3-id (misc/as-uuid (:id (decode-body p3-resp)))
 
           ;; Find admin's player id
           all-players (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/players")) auth)))
-          p1-id (:id (first (filter #(= (:user_id %) admin-id) all-players)))
+          p1-id (misc/as-uuid (:id (first (filter #(= (misc/as-uuid (:user_id %)) admin-id) all-players))))
 
           ;; 4. Create pelada
           pelada-resp (app (-> (mock/request :post "/api/peladas")
                                (mock/json-body {:organization_id org-id})
                                auth))
-          pelada-id (:id (decode-body pelada-resp))
+          pelada-id (misc/as-uuid (:id (decode-body pelada-resp)))
 
           ;; 5. Batch update attendance for p2 and p3
           batch-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance/batch"))
@@ -146,9 +147,9 @@
       ;; 6. Verify they are confirmed
       (let [details-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) auth))
             available (:available_players (decode-body details-resp))]
-        (is (some (fn [p] (and (= (:id p) p2-id) (= (:Attendance_status p) "confirmed"))) available))
-        (is (some (fn [p] (and (= (:id p) p3-id) (= (:Attendance_status p) "confirmed"))) available))
-        (is (some (fn [p] (and (= (:id p) p1-id) (= (:Attendance_status p) "pending"))) available))))))
+        (is (some (fn [p] (and (= (str (:id p)) (str p2-id)) (= (:Attendance_status p) "confirmed"))) available))
+        (is (some (fn [p] (and (= (str (:id p)) (str p3-id)) (= (:Attendance_status p) "confirmed"))) available))
+        (is (some (fn [p] (and (= (str (:id p)) (str p1-id)) (= (:Attendance_status p) "pending"))) available))))))
 
 (deftest convidado-waitlist-test
   (let [app (-> th/*test-system* :app :app-handler)
@@ -171,24 +172,24 @@
           org-resp (app (-> (mock/request :post "/api/organizations")
                             (mock/json-body {:name "Waitlist Club"})
                             admin-auth))
-          org-id (:id (decode-body org-resp))
+          org-id (misc/as-uuid (:id (decode-body org-resp)))
 
           ;; 3. Create player for convidado (defaults to convidado)
           p-resp (app (-> (mock/request :post "/api/players")
                           (mock/json-body {:organization_id org-id :user_id convidado-id})
                           admin-auth))
-          p-id (:id (decode-body p-resp))
+          p-id (misc/as-uuid (:id (decode-body p-resp)))
 
           ;; 4. Create pelada
           pelada-resp (app (-> (mock/request :post "/api/peladas")
                                (mock/json-body {:organization_id org-id})
                                admin-auth))
-          pelada-id (:id (decode-body pelada-resp))]
+          pelada-id (misc/as-uuid (:id (decode-body pelada-resp)))]
 
       ;; 5. Verify member_type is convidado
       (let [players-resp (app (-> (mock/request :get (str "/api/organizations/" org-id "/players")) admin-auth))
             players (decode-body players-resp)]
-        (is (some (fn [p] (and (= (:id p) p-id) (= (:member_type p) "convidado"))) players)))
+        (is (some (fn [p] (and (= (str (:id p)) (str p-id)) (= (:member_type p) "convidado"))) players)))
 
       ;; 6. Convidado tries to confirm attendance
       (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance"))
@@ -198,7 +199,7 @@
       ;; 7. Verify convidado is in waitlist
       (let [details-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) admin-auth))
             available (:available_players (decode-body details-resp))]
-        (is (some (fn [p] (and (= (:id p) p-id) (= (:Attendance_status p) "waitlist"))) available)))
+        (is (some (fn [p] (and (= (str (:id p)) (str p-id)) (= (:Attendance_status p) "waitlist"))) available)))
 
       ;; 8. Admin moves convidado to confirmed
       (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance"))
@@ -208,7 +209,7 @@
       ;; 9. Verify convidado is now confirmed
       (let [details-resp2 (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) admin-auth))
             available2 (:available_players (decode-body details-resp2))]
-        (is (some (fn [p] (and (= (:id p) p-id) (= (:Attendance_status p) "confirmed"))) available2))))))
+        (is (some (fn [p] (and (= (str (:id p)) (str p-id)) (= (:Attendance_status p) "confirmed"))) available2))))))
 
 (deftest list-pending-attendance-test
   (let [db-val (-> th/*test-system* :database :database)

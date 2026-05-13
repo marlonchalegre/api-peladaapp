@@ -3,6 +3,7 @@
    [api-peladaapp.adapters.finance :as adapter.finance]
    [api-peladaapp.db.finance :as db.finance]
    [api-peladaapp.helpers.exception :as exception]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.helpers.responses :refer [created ok]]
    [api-peladaapp.logic.authorization :as auth]
@@ -11,7 +12,7 @@
 
 (defn get-finance [request]
   (try (let [db (:database request)
-             org-id (Integer/parseInt (str (get-in request [:params :id])))
+             org-id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id org-id db)
          (ok (adapter.finance/model->finance-response (db.finance/get-organization-finance org-id db))))
@@ -19,7 +20,7 @@
 
 (defn update-finance [request]
   (try (let [db (:database request)
-             org-id (Integer/parseInt (str (get-in request [:params :id])))
+             org-id (misc/as-uuid (get-in request [:params :id]))
              body (:body request)
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id org-id db)
@@ -30,7 +31,7 @@
 
 (defn list-transactions [request]
   (try (let [db (:database request)
-             org-id (Integer/parseInt (str (get-in request [:params :id])))
+             org-id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)
              {:keys [page per-page]} (pagination/parse-pagination-params (:query-params request))
              offset (* (dec page) per-page)]
@@ -43,7 +44,7 @@
 
 (defn add-transaction [request]
   (try (let [db (:database request)
-             org-id (Integer/parseInt (str (get-in request [:params :id])))
+             org-id (misc/as-uuid (get-in request [:params :id]))
              body (:body request)
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id org-id db)
@@ -57,8 +58,8 @@
 
 (defn reverse-transaction [request]
   (try (let [db (:database request)
-             org-id (Integer/parseInt (str (get-in request [:params :id])))
-             tx-id (Integer/parseInt (str (get-in request [:params :tx_id])))
+             org-id (misc/as-uuid (get-in request [:params :id]))
+             tx-id (misc/as-uuid (get-in request [:params :tx_id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id org-id db)
          (db.finance/reverse-transaction tx-id db)
@@ -67,7 +68,7 @@
 
 (defn get-monthly-payments [request]
   (try (let [db (:database request)
-             org-id (Integer/parseInt (str (get-in request [:params :id])))
+             org-id (misc/as-uuid (get-in request [:params :id]))
              year (Integer/parseInt (get-in request [:query-params "year"]))
              month (Integer/parseInt (get-in request [:query-params "month"]))
              user-id (auth/get-user-id-from-request request)]
@@ -77,7 +78,7 @@
 
 (defn mark-monthly-payment [request]
   (try (let [db (:database request)
-             org-id (Integer/parseInt (str (get-in request [:params :id])))
+             org-id (misc/as-uuid (get-in request [:params :id]))
              body (:body request)
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id org-id db)
@@ -104,9 +105,9 @@
                             (+ (:mensalista-price org-finance) fine))
                  ;; Find existing payment record to see if there's a transaction to reverse
                  existing-payments (db.finance/get-monthly-payments org-id year month tx)
-                 existing (first (filter (fn [p] (and (= (some-> p :player-id long) (some-> player-id long))
-                                                      (= (some-> p :year long) (some-> year long))
-                                                      (= (some-> p :month long) (some-> month long))))
+                 existing (first (filter (fn [p] (and (= (misc/as-uuid (:player-id p)) (misc/as-uuid player-id))
+                                                      (= (:year p) year)
+                                                      (= (:month p) month)))
                                          existing-payments))
 
                  existing-tx-id (:transaction-id existing)
@@ -159,7 +160,7 @@
 
 (defn get-summary [request]
   (try (let [db (:database request)
-             org-id (Integer/parseInt (str (get-in request [:params :id])))
+             org-id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id org-id db)
          (let [summary (db.finance/get-summary org-id db)]

@@ -3,13 +3,13 @@
    [schema.core :as s]))
 
 (s/defschema CreateTeamRequest
-  {:pelada_id s/Int
+  {:pelada_id s/Uuid
    (s/optional-key :name) s/Str})
 
 (s/defschema UpdateTeamRequest
-  {(s/optional-key :pelada_id) s/Int
+  {(s/optional-key :pelada_id) s/Uuid
    (s/optional-key :name) s/Str})
 
 (s/defschema AddPlayerToTeamRequest
-  {:player_id s/Int
+  {:player_id s/Uuid
    (s/optional-key :is_goalkeeper) s/Bool})

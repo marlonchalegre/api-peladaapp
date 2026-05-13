@@ -9,6 +9,7 @@
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.exception :as exception]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.responses :refer [bad-request created deleted ok]]
    [api-peladaapp.logic.authorization :as auth]
    [api-peladaapp.logic.monthly-substitution :as logic.monthly-sub]
@@ -27,7 +28,7 @@
 
 (defn leave [request]
   (try (let [db (:database request)
-             org-id (Integer/parseInt (str (get-in request [:params :id])))
+             org-id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-member! user-id org-id db)
          (let [is-admin? (db.admin/is-user-admin-of-organization? user-id org-id db)
@@ -47,7 +48,7 @@
 
 (defn get-by-id [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-member! user-id id db)
          (-> (controller.organization/get-organization id db)
@@ -57,7 +58,7 @@
 
 (defn update [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              body (:body request)
              org (adapter.organization/update-request->model body)
              user-id (auth/get-user-id-from-request request)]
@@ -69,7 +70,7 @@
 
 (defn delete [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id id db)
          (deleted (controller.organization/delete-organization id db)))
@@ -77,14 +78,14 @@
 
 (defn list-by-user [request]
   (try (let [db (:database request)
-             target-user-id (Integer/parseInt (str (get-in request [:params :user_id])))]
+             target-user-id (misc/as-uuid (get-in request [:params :user_id]))]
          (auth/require-self-or-admin! request target-user-id)
          (ok (controller.organization/list-user-organizations target-user-id db)))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn get-statistics [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              year (or (some-> (get-in request [:query-params "year"]) str Integer/parseInt) 0)
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-member! user-id id db)
@@ -95,7 +96,7 @@
 
 (defn invite [request]
   (try (let [db (:database request)
-             organization-id (Integer/parseInt (str (get-in request [:params :id])))
+             organization-id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)
              email (get-in request [:body :email])
              name (get-in request [:body :name])]
@@ -109,7 +110,7 @@
 
 (defn get-invite-link [request]
   (try (let [db (:database request)
-             organization-id (Integer/parseInt (str (get-in request [:params :id])))
+             organization-id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id organization-id db)
          (ok {:token (controller.organization/get-or-create-organization-link organization-id user-id db)}))
@@ -117,7 +118,7 @@
 
 (defn reset-invite-link [request]
   (try (let [db (:database request)
-             organization-id (Integer/parseInt (str (get-in request [:params :id])))
+             organization-id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id organization-id db)
          (ok {:token (controller.organization/reset-organization-link organization-id user-id db)}))
@@ -148,7 +149,7 @@
 
 (defn list-invitations [request]
   (try (let [db (:database request)
-             organization-id (Integer/parseInt (str (get-in request [:params :id])))
+             organization-id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id organization-id db)
          (ok (map adapter.invitation/model->response (controller.organization/list-organization-invitations organization-id db))))
@@ -156,8 +157,8 @@
 
 (defn revoke-invitation [request]
   (try (let [db (:database request)
-             organization-id (Integer/parseInt (str (get-in request [:params :id])))
-             invitation-id (Integer/parseInt (str (get-in request [:params :invitation_id])))
+             organization-id (misc/as-uuid (get-in request [:params :id]))
+             invitation-id (misc/as-uuid (get-in request [:params :invitation_id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id organization-id db)
          (controller.organization/revoke-invitation invitation-id organization-id db)
@@ -166,7 +167,7 @@
 
 (defn test-waha [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id id db)
          (ok (controller.organization/test-waha-connection id db)))
@@ -174,7 +175,7 @@
 
 (defn list-substitutions [request]
   (try (let [db (:database request)
-             org-id (Integer/parseInt (str (get-in request [:params :organization_id])))
+             org-id (misc/as-uuid (get-in request [:params :organization_id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-member! user-id org-id db)
          (ok (db.monthly-sub/list-substitutions-by-org org-id db)))
@@ -182,11 +183,11 @@
 
 (defn create-substitution [request]
   (try (let [db (:database request)
-             org-id (Integer/parseInt (str (get-in request [:params :organization_id])))
+             org-id (misc/as-uuid (get-in request [:params :organization_id]))
              user-id (auth/get-user-id-from-request request)
              body (:body request)
-             permanent-player-id (:permanent_player_id body)
-             temporary-player-id (:temporary_player_id body)
+             permanent-player-id (misc/as-uuid (:permanent_player_id body))
+             temporary-player-id (misc/as-uuid (:temporary_player_id body))
              start-date (:start_date body)]
          (auth/require-organization-admin! user-id org-id db)
          (ok (logic.monthly-sub/substitute-player! org-id permanent-player-id temporary-player-id start-date db)))
@@ -194,9 +195,9 @@
 
 (defn end-substitution [request]
   (try (let [db (:database request)
-             org-id (Integer/parseInt (str (get-in request [:params :organization_id])))
+             org-id (misc/as-uuid (get-in request [:params :organization_id]))
              user-id (auth/get-user-id-from-request request)
-             sub-id (Integer/parseInt (str (get-in request [:params :sub_id])))
+             sub-id (misc/as-uuid (get-in request [:params :sub_id]))
              end-date (get-in request [:body :end_date] (str (java.time.LocalDate/now)))]
          (auth/require-organization-admin! user-id org-id db)
          (ok (logic.monthly-sub/end-substitution! sub-id end-date db)))

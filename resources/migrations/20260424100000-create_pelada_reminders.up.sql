@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS "PeladaReminders" (
-    id SERIAL PRIMARY KEY,
-    pelada_id INTEGER NOT NULL,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    pelada_id UUID NOT NULL,
     type VARCHAR NOT NULL,
     sent_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (pelada_id) REFERENCES "Peladas"(id)

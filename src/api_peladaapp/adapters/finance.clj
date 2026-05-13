@@ -35,8 +35,8 @@
   (when payload
     (let [p (misc/unamespace payload)]
       (medley.core/assoc-some {}
-                              :id (:id p)
-                              :organization-id (:organization_id p)
+                              :id (misc/as-uuid (:id p))
+                              :organization-id (misc/as-uuid (:organization_id p))
                               :mensalista-price (:mensalista_price p)
                               :diarista-price (:diarista_price p)
                               :monthly-fine-amount (:monthly_fine_amount p)
@@ -99,10 +99,10 @@
   (when payload
     (let [p (misc/unamespace payload)]
       (medley.core/assoc-some {}
-                              :id (:id p)
-                              :organization-id (:organization_id p)
-                              :player-id (:player_id p)
-                              :pelada-id (:pelada_id p)
+                              :id (misc/as-uuid (:id p))
+                              :organization-id (misc/as-uuid (:organization_id p))
+                              :player-id (misc/as-uuid (:player_id p))
+                              :pelada-id (misc/as-uuid (:pelada_id p))
                               :amount (:amount p)
                               :fine-amount (:fine_amount p)
                               :type (:type p)
@@ -110,7 +110,7 @@
                               :description (:description p)
                               :status (:status p)
                               :payment-date (:payment_date p)
-                              :created-by (:created_by p)))))
+                              :created-by (misc/as-uuid (:created_by p))))))
 
 (defn model->transaction-response [model]
   (when model
@@ -171,13 +171,13 @@
   (when payload
     (let [p (misc/unamespace payload)]
       (medley.core/assoc-some {}
-                              :id (:id p)
-                              :organization-id (:organization_id p)
-                              :player-id (:player_id p)
+                              :id (misc/as-uuid (:id p))
+                              :organization-id (misc/as-uuid (:organization_id p))
+                              :player-id (misc/as-uuid (:player_id p))
                               :year (:year p)
                               :month (:month p)
-                              :transaction-id (:transaction_id p)
-                              :fine-transaction-id (:fine_transaction_id p)
+                              :transaction-id (misc/as-uuid (:transaction_id p))
+                              :fine-transaction-id (misc/as-uuid (:fine_transaction_id p))
                               :paid (:paid p)))))
 
 (defn model->monthly-payment-response [model]

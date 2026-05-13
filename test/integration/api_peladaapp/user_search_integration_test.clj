@@ -1,6 +1,7 @@
 (ns api-peladaapp.user-search-integration-test
   (:require
    [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
@@ -27,14 +28,14 @@
     ;; Setup: Create organization and add all users to it
     (let [org-id (:id (exec-one! ds (-> (h/insert-into :Organizations) (h/values [{:name "Test Org"}]) (h/returning :id))))]
       ;; Add admin to org
-      (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id admin-user-id :grade 5.0}])))
+      (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id (misc/as-uuid org-id) :user_id (misc/as-uuid admin-user-id) :grade 5.0}])))
 
       ;; Seed data and add to org
       (doseq [user [{:name "Cristiano Ronaldo" :email "cr7@test.com"}
                     {:name "Lionel Messi" :email "leo@test.com"}
                     {:name "Neymar Jr" :email "ney@gmail.com"}]]
         (let [user-id (db.user/insert-user (assoc user :password "pass") ds)]
-          (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :grade 5.0}]))))))
+          (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id (misc/as-uuid org-id) :user_id (misc/as-uuid user-id) :grade 5.0}]))))))
 
     (testing "GET /api/users/search - search by name"
       (let [resp (app (-> (mock/request :get "/api/users/search")

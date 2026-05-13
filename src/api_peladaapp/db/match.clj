@@ -13,8 +13,14 @@
 
 (def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
-(s/defn insert-match :- s/Int
-  [{:keys [pelada-id home-team-id away-team-id sequence status home-score away-score]}
+(s/defn insert-match :- s/Uuid
+  [{:keys [pelada-id home-team-id away-team-id sequence status home-score away-score]} :- {:pelada-id s/Uuid
+                                                                                           :home-team-id s/Uuid
+                                                                                           :away-team-id s/Uuid
+                                                                                           :sequence s/Int
+                                                                                           :status s/Str
+                                                                                           (s/optional-key :home-score) (s/maybe s/Int)
+                                                                                           (s/optional-key :away-score) (s/maybe s/Int)}
    db]
   (let [row {:pelada_id pelada-id
              :home_team_id home-team-id
@@ -29,7 +35,7 @@
     (:id (jdbc/execute-one! db (hsql/format query) opts))))
 
 (s/defn list-matches-by-pelada :- [s/Any]
-  [pelada-id db]
+  [pelada-id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :Matches)
                   (h/where [:= :pelada_id pelada-id])
@@ -37,7 +43,7 @@
     (->> (jdbc/execute! db (hsql/format query) opts)
          (map adapter.match/db->model))))
 
-(s/defn get-match [id db]
+(s/defn get-match [id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :Matches)
                   (h/where [:= :id id]))]
@@ -45,7 +51,7 @@
         adapter.match/db->model)))
 
 (s/defn update-match :- s/Int
-  [id {:keys [home-score away-score status timer-started-at timer-accumulated-ms timer-status]} db]
+  [id :- s/Uuid {:keys [home-score away-score status timer-started-at timer-accumulated-ms timer-status]} db]
   (let [db-row (cond-> {}
                  (some? home-score) (assoc :home_score home-score)
                  (some? away-score) (assoc :away_score away-score)
@@ -62,11 +68,11 @@
             affected-rows-count)))))
 
 (s/defn update-score :- s/Int
-  [id data db]
+  [id :- s/Uuid data db]
   (update-match id data db))
 
 (s/defn update-sequence :- s/Int
-  [id sequence db]
+  [id :- s/Uuid sequence :- s/Int db]
   (let [query (-> (h/update :Matches)
                   (h/set {:sequence sequence})
                   (h/where [:= :id id]))]
@@ -76,7 +82,7 @@
 (s/defn finish-all-by-pelada
   "Finish all matches for a pelada. Matches not yet finished are closed.
    It also ensures timers are stopped and accumulated time is calculated for running matches."
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (let [;; Note: Postgres handles interval arithmetic better with native types.
         ;; Using :raw for EXTRACT to ensure "FROM" keyword is used instead of comma.
         query (-> (h/update :Matches)

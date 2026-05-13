@@ -6,6 +6,7 @@
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
@@ -51,11 +52,11 @@
     (db.pelada/update-pelada pelada-id {:status "closed" :closed-at closed-at} ds)
 
     (let [team-resp (exec-one! ds (-> (h/insert-into :Teams)
-                                      (h/values [{:pelada_id pelada-id :name "Team A"}])
+                                      (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "Team A"}])
                                       (h/returning :id)))
           team-id (:id team-resp)]
       (exec! ds (-> (h/insert-into :TeamPlayers)
-                    (h/values [{:team_id team-id :player_id player-id}])))
+                    (h/values [{:team_id (misc/as-uuid team-id) :player_id (misc/as-uuid player-id)}])))
       (let [tp (exec! ds (-> (h/select :*) (h/from :TeamPlayers)))]
         (is (= 1 (count tp)))))
 

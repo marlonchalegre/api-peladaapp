@@ -10,19 +10,19 @@
 (s/defn create-request->model :- models.player/Player
   [request :- requests.player/CreatePlayerRequest]
   (medley.core/assoc-some {}
-                          :user-id (:user_id request)
-                          :organization-id (:organization_id request)
+                          :user-id (misc/as-uuid (:user_id request))
+                          :organization-id (misc/as-uuid (:organization_id request))
                           :grade (:grade request)
-                          :position-id (:position_id request)
+                          :position-id (misc/as-uuid (:position_id request))
                           :member-type (:member_type request)))
 
 (s/defn update-request->model :- models.player/Player
   [request :- requests.player/UpdatePlayerRequest]
   (medley.core/assoc-some {}
-                          :user-id (:user_id request)
-                          :organization-id (:organization_id request)
+                          :user-id (misc/as-uuid (:user_id request))
+                          :organization-id (misc/as-uuid (:organization_id request))
                           :grade (:grade request)
-                          :position-id (:position_id request)
+                          :position-id (misc/as-uuid (:position_id request))
                           :member-type (:member_type request)))
 
 (s/defn model->response :- responses.player/PlayerResponse

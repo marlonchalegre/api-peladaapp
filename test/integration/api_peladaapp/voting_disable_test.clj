@@ -1,5 +1,6 @@
 (ns api-peladaapp.voting-disable-test
   (:require
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
@@ -36,7 +37,7 @@
     ;; Add P1 and P2 to org
     (doseq [email ["p1@test.com" "p2@test.com"]]
       (let [uid (th/user-id-by-email ds email)]
-        (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id uid}])))))
+        (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id (misc/as-uuid org-id) :user_id (misc/as-uuid uid)}])))))
 
     (let [pelada-id (:id (th/decode-body (app (-> (mock/request :post "/api/peladas")
                                                   (mock/json-body {:organization_id org-id :num_teams 2})
@@ -47,22 +48,23 @@
       (app (-> (mock/request :post "/api/teams") (mock/json-body {:pelada_id pelada-id :name "Team B"}) auth1))
 
       ;; Get player IDs and team IDs
-      (let [admin-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (th/user-id-by-email ds "admin@test.com")]))))
-            p1-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (th/user-id-by-email ds "p1@test.com")]))))
-            p2-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (th/user-id-by-email ds "p2@test.com")]))))
-            teams (exec! ds (-> (h/select :id) (h/from :Teams) (h/where [:= :pelada_id pelada-id]) (h/order-by :id)))
+      (let [admin-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (misc/as-uuid (th/user-id-by-email ds "admin@test.com"))]))))
+            p1-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (misc/as-uuid (th/user-id-by-email ds "p1@test.com"))]))))
+            p2-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (misc/as-uuid (th/user-id-by-email ds "p2@test.com"))]))))
+            teams (exec! ds (-> (h/select :id) (h/from :Teams) (h/where [:= :pelada_id (misc/as-uuid pelada-id)]) (h/order-by :id)))
             t1-id (:id (first teams))
             t2-id (:id (second teams))]
 
         ;; Add players to teams
-        (exec! ds (-> (h/insert-into :TeamPlayers) (h/values [{:team_id t1-id :player_id admin-id}
-                                                              {:team_id t1-id :player_id p1-id}
-                                                              {:team_id t2-id :player_id p2-id}])))
+        (exec! ds (-> (h/insert-into :TeamPlayers) (h/values [{:team_id (misc/as-uuid t1-id) :player_id (misc/as-uuid admin-id)}
+                                                              {:team_id (misc/as-uuid t1-id) :player_id (misc/as-uuid p1-id)}
+                                                              {:team_id (misc/as-uuid t2-id) :player_id (misc/as-uuid p2-id)}])))
 
         ;; Create attendance records for all players with voting_enabled = true
         (doseq [pid [admin-id p1-id p2-id]]
           (exec! ds (-> (h/insert-into :Attendance)
-                        (h/values [{:pelada_id pelada-id :player_id pid :status "confirmed" :voting_enabled true}]))))
+                        (h/values [{:pelada_id (misc/as-uuid pelada-id) :player_id (misc/as-uuid pid) :status "confirmed" :voting_enabled true}]))))
+
 
         ;; Transition pelada through states
         (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth1))

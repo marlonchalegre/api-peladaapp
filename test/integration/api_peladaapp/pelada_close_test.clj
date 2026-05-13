@@ -1,6 +1,7 @@
 (ns api-peladaapp.pelada-close-test
   (:require
    [api-peladaapp.controllers.pelada :as pelada.controller]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [clojure.data.json :as json]
@@ -70,7 +71,7 @@
       ;; Start pelada and match timers
       (is (= 200 (:status (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/timer/start")) auth)))))
 
-      (let [matches (exec! ds (-> (h/select :id) (h/from :Matches) (h/where [:= :pelada_id pelada-id])))
+      (let [matches (exec! ds (-> (h/select :id) (h/from :Matches) (h/where [:= :pelada_id (misc/as-uuid pelada-id)])))
             match-id (:id (first matches))]
         (is (= 200 (:status (app (-> (mock/request :post (str "/api/matches/" match-id "/timer/start")) auth)))))
 
@@ -85,12 +86,12 @@
           (is (= "voting" (:status body)))
 
           ;; Verify pelada timer paused and has elapsed time
-          (let [pelada (pelada.controller/get-pelada pelada-id ds)]
+          (let [pelada (pelada.controller/get-pelada (misc/as-uuid pelada-id) ds)]
             (is (= "paused" (:timer-status pelada)))
             (is (pos? (:timer-accumulated-ms pelada))))
 
           ;; Verify match timer paused and has elapsed time
-          (let [match (exec-one! ds (-> (h/select :*) (h/from :Matches) (h/where [:= :id match-id])))]
+          (let [match (exec-one! ds (-> (h/select :*) (h/from :Matches) (h/where [:= :id (misc/as-uuid match-id)])))]
             (is (= "finished" (:status match)))
             (is (= "paused" (:timer_status match)))
             (is (pos? (:timer_accumulated_ms match)))))))))

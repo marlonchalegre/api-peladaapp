@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS "Teams" (
-  id SERIAL PRIMARY KEY,
-  pelada_id INTEGER NOT NULL,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  pelada_id UUID NOT NULL,
   name VARCHAR,
   FOREIGN KEY (pelada_id) REFERENCES "Peladas"(id)
 );

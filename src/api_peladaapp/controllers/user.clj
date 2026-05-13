@@ -40,7 +40,7 @@
 
 (s/defn update-user :- models.user/User
   [user :- models.user/UserProfileUpdate
-   user-id :- s/Int
+   user-id :- s/Uuid
    db]
   (let [existing-user (-> (db.user/find-user-by-id user-id db)
                           (dissoc :id :password))]
@@ -53,7 +53,7 @@
             (db.user/find-user-by-id user-id db))))))
 
 (s/defn get-user :- models.user/User
-  [user-id :- s/Int
+  [user-id :- s/Uuid
    db]
   (let [user (db.user/find-user-by-id user-id db)]
     (if (nil? user)
@@ -62,7 +62,7 @@
         (assoc user :admin-orgs admin-orgs)))))
 
 (s/defn delete-user
-  [user-id :- s/Int
+  [user-id :- s/Uuid
    db]
   (let [user (db.user/find-user-by-id user-id db)]
     (if (nil? user)
@@ -99,7 +99,7 @@
 (s/defn update-user-profile :- models.user/User
   "Update user profile - only allows updating name, username, email, password and position. Score is protected."
   [profile-data :- models.user/UserProfileUpdate
-   user-id :- s/Int
+   user-id :- s/Uuid
    db]
   (let [existing-user (db.user/find-user-by-id user-id db)]
     (if (nil? existing-user)

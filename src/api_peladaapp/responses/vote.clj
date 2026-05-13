@@ -3,10 +3,10 @@
    [schema.core :as s]))
 
 (s/defschema VoteResponse
-  {:id s/Int
-   :pelada-id s/Int
-   :voter-id s/Int
-   :target-id s/Int
+  {:id s/Uuid
+   :pelada-id s/Uuid
+   :voter-id s/Uuid
+   :target-id s/Uuid
    :stars s/Int
    (s/optional-key :created-at) s/Any})
 
@@ -14,7 +14,7 @@
   {:votes-cast s/Int})
 
 (s/defschema EligiblePlayer
-  {:player-id s/Int
+  {:player-id s/Uuid
    :name s/Str
    (s/optional-key :position) (s/maybe s/Str)
    (s/optional-key :goals) s/Int
@@ -23,12 +23,12 @@
    (s/optional-key :voting-enabled) s/Bool})
 
 (s/defschema VoterStatus
-  {:player-id s/Int
+  {:player-id s/Uuid
    :name s/Str
    :has-voted s/Bool})
 
 (s/defschema PlayerResult
-  {:player-id s/Int
+  {:player-id s/Uuid
    :name s/Str
    :position (s/maybe s/Str)
    :average-stars s/Num
@@ -43,7 +43,7 @@
    :voters [VoterStatus]
    :total-eligible s/Int
    :total-voted s/Int
-   (s/optional-key :organization-id) s/Int
+   (s/optional-key :organization-id) s/Uuid
    (s/optional-key :organization-name) s/Str})
 
 (s/defschema VotingStatusResponse
@@ -56,5 +56,5 @@
    :has-voted s/Bool
    :eligible-players [EligiblePlayer]
    (s/optional-key :current-votes) [VoteResponse]
-   (s/optional-key :voter-player-id) (s/maybe s/Int)
+   (s/optional-key :voter-player-id) (s/maybe s/Uuid)
    (s/optional-key :message) s/Str})

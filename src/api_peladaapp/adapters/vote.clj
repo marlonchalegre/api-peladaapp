@@ -9,9 +9,9 @@
 
 (s/defn create-request->model :- models.vote/Vote
   [request :- requests.vote/CastVoteRequest]
-  {:pelada-id (:pelada_id request)
-   :voter-id (:voter_id request)
-   :target-id (:target_id request)
+  {:pelada-id (misc/as-uuid (:pelada_id request))
+   :voter-id (misc/as-uuid (:voter_id request))
+   :target-id (misc/as-uuid (:target_id request))
    :stars (:stars request)})
 
 (s/defn model->response :- responses.vote/VoteResponse

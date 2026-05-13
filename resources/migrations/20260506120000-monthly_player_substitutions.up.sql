@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS "MonthlyPlayerSubstitutions" (
-  id SERIAL PRIMARY KEY,
-  organization_id INTEGER NOT NULL,
-  permanent_player_id INTEGER NOT NULL,
-  temporary_player_id INTEGER NOT NULL,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL,
+  permanent_player_id UUID NOT NULL,
+  temporary_player_id UUID NOT NULL,
   start_date DATE NOT NULL,
   end_date DATE,
   active BOOLEAN DEFAULT TRUE,

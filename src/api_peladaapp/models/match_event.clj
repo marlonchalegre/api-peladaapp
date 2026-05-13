@@ -3,9 +3,9 @@
    [schema.core :as s]))
 
 (s/defschema MatchEvent
-  {:id s/Int
-   :match-id s/Int
-   :player-id s/Int
+  {:id s/Uuid
+   :match-id s/Uuid
+   :player-id s/Uuid
    :event-type s/Str
    (s/optional-key :created-at) s/Any
    (s/optional-key :session-time-ms) (s/maybe s/Int)

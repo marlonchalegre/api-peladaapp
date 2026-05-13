@@ -9,26 +9,31 @@
    [next.jdbc.result-set :as rs]
    [schema.core :as s]))
 
+(defn- affected-rows-count [result]
+  (let [res (if (vector? result) (first result) result)]
+    (or (:update-count res) (:next.jdbc/update-count res) (-> res vals first) 0)))
+
 (def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn get-vote :- (s/maybe models.vote/Vote)
-  [id :- s/Int db]
+  [id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :Votes)
                   (h/where [:= :id id]))]
     (-> (jdbc/execute-one! db (hsql/format query) opts)
         adapter.vote/db->model)))
 
-(s/defn insert-vote :- s/Int
-  [{:keys [pelada-id voter-id target-id stars]}
+(s/defn insert-vote :- s/Uuid
+  [{:keys [pelada-id voter-id target-id stars]} :- {:pelada-id s/Uuid :voter-id s/Uuid :target-id s/Uuid :stars s/Int}
    db]
   (let [row {:pelada_id pelada-id :voter_id voter-id :target_id target-id :stars stars}
         query (-> (h/insert-into :Votes)
-                  (h/values [row]))]
+                  (h/values [row])
+                  (h/returning :id))]
     (:id (jdbc/execute-one! db (hsql/format query) opts))))
 
 (s/defn list-votes-by-pelada :- [models.vote/Vote]
-  [pelada-id db]
+  [pelada-id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :Votes)
                   (h/where [:= :pelada_id pelada-id]))]
@@ -36,7 +41,7 @@
          (map adapter.vote/db->model))))
 
 (s/defn list-votes-for-player :- [models.vote/Vote]
-  [pelada-id player-id db]
+  [pelada-id :- s/Uuid player-id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :Votes)
                   (h/where [:= :pelada_id pelada-id] [:= :target_id player-id]))]
@@ -45,7 +50,7 @@
 
 (s/defn list-votes-by-voter :- [models.vote/Vote]
   "Get all votes cast by a specific voter in a pelada."
-  [pelada-id voter-id db]
+  [pelada-id :- s/Uuid voter-id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :Votes)
                   (h/where [:= :pelada_id pelada-id] [:= :voter_id voter-id]))]
@@ -54,7 +59,7 @@
 
 (s/defn has-voter-voted? :- s/Bool
   "Check if a voter has cast any votes in a pelada."
-  [pelada-id voter-id db]
+  [pelada-id :- s/Uuid voter-id :- s/Uuid db]
   (let [query (-> (h/select [[:count :*] :count])
                   (h/from :Votes)
                   (h/where [:and [:= :pelada_id pelada-id] [:= :voter_id voter-id]]))
@@ -63,17 +68,19 @@
 
 (s/defn delete-votes-by-voter :- s/Int
   "Delete all Votes by a voter in a pelada (for re-voting)."
-  [pelada-id voter-id db]
+  [pelada-id :- s/Uuid voter-id :- s/Uuid db]
   (let [query (-> (h/delete-from :Votes)
                   (h/where [:and [:= :pelada_id pelada-id] [:= :voter_id voter-id]]))]
-    (:id (jdbc/execute-one! db (hsql/format query) opts))))
+    (-> (jdbc/execute-one! db (hsql/format query) opts)
+        affected-rows-count)))
 
 (s/defn delete-votes-for-target :- s/Int
   "Delete all Votes cast for a target player in a pelada."
-  [pelada-id target-id db]
+  [pelada-id :- s/Uuid target-id :- s/Uuid db]
   (let [query (-> (h/delete-from :Votes)
                   (h/where [:and [:= :pelada_id pelada-id] [:= :target_id target-id]]))]
-    (:id (jdbc/execute-one! db (hsql/format query) opts))))
+    (-> (jdbc/execute-one! db (hsql/format query) opts)
+        affected-rows-count)))
 
 (s/defn insert-votes-batch :- s/Int
   "Insert multiple Votes at once."
@@ -92,7 +99,7 @@
       (count rows))))
 
 (s/defn list-ranking-by-pelada
-  [pelada-id db]
+  [pelada-id :- s/Uuid db]
   (let [query (-> (h/select :v.target_id [:u.id :user_id] [:u.name :player_name] :u.avatar_filename
                             [[:avg :v.stars] :avg_stars] [[:count :v.id] :vote_count])
                   (h/from [:Votes :v])
@@ -113,7 +120,7 @@
             :vote-count (int (or (:vote_count r) 0))})
          results)))
 
-(s/defn list-pending-voters-by-pelada [pelada-id db]
+(s/defn list-pending-voters-by-pelada [pelada-id :- s/Uuid db]
   (let [query (-> (h/select [:pa.player_id :player_id] [:u.name :player_name] :u.phone)
                   (h/from [:Attendance :pa])
                   (h/join [:OrganizationPlayers :op] [:= :pa.player_id :op.id])
@@ -128,7 +135,7 @@
     (map (fn [r] {:player-id (:player_id r) :player-name (:player_name r) :phone (:phone r)}) results)))
 
 (s/defn list-eligible-players-for-voting
-  [pelada-id voter-player-id db]
+  [pelada-id :- s/Uuid voter-player-id :- (s/maybe s/Uuid) db]
   (let [where-clause (cond-> [:and [:in :op.id (-> (h/select :player_id)
                                                    (h/from [:TeamPlayers :sub_tp])
                                                    (h/join [:Teams :sub_t] [:= :sub_t.id :sub_tp.team_id])
@@ -147,7 +154,7 @@
     (jdbc/execute! db (hsql/format query) opts)))
 
 (s/defn list-pelada-participants
-  [pelada-id db]
+  [pelada-id :- s/Uuid db]
   (let [query (-> (h/select [:op.id :player_id] [:u.id :user_id] :u.name :u.position :u.avatar_filename
                             [[:coalesce :s.goals 0] :goals]
                             [[:coalesce :s.assists 0] :assists]

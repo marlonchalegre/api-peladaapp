@@ -1,4 +1,4 @@
 CREATE TABLE IF NOT EXISTS "Positions" (
-  id SERIAL PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   value VARCHAR
 );

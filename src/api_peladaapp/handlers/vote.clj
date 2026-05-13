@@ -3,18 +3,19 @@
    [api-peladaapp.adapters.vote :as adapter.vote]
    [api-peladaapp.controllers.vote :as controller.vote]
    [api-peladaapp.helpers.exception :as exception]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.responses :as responses :refer [ok]]
    [api-peladaapp.logic.authorization :as auth]))
 
 (defn batch-cast [request]
   (try (let [db (:database request)
-             pelada-id (Integer/parseInt (str (get-in request [:params :id])))
+             pelada-id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)
              ;; We need the player-id, not the user-id, for the votes table
              voting-info (controller.vote/get-voting-info pelada-id user-id db)
              voter-player-id (:voter-player-id voting-info)
              body (:body request)
-             votes (map (fn [v] {:target-id (:target_id v) :stars (:stars v)}) (:votes body))]
+             votes (map (fn [v] {:target-id (misc/as-uuid (:target_id v)) :stars (:stars v)}) (:votes body))]
 
          (if-not voter-player-id
            (responses/forbidden {:message (or (:message voting-info) "User cannot vote in this pelada")})
@@ -24,7 +25,7 @@
 
 (defn voting-info [request]
   (try (let [db (:database request)
-             pelada-id (Integer/parseInt (str (get-in request [:params :id])))
+             pelada-id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)]
          ;; Use adapter to convert kebab-case internal model to snake_case response
          (ok (adapter.vote/voting-info-model->response
@@ -33,7 +34,7 @@
 
 (defn voting-results [request]
   (try (let [db (:database request)
-             pelada-id (Integer/parseInt (str (get-in request [:params :id])))
+             pelada-id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)]
          (ok (adapter.vote/voting-results-model->response
               (controller.vote/get-voting-results pelada-id user-id db))))
@@ -41,7 +42,7 @@
 
 (defn voting-status [request]
   (try (let [db (:database request)
-             pelada-id (Integer/parseInt (str (get-in request [:params :id])))]
+             pelada-id (misc/as-uuid (get-in request [:params :id]))]
          (ok (adapter.vote/voting-status-model->response
               (controller.vote/get-voting-status pelada-id db))))
        (catch Exception e (exception/api-exception-handler e))))
