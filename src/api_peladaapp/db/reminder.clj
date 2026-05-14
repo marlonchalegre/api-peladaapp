@@ -13,7 +13,7 @@
    type :- s/Str
    db]
   (let [query (-> (h/insert-into :PeladaReminders)
-                  (h/values [{:pelada_id pelada-id :type type}])
+                  (h/values [{:pelada_id pelada-id :type [:cast type :reminder_type]}])
                   (h/returning :id))]
     (:id (jdbc/execute-one! db (hsql/format query) opts))))
 
@@ -23,7 +23,7 @@
    db]
   (let [query (-> (h/select :sent_at)
                   (h/from :PeladaReminders)
-                  (h/where [:= :pelada_id pelada-id] [:= :type type])
+                  (h/where [:= :pelada_id pelada-id] [:= :type [:cast type :reminder_type]])
                   (h/order-by [:sent_at :desc])
                   (h/limit 1))]
     (-> (jdbc/execute-one! db (hsql/format query) opts)

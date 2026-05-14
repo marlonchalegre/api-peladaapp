@@ -14,4 +14,3 @@ CREATE TABLE IF NOT EXISTS "Votes" (
 CREATE INDEX IF NOT EXISTS votes_index_pelada ON "Votes" (pelada_id);
 --;;
 CREATE INDEX IF NOT EXISTS votes_index_target ON "Votes" (pelada_id, target_id);
---;;

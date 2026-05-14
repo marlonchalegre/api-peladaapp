@@ -19,7 +19,8 @@
   (let [row {:organization_id (:organization-id invitation)
              :email (:email invitation)
              :token (:token invitation)
-             :invited_by (:invited-by invitation)}
+             :invited_by (:invited-by invitation)
+             :status [:cast "pending" :invitation_status]}
         query (-> (h/insert-into :OrganizationInvitations)
                   (h/values [row])
                   (h/returning :id))]
@@ -39,7 +40,7 @@
   (let [query (-> (h/select :i.* [:o.name :organization_name])
                   (h/from [:OrganizationInvitations :i])
                   (h/join [:Organizations :o] [:= :i.organization_id :o.id])
-                  (h/where [:and [:= [:lower :i.email] (str/lower-case email)] [:= :i.status "pending"]]))
+                  (h/where [:and [:= [:lower :i.email] (str/lower-case email)] [:= :i.status [:cast "pending" :invitation_status]]]))
         result (jdbc/execute! db (hsql/format query) opts)]
     (map adapter.invitation/db->model result)))
 
@@ -49,14 +50,14 @@
         query (-> (h/select :i.* [:o.name :organization_name])
                   (h/from [:OrganizationInvitations :i])
                   (h/join [:Organizations :o] [:= :i.organization_id :o.id])
-                  (h/where [:and [:in [:lower :i.email] lower-ids] [:= :i.status "pending"]]))
+                  (h/where [:and [:in [:lower :i.email] lower-ids] [:= :i.status [:cast "pending" :invitation_status]]]))
         result (jdbc/execute! db (hsql/format query) opts)]
     (map adapter.invitation/db->model result)))
 
 (s/defn update-invitation-status :- s/Int
   [id :- s/Uuid status :- s/Str db]
   (let [query (-> (h/update :OrganizationInvitations)
-                  (h/set {:status status})
+                  (h/set {:status [:cast status :invitation_status]})
                   (h/where [:= :id id]))]
     (-> (jdbc/execute-one! db (hsql/format query) opts)
         affected-rows-count)))
@@ -65,8 +66,8 @@
   [organization-id :- s/Uuid identifiers :- [s/Str] db]
   (let [lower-ids (map str/lower-case identifiers)
         query (-> (h/update :OrganizationInvitations)
-                  (h/set {:status "accepted"})
-                  (h/where [:and [:= :organization_id organization-id] [:= :status "pending"] [:in [:lower :email] lower-ids]]))]
+                  (h/set {:status [:cast "accepted" :invitation_status]})
+                  (h/where [:and [:= :organization_id organization-id] [:= :status [:cast "pending" :invitation_status]] [:in [:lower :email] lower-ids]]))]
     (-> (jdbc/execute-one! db (hsql/format query) opts)
         affected-rows-count)))
 
@@ -90,7 +91,7 @@
 
 (s/defn list-invitations-by-organization
   [organization-id :- s/Uuid db]
-  (let [query (-> (h/select :*) (h/from :OrganizationInvitations) (h/where [:and [:= :organization_id organization-id] [:= :status "pending"]]) (h/order-by [:created_at :desc]))
+  (let [query (-> (h/select :*) (h/from :OrganizationInvitations) (h/where [:and [:= :organization_id organization-id] [:= :status [:cast "pending" :invitation_status]]]) (h/order-by [:created_at :desc]))
         result (jdbc/execute! db (hsql/format query) opts)]
     (map adapter.invitation/db->model result)))
 

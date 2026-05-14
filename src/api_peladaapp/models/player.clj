@@ -7,7 +7,7 @@
    :user-id s/Uuid
    :organization-id s/Uuid
    :grade (s/maybe s/Num)
-   :position-id (s/maybe s/Uuid)
+   :position (s/maybe s/Str)
    (s/optional-key :member-type) s/Str
    (s/optional-key :user-name) s/Str
    (s/optional-key :user-username) s/Str

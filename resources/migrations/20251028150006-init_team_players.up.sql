@@ -10,4 +10,3 @@ CREATE TABLE IF NOT EXISTS "TeamPlayers" (
 CREATE INDEX IF NOT EXISTS teamplayers_index_team ON "TeamPlayers" (team_id);
 --;;
 CREATE INDEX IF NOT EXISTS teamplayers_index_player ON "TeamPlayers" (player_id);
---;;

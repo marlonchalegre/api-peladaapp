@@ -30,7 +30,7 @@
                (catch Exception _ true))))))
 
 (defn- run-attendance-reminders! [db ^ZonedDateTime now]
-  (let [orgs (db.organization/list-all-organizations db)]
+  (let [orgs (db.organization/list-organizations db)]
     (doseq [org orgs]
       (let [org-id (:id org)]
         (when (:waha-attendance-reminder-enabled org)

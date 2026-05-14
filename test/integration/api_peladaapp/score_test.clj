@@ -37,7 +37,7 @@
                         (h/values [{:name name :email email :password "p"}])))
         (let [user-id (th/user-id-by-email ds email)]
           (insert! ds (-> (h/insert-into :OrganizationPlayers)
-                          (h/values [{:organization_id (misc/as-uuid org-id) :user_id (misc/as-uuid user-id)}])))))
+                          (h/values [{:organization_id (misc/as-uuid org-id) :user_id (misc/as-uuid user-id) :member_type [:cast "diarista" :member_type]}])))))
 
       (let [ana-id (th/user-id-by-email ds "ana@example.com")
             bob-id (th/user-id-by-email ds "bob@example.com")
@@ -52,7 +52,7 @@
         (insert! ds (-> (h/insert-into :Peladas)
                         (h/values [{:organization_id (misc/as-uuid org-id)
                                     :scheduled_at scheduled-at
-                                    :status "closed"
+                                    :status [:cast "closed" :pelada_status]
                                     :closed_at closed-at}])))
 
         (let [pelada-id (-> (jdbc/execute-one! ds (hsql/format (-> (h/select :id)
@@ -79,7 +79,8 @@
                             (h/values [{:name "Dani" :email "dani@e.com" :password "p"}])))
             (let [dani-id (th/user-id-by-email ds "dani@e.com")]
               (insert! ds (-> (h/insert-into :OrganizationPlayers)
-                              (h/values [{:organization_id (misc/as-uuid org-id) :user_id (misc/as-uuid dani-id) :grade 7.5}])))
-              (let [dani-player-id (th/player-id-by-user-id ds dani-id org-id)
-                    scores (logic.score/get-normalized-scores [dani-player-id] ds)]
-                (is (= 7.5 (get scores dani-player-id)))))))))))
+                              (h/values [{:organization_id (misc/as-uuid org-id) :user_id (misc/as-uuid dani-id) :grade 7.5 :member_type [:cast "diarista" :member_type]}]))))
+            (let [dani-id (th/user-id-by-email ds "dani@e.com")
+                  dani-player-id (th/player-id-by-user-id ds dani-id org-id)
+                  scores (logic.score/get-normalized-scores [dani-player-id] ds)]
+              (is (= 7.5 (get scores dani-player-id))))))))))

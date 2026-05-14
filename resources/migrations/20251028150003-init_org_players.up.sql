@@ -15,4 +15,3 @@ CREATE INDEX IF NOT EXISTS orgplayers_index_org ON "OrganizationPlayers" (organi
 CREATE INDEX IF NOT EXISTS orgplayers_index_user ON "OrganizationPlayers" (user_id);
 --;;
 CREATE UNIQUE INDEX IF NOT EXISTS orgplayers_unique_org_user ON "OrganizationPlayers" (organization_id, user_id);
---;;

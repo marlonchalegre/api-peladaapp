@@ -70,7 +70,6 @@
       (let [old-date (.minus (java.time.OffsetDateTime/now) (java.time.Duration/ofHours 26))]
         (exec! ds (-> (h/update :Peladas) (h/set {:closed_at [[:cast old-date :timestamp]]}) (h/where [:= :id (misc/as-uuid pelada-id)]))))
 
-
       (testing "Admin can access results even if didn't vote"
         (let [resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/voting-results")) auth-admin))]
           (is (= 200 (:status resp)))))

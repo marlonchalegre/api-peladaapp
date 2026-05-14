@@ -42,7 +42,8 @@
                                                                           {:builder-fn rs/as-unqualified-lower-maps}))]
                                       (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
                                                                                   (h/values [{:user_id (misc/as-uuid user-id)
-                                                                                              :organization_id (misc/as-uuid org-id)}])
+                                                                                              :organization_id (misc/as-uuid org-id)
+                                                                                              :member_type [:cast "diarista" :member_type]}])
                                                                                   (h/returning :id)))
                                                               {:builder-fn rs/as-unqualified-lower-maps})))))]
         (logic.randomize/randomize-teams! pelada-id org-player-ids 3 ds)
@@ -85,38 +86,38 @@
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             ;; P1: GK, score 10
             u1-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users)
-                                                              (h/values [{:name "GK" :email "gk@e.com" :password "p" :position "Goalkeeper"}])
+                                                              (h/values [{:name "GK" :email "gk@e.com" :password "p" :position [:cast "Goalkeeper" :player_position]}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             p1-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
-                                                              (h/values [{:user_id (misc/as-uuid u1-id) :organization_id (misc/as-uuid org-id) :grade 10.0}])
+                                                              (h/values [{:user_id (misc/as-uuid u1-id) :organization_id (misc/as-uuid org-id) :grade 10.0 :member_type [:cast "diarista" :member_type]}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             ;; P4: Defender, score 7
             u4-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users)
-                                                              (h/values [{:name "Def" :email "def@e.com" :password "p" :position "Defender"}])
+                                                              (h/values [{:name "Def" :email "def@e.com" :password "p" :position [:cast "Defender" :player_position]}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             p4-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
-                                                              (h/values [{:user_id (misc/as-uuid u4-id) :organization_id (misc/as-uuid org-id) :grade 7.0}])
+                                                              (h/values [{:user_id (misc/as-uuid u4-id) :organization_id (misc/as-uuid org-id) :grade 7.0 :member_type [:cast "diarista" :member_type]}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             ;; P3: Striker, score 8
             u3-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users)
-                                                              (h/values [{:name "Str1" :email "s1@e.com" :password "p" :position "Striker"}])
+                                                              (h/values [{:name "Str1" :email "s1@e.com" :password "p" :position [:cast "Striker" :player_position]}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             p3-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
-                                                              (h/values [{:user_id (misc/as-uuid u3-id) :organization_id (misc/as-uuid org-id) :grade 8.0}])
+                                                              (h/values [{:user_id (misc/as-uuid u3-id) :organization_id (misc/as-uuid org-id) :grade 8.0 :member_type [:cast "diarista" :member_type]}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             ;; P2: Striker, score 5
             u2-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users)
-                                                              (h/values [{:name "Str2" :email "s2@e.com" :password "p" :position "Striker"}])
+                                                              (h/values [{:name "Str2" :email "s2@e.com" :password "p" :position [:cast "Striker" :player_position]}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))
             p2-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
-                                                              (h/values [{:user_id (misc/as-uuid u2-id) :organization_id (misc/as-uuid org-id) :grade 5.0}])
+                                                              (h/values [{:user_id (misc/as-uuid u2-id) :organization_id (misc/as-uuid org-id) :grade 5.0 :member_type [:cast "diarista" :member_type]}])
                                                               (h/returning :id)))
                                           {:builder-fn rs/as-unqualified-lower-maps}))]
         (logic.randomize/randomize-teams! pelada-id [p1-id p2-id p3-id p4-id] 2 ds)
@@ -175,13 +176,14 @@
                                                                                             (h/values [{:name (str "P" i)
                                                                                                         :email (str "p" i "@e.com")
                                                                                                         :password "p"
-                                                                                                        :position "Midfielder"}])
+                                                                                                        :position [:cast "Midfielder" :player_position]}])
                                                                                             (h/returning :id)))
                                                                         {:builder-fn rs/as-unqualified-lower-maps}))]
                                     (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
                                                                                 (h/values [{:user_id (misc/as-uuid user-id)
                                                                                             :organization_id (misc/as-uuid org-id)
-                                                                                            :grade 5.0}])
+                                                                                            :grade 5.0
+                                                                                            :member_type [:cast "diarista" :member_type]}])
                                                                                 (h/returning :id)))
                                                             {:builder-fn rs/as-unqualified-lower-maps})))))]
           (logic.randomize/randomize-teams! pelada-id player-ids 6 ds)
@@ -221,13 +223,14 @@
                                                                                           (h/values [{:name (str "P" i)
                                                                                                       :email (str "p" i "@e.com")
                                                                                                       :password "p"
-                                                                                                      :position "Midfielder"}])
+                                                                                                      :position [:cast "Midfielder" :player_position]}])
                                                                                           (h/returning :id)))
                                                                       {:builder-fn rs/as-unqualified-lower-maps}))]
                                   (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
                                                                               (h/values [{:user_id (misc/as-uuid user-id)
                                                                                           :organization_id (misc/as-uuid org-id)
-                                                                                          :grade 5.0}])
+                                                                                          :grade 5.0
+                                                                                          :member_type [:cast "diarista" :member_type]}])
                                                                               (h/returning :id)))
                                                           {:builder-fn rs/as-unqualified-lower-maps})))))]
         (jdbc/execute! ds (hsql/format (-> (h/insert-into :TeamPlayers)
@@ -273,13 +276,14 @@
                                                                                       (h/values [{:name (str "GK" i)
                                                                                                   :email (str "gk" i "@e.com")
                                                                                                   :password "p"
-                                                                                                  :position "Goalkeeper"}])
+                                                                                                  :position [:cast "Goalkeeper" :player_position]}])
                                                                                       (h/returning :id)))
                                                                   {:builder-fn rs/as-unqualified-lower-maps}))]
                               (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
                                                                           (h/values [{:user_id (misc/as-uuid user-id)
                                                                                       :organization_id (misc/as-uuid org-id)
-                                                                                      :grade 10.0}])
+                                                                                      :grade 10.0
+                                                                                      :member_type [:cast "diarista" :member_type]}])
                                                                           (h/returning :id)))
                                                       {:builder-fn rs/as-unqualified-lower-maps})))))
             df-ids (doall (for [i (range 1 3)]
@@ -287,46 +291,46 @@
                                                                                       (h/values [{:name (str "DF" i)
                                                                                                   :email (str "df" i "@e.com")
                                                                                                   :password "p"
-                                                                                                  :position "Defender"}])
+                                                                                                  :position [:cast "Defender" :player_position]}])
                                                                                       (h/returning :id)))
                                                                   {:builder-fn rs/as-unqualified-lower-maps}))]
                               (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
                                                                           (h/values [{:user_id (misc/as-uuid user-id)
                                                                                       :organization_id (misc/as-uuid org-id)
-                                                                                      :grade 5.0}])
+                                                                                      :grade 5.0
+                                                                                      :member_type [:cast "diarista" :member_type]}])
                                                                           (h/returning :id)))
                                                       {:builder-fn rs/as-unqualified-lower-maps})))))
             player-ids (concat gk-ids df-ids)]
         (logic.randomize/randomize-teams! pelada-id player-ids 2 ds)
         (let [t1-players (set (map (comp misc/as-uuid :player_id) (jdbc/execute! ds (hsql/format (-> (h/select :player_id)
-                                                                                 (h/from :TeamPlayers)
-                                                                                 (h/where [:= :team_id (misc/as-uuid t1-id)])))
-                                                             {:builder-fn rs/as-unqualified-lower-maps})))
+                                                                                                     (h/from :TeamPlayers)
+                                                                                                     (h/where [:= :team_id (misc/as-uuid t1-id)])))
+                                                                                 {:builder-fn rs/as-unqualified-lower-maps})))
               t2-players (set (map (comp misc/as-uuid :player_id) (jdbc/execute! ds (hsql/format (-> (h/select :player_id)
-                                                                                 (h/from :TeamPlayers)
-                                                                                 (h/where [:= :team_id (misc/as-uuid t2-id)])))
-                                                             {:builder-fn rs/as-unqualified-lower-maps})))]
+                                                                                                     (h/from :TeamPlayers)
+                                                                                                     (h/where [:= :team_id (misc/as-uuid t2-id)])))
+                                                                                 {:builder-fn rs/as-unqualified-lower-maps})))]
           (is (= 1 (count (clojure.set/intersection t1-players (set (map misc/as-uuid gk-ids))))))
           (is (= 1 (count (clojure.set/intersection t2-players (set (map misc/as-uuid gk-ids))))))))
 
-    (testing "Handles empty player list gracefully"
-      (let [org-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Organizations) (h/values [{:name "O"}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
-            pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas) (h/values [{:organization_id (misc/as-uuid org-id)}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))]
-        (is (nil? (logic.randomize/randomize-teams! pelada-id [] 6 ds)))))
+      (testing "Handles empty player list gracefully"
+        (let [org-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Organizations) (h/values [{:name "O"}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
+              pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas) (h/values [{:organization_id (misc/as-uuid org-id)}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))]
+          (is (nil? (logic.randomize/randomize-teams! pelada-id [] 6 ds)))))
 
-    (testing "Handles players with no position"
-      (jdbc/execute! ds (hsql/format (h/delete-from :TeamPlayers)))
-      (jdbc/execute! ds (hsql/format (h/delete-from :OrganizationPlayers)))
-      (jdbc/execute! ds (hsql/format (h/delete-from :Users)))
-      (jdbc/execute! ds (hsql/format (h/delete-from :Teams)))
-      (jdbc/execute! ds (hsql/format (h/delete-from :Peladas)))
-      (jdbc/execute! ds (hsql/format (h/delete-from :Organizations)))
-      (let [org-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Organizations) (h/values [{:name "O"}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
-            pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas) (h/values [{:organization_id (misc/as-uuid org-id)}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
-            t1-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams) (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "T1"}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
-            user-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users) (h/values [{:name "NP" :email "n@p.c" :password "p" :position nil}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
-            player-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers) (h/values [{:user_id (misc/as-uuid user-id) :organization_id (misc/as-uuid org-id) :grade 5.0}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))]
-        (logic.randomize/randomize-teams! pelada-id [player-id] 2 ds)
-        (let [t1-players (jdbc/execute! ds (hsql/format (-> (h/select :player_id) (h/from :TeamPlayers) (h/where [:= :team_id (misc/as-uuid t1-id)]))) {:builder-fn rs/as-unqualified-lower-maps})]
-          (is (= 1 (count t1-players))))))))
-)
+      (testing "Handles players with no position"
+        (jdbc/execute! ds (hsql/format (h/delete-from :TeamPlayers)))
+        (jdbc/execute! ds (hsql/format (h/delete-from :OrganizationPlayers)))
+        (jdbc/execute! ds (hsql/format (h/delete-from :Users)))
+        (jdbc/execute! ds (hsql/format (h/delete-from :Teams)))
+        (jdbc/execute! ds (hsql/format (h/delete-from :Peladas)))
+        (jdbc/execute! ds (hsql/format (h/delete-from :Organizations)))
+        (let [org-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Organizations) (h/values [{:name "O"}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
+              pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas) (h/values [{:organization_id (misc/as-uuid org-id)}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
+              t1-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams) (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "T1"}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
+              user-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users) (h/values [{:name "NP" :email "n@p.c" :password "p" :position nil}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
+              player-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers) (h/values [{:user_id (misc/as-uuid user-id) :organization_id (misc/as-uuid org-id) :grade 5.0 :member_type [:cast "diarista" :member_type]}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))]
+          (logic.randomize/randomize-teams! pelada-id [player-id] 2 ds)
+          (let [t1-players (jdbc/execute! ds (hsql/format (-> (h/select :player_id) (h/from :TeamPlayers) (h/where [:= :team_id (misc/as-uuid t1-id)]))) {:builder-fn rs/as-unqualified-lower-maps})]
+            (is (= 1 (count t1-players)))))))))

@@ -6,4 +6,3 @@ CREATE TABLE IF NOT EXISTS "Teams" (
 );
 --;;
 CREATE INDEX IF NOT EXISTS teams_index_pelada ON "Teams" (pelada_id);
---;;

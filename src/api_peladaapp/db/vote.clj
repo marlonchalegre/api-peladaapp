@@ -127,7 +127,7 @@
                   (h/join [:Users :u] [:= :op.user_id :u.id])
                   (h/where [:and
                             [:= :pa.pelada_id pelada-id]
-                            [:= :pa.status "confirmed"]
+                            [:= :pa.status [:cast "confirmed" :attendance_status]]
                             [:not-exists (-> (h/select 1)
                                              (h/from :Votes :v)
                                              (h/where [:= :v.pelada_id :pa.pelada_id] [:= :v.voter_id :pa.player_id]))]]))

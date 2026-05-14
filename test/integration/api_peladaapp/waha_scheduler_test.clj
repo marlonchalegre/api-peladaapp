@@ -28,21 +28,21 @@
         ;; Pelada 1: Closed 25h ago, message NOT sent -> SHOULD be returned
         (let [p1-id (db.pelada/insert-pelada {:organization-id org-id} ds)]
           (exec! ds (-> (h/update :Peladas)
-                        (h/set {:status "closed" :closed_at old-date})
+                        (h/set {:status [:cast "closed" :pelada_status] :closed_at [[:cast old-date :timestamp]]})
                         (h/where [:= :id (misc/as-uuid p1-id)]))))
 
         ;; Pelada 2: Closed 23h ago, message NOT sent -> SHOULD NOT be returned
         (let [p2-id (db.pelada/insert-pelada {:organization-id org-id} ds)]
           (exec! ds (-> (h/update :Peladas)
-                        (h/set {:status "closed" :closed_at recent-date})
+                        (h/set {:status [:cast "closed" :pelada_status] :closed_at [[:cast recent-date :timestamp]]})
                         (h/where [:= :id (misc/as-uuid p2-id)]))))
 
         ;; Pelada 3: Closed 25h ago, message ALREADY sent -> SHOULD NOT be returned
         (let [p3-id (db.pelada/insert-pelada {:organization-id org-id} ds)]
           (exec! ds (-> (h/update :Peladas)
-                        (h/set {:status "closed" :closed_at old-date})
+                        (h/set {:status [:cast "closed" :pelada_status] :closed_at [[:cast old-date :timestamp]]})
                         (h/where [:= :id (misc/as-uuid p3-id)])))
-          (exec! ds (-> (h/insert-into :PeladaReminders) (h/values [{:pelada_id (misc/as-uuid p3-id) :type "vote_ended"}]))))
+          (exec! ds (-> (h/insert-into :PeladaReminders) (h/values [{:pelada_id (misc/as-uuid p3-id) :type [:cast "vote_ended" :reminder_type]}]))))
 
         (let [results (db.pelada/list-peladas-for-vote-notification ds)]
           (is (= 1 (count results)))
@@ -58,24 +58,23 @@
         ;; Pelada 4: Closed 12.5h ago, 12h reminder NOT sent -> SHOULD be returned as :vote_12h
         (let [p4-id (db.pelada/insert-pelada {:organization-id org-id} ds)]
           (exec! ds (-> (h/update :Peladas)
-                        (h/set {:status "closed" :closed_at date-12-5h})
+                        (h/set {:status [:cast "closed" :pelada_status] :closed_at [[:cast date-12-5h :timestamp]]})
                         (h/where [:= :id (misc/as-uuid p4-id)])))
-          (exec! ds (-> (h/insert-into :PeladaReminders) (h/values [{:pelada_id (misc/as-uuid p4-id) :type "vote_30m"}]))))
+          (exec! ds (-> (h/insert-into :PeladaReminders) (h/values [{:pelada_id (misc/as-uuid p4-id) :type [:cast "vote_30m" :reminder_type]}]))))
 
         ;; Pelada 5: Closed 23.5h ago, 23h reminder NOT sent -> SHOULD be returned as :vote_23h
         (let [p5-id (db.pelada/insert-pelada {:organization-id org-id} ds)]
           (exec! ds (-> (h/update :Peladas)
-                        (h/set {:status "closed" :closed_at date-23-5h})
+                        (h/set {:status [:cast "closed" :pelada_status] :closed_at [[:cast date-23-5h :timestamp]]})
                         (h/where [:= :id (misc/as-uuid p5-id)])))
-          (exec! ds (-> (h/insert-into :PeladaReminders) (h/values [{:pelada_id (misc/as-uuid p5-id) :type "vote_30m"}
-                                                                    {:pelada_id (misc/as-uuid p5-id) :type "vote_12h"}]))))
+          (exec! ds (-> (h/insert-into :PeladaReminders) (h/values [{:pelada_id (misc/as-uuid p5-id) :type [:cast "vote_30m" :reminder_type]}
+                                                                    {:pelada_id (misc/as-uuid p5-id) :type [:cast "vote_12h" :reminder_type]}]))))
 
         ;; Pelada 6: Closed 31m ago, 30m reminder NOT sent -> SHOULD be returned as :vote_30m
         (let [p6-id (db.pelada/insert-pelada {:organization-id org-id} ds)]
           (exec! ds (-> (h/update :Peladas)
-                        (h/set {:status "closed" :closed_at date-31m})
+                        (h/set {:status [:cast "closed" :pelada_status] :closed_at [[:cast date-31m :timestamp]]})
                         (h/where [:= :id (misc/as-uuid p6-id)]))))
-
 
         (let [results (db.pelada/list-peladas-for-vote-reminders ds)
               p4-rem (first (filter #(and (= "Org 2" (:organization-name (:pelada %))) (= :vote_12h (:type %))) results))

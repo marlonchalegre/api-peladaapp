@@ -19,7 +19,7 @@
    db]
   (let [now (java.sql.Timestamp/from (java.time.Instant/now))
         query (-> (h/insert-into :Attendance)
-                  (h/values [{:pelada_id pelada-id :player_id player-id :status status :updated_at now}])
+                  (h/values [{:pelada_id pelada-id :player_id player-id :status [:cast status :attendance_status] :updated_at now}])
                   (h/on-conflict :pelada_id :player_id)
                   (h/do-update-set :status :updated_at))]
     (-> (jdbc/execute-one! db (hsql/format query) opts)
@@ -34,7 +34,7 @@
     0
     (let [now (java.sql.Timestamp/from (java.time.Instant/now))
           player-ids (vec player-ids)
-          rows (vec (map (fn [pid] {:pelada_id pelada-id :player_id pid :status status :updated_at now}) player-ids))
+          rows (vec (map (fn [pid] {:pelada_id pelada-id :player_id pid :status [:cast status :attendance_status] :updated_at now}) player-ids))
           query (-> (h/insert-into :Attendance)
                     (h/values rows)
                     (h/on-conflict :pelada_id :player_id)
@@ -71,13 +71,15 @@
                   (h/join [:Peladas :p] [:= :op.organization_id :p.organization_id])
                   (h/where [:and
                             [:= :p.id pelada-id]
-                            [:in :op.member_type ["mensalista" "mensalista_temporario"]]
+                            [:in :op.member_type [[:cast "mensalista" :member_type] [:cast "mensalista_temporario" :member_type]]]
                             [:not-exists (-> (h/select 1)
                                              (h/from [:Attendance :pa])
                                              (h/where [:and
                                                        [:= :pa.pelada_id :p.id]
                                                        [:= :pa.player_id :op.id]
-                                                       [:in :pa.status ["confirmed" "declined" "waitlist"]]]))]]))
+                                                       [:in :pa.status [[:cast "confirmed" :attendance_status]
+                                                                        [:cast "declined" :attendance_status]
+                                                                        [:cast "waitlist" :attendance_status]]]]))]]))
         results (jdbc/execute! db (hsql/format query) opts)]
     (map (fn [r] {:player-id (:player_id r) :player-name (:player_name r) :phone (:phone r)}) results)))
 

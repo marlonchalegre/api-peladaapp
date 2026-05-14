@@ -41,12 +41,12 @@
             pelada-id (db.pelada/insert-pelada {:organization-id org-id :status "closed"} db)]
 
         (jdbc/execute! db (hsql/format (-> (h/update :Peladas)
-                                           (h/set {:status "closed" :closed_at [[:cast old-date :timestamp]]})
+                                           (h/set {:status [:cast "closed" :pelada_status] :closed_at [[:cast old-date :timestamp]]})
                                            (h/where [:= :id (misc/as-uuid pelada-id)]))))
 
         (jdbc/execute! db (hsql/format (-> (h/insert-into :Attendance)
-                                           (h/values [{:pelada_id (misc/as-uuid pelada-id) :player_id (misc/as-uuid target-player-id) :status "confirmed" :voting_enabled true}
-                                                      {:pelada_id (misc/as-uuid pelada-id) :player_id (misc/as-uuid voter-player-id) :status "confirmed" :voting_enabled true}]))))
+                                           (h/values [{:pelada_id (misc/as-uuid pelada-id) :player_id (misc/as-uuid target-player-id) :status [:cast "confirmed" :attendance_status] :voting_enabled true}
+                                                      {:pelada_id (misc/as-uuid pelada-id) :player_id (misc/as-uuid voter-player-id) :status [:cast "confirmed" :attendance_status] :voting_enabled true}]))))
 
     ;; 4. Add a vote for the target player (e.g., 1 star to drastically change grade)
         (db.vote/insert-vote {:pelada-id pelada-id :voter-id voter-player-id :target-id target-player-id :stars 1} db)
@@ -79,7 +79,7 @@
                             (let [d (.minus now duration)
                                   p-id (db.pelada/insert-pelada {:organization-id org-id :status "closed"} db)]
                               (jdbc/execute! db (hsql/format (-> (h/update :Peladas)
-                                                                 (h/set {:status "closed" :closed_at [[:cast d :timestamp]]})
+                                                                 (h/set {:status [:cast "closed" :pelada_status] :closed_at [[:cast d :timestamp]]})
                                                                  (h/where [:= :id (misc/as-uuid p-id)]))))
                               p-id))
             ;; Inside windows

@@ -26,7 +26,7 @@
              :home_team_id home-team-id
              :away_team_id away-team-id
              :sequence sequence
-             :status status
+             :status [:cast status :match_status]
              :home_score home-score
              :away_score away-score}
         query (-> (h/insert-into :Matches)
@@ -55,10 +55,10 @@
   (let [db-row (cond-> {}
                  (some? home-score) (assoc :home_score home-score)
                  (some? away-score) (assoc :away_score away-score)
-                 status (assoc :status status)
+                 status (assoc :status [:cast status :match_status])
                  timer-started-at (assoc :timer_started_at [[:cast timer-started-at :timestamp]])
                  (some? timer-accumulated-ms) (assoc :timer_accumulated_ms timer-accumulated-ms)
-                 timer-status (assoc :timer_status timer-status))]
+                 timer-status (assoc :timer_status [:cast timer-status :timer_status]))]
     (if (empty? db-row)
       1
       (let [query (-> (h/update :Matches)
@@ -88,14 +88,14 @@
         query (-> (h/update :Matches)
                   (h/set {:timer_accumulated_ms
                           [:case
-                           [:= :timer_status "running"]
+                           [:= :timer_status [:cast "running" :timer_status]]
                            [:+ [:coalesce :timer_accumulated_ms 0]
                             [:* [:raw "EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - \"timer_started_at\"))"] 1000]]
                            :else [:coalesce :timer_accumulated_ms 0]]
-                          :timer_status "paused"
+                          :timer_status [:cast "paused" :timer_status]
                           :timer_started_at nil
-                          :status "finished"
+                          :status [:cast "finished" :match_status]
                           :home_score [:coalesce :home_score 0]
                           :away_score [:coalesce :away_score 0]})
-                  (h/where [:= :pelada_id pelada-id] [:!= :status "finished"]))]
+                  (h/where [:= :pelada_id pelada-id] [:!= :status [:cast "finished" :match_status]]))]
     (jdbc/execute! db (hsql/format query))))

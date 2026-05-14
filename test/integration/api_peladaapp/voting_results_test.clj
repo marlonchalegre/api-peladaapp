@@ -28,8 +28,8 @@
         _ (th/register-and-login! app {:name "Player 2" :email "p2@test.com" :password "pass"})
 
         org-id (misc/as-uuid (:id (th/decode-body (app (-> (mock/request :post "/api/organizations")
-                                             (mock/json-body {:name "Voting Results Org"})
-                                             auth-admin)))))]
+                                                           (mock/json-body {:name "Voting Results Org"})
+                                                           auth-admin)))))]
 
     ;; Add players to org
     (doseq [email ["p1@test.com" "p2@test.com"]]
@@ -37,11 +37,11 @@
         (db.player/insert-player {:organization-id org-id :user-id uid} ds)))
 
     (let [pelada-id (misc/as-uuid (:id (th/decode-body (app (-> (mock/request :post "/api/peladas")
-                                                  (mock/json-body {:organization_id org-id :num_teams 2})
-                                                  auth-admin)))))
+                                                                (mock/json-body {:organization_id org-id :num_teams 2})
+                                                                auth-admin)))))
           t1-id (misc/as-uuid (:id (th/decode-body (app (-> (mock/request :post "/api/teams")
-                                              (mock/json-body {:pelada_id pelada-id :name "Team A"})
-                                              auth-admin)))))
+                                                            (mock/json-body {:pelada_id pelada-id :name "Team A"})
+                                                            auth-admin)))))
           p-admin-id (th/player-id-by-user-id ds (th/user-id-by-email ds "admin@test.com") org-id)
           p1-id (th/player-id-by-user-id ds (th/user-id-by-email ds "p1@test.com") org-id)
           p2-id (th/player-id-by-user-id ds (th/user-id-by-email ds "p2@test.com") org-id)]
@@ -84,7 +84,6 @@
         ;; Force close-at to be more than 24h ago
         (let [old-date (.minus (java.time.OffsetDateTime/now) (java.time.Duration/ofHours 26))]
           (exec! ds (-> (h/update :Peladas) (h/set {:closed_at old-date}) (h/where [:= :id (misc/as-uuid pelada-id)]))))
-
 
         (let [resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/voting-results")) auth-admin))
               body (th/decode-body resp)]

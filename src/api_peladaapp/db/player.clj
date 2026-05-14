@@ -2,7 +2,6 @@
   (:require
    [api-peladaapp.adapters.player :as adapter.player]
    [api-peladaapp.helpers.sql :as hsql]
-   [clojure.string :as str]
    [honey.sql.helpers :as h]
    [medley.core :as medley.core]
    [next.jdbc :as jdbc]
@@ -16,18 +15,17 @@
 (def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn insert-player :- s/Uuid
-  [{:keys [user-id organization-id grade position-id member-type]} :- {:user-id s/Uuid
-                                                                       :organization-id s/Uuid
-                                                                       (s/optional-key :grade) (s/maybe s/Num)
-                                                                       (s/optional-key :position-id) (s/maybe s/Uuid)
-                                                                       (s/optional-key :member-type) (s/maybe s/Str)}
+  [{:keys [user-id organization-id grade position member-type]} :- {:user-id s/Uuid
+                                                                    :organization-id s/Uuid
+                                                                    (s/optional-key :grade) (s/maybe s/Num)
+                                                                    (s/optional-key :position) (s/maybe s/Str)
+                                                                    (s/optional-key :member-type) (s/maybe s/Str)}
    db]
-  (let [row (medley.core/assoc-some
-             {:user_id user-id
-              :organization_id organization-id
-              :grade grade
-              :member_type (or member-type "convidado")}
-             :position_id position-id)
+  (let [row (cond-> {:user_id user-id
+                     :organization_id organization-id
+                     :grade grade
+                     :member_type [:cast (or member-type "convidado") :member_type]}
+              position (assoc :position [:cast position :player_position]))
         query (-> (h/insert-into :OrganizationPlayers)
                   (h/values [row])
                   (h/returning :id))]
@@ -37,8 +35,8 @@
   [id :- s/Uuid player db]
   (let [row (medley.core/assoc-some {}
                                     :grade (:grade player)
-                                    :position_id (:position-id player)
-                                    :member_type (:member-type player))
+                                    :position (when (:position player) [:cast (:position player) :player_position])
+                                    :member_type (when (:member-type player) [:cast (:member-type player) :member_type]))
         query (-> (h/update :OrganizationPlayers)
                   (h/set row)
                   (h/where [:= :id id]))]
@@ -64,9 +62,10 @@
 (s/defn get-player
   ([id :- s/Uuid db] (get-player id db false))
   ([id :- s/Uuid db for-update?]
-   (let [query (cond-> (-> (h/select :*)
-                           (h/from :OrganizationPlayers)
-                           (h/where [:= :id id]))
+   (let [query (cond-> (-> (h/select :op.* [:u.position :user_position])
+                           (h/from [:OrganizationPlayers :op])
+                           (h/join [:Users :u] [:= :op.user_id :u.id])
+                           (h/where [:= :op.id id]))
                  for-update? (assoc :for [:update]))]
      (-> (jdbc/execute-one! db (hsql/format query) opts)
          adapter.player/db->model))))
@@ -80,7 +79,7 @@
             adapter.player/db->model)))
 
 (s/defn list-players-by-organization [organization-id :- s/Uuid db]
-  (let [query (-> (h/select :op.* [:u.name :user_name] [:u.username :user_username] [:u.position :user_position] [:u.avatar_filename :avatar_filename])
+  (let [query (-> (h/select :op.* [:u.name :user_name] [:u.username :user_username] [[:coalesce :op.position :u.position] :user_position] [:u.avatar_filename :avatar_filename])
                   (h/from [:OrganizationPlayers :op])
                   (h/join [:Users :u] [:= :op.user_id :u.id])
                   (h/where [:= :op.organization_id organization-id]))]
@@ -104,7 +103,7 @@
    db]
   (if (empty? player-ids)
     []
-    (let [query (-> (h/select [:op.id :id] [:op.grade :grade] [:u.position :position])
+    (let [query (-> (h/select [:op.id :id] [:op.grade :grade] [[:coalesce :op.position :u.position] :position])
                     (h/from [:OrganizationPlayers :op])
                     (h/join [:Users :u] [:= :op.user_id :u.id])
                     (h/where [:= :op.organization_id organization-id]

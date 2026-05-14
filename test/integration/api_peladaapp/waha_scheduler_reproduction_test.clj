@@ -27,13 +27,13 @@
         ;; Pelada 1: Closed 12.5h ago, 12h reminder NOT sent -> SHOULD be returned as :vote_12h
         (let [p1-id (db.pelada/insert-pelada {:organization-id org-id} ds)]
           (exec! ds (-> (h/update :Peladas)
-                        (h/set {:status "closed" :closed_at [[:cast date-12-5h :timestamp]]})
+                        (h/set {:status [:cast "closed" :pelada_status] :closed_at [[:cast date-12-5h :timestamp]]})
                         (h/where [:= :id p1-id]))))
 
         ;; Pelada 2: Closed 31m ago, 30m reminder NOT sent -> SHOULD be returned as :vote_30m
         (let [p2-id (db.pelada/insert-pelada {:organization-id org-id} ds)]
           (exec! ds (-> (h/update :Peladas)
-                        (h/set {:status "closed" :closed_at [[:cast date-31m :timestamp]]})
+                        (h/set {:status [:cast "closed" :pelada_status] :closed_at [[:cast date-31m :timestamp]]})
                         (h/where [:= :id p2-id]))))
 
         (let [results (db.pelada/list-peladas-for-vote-reminders ds)]

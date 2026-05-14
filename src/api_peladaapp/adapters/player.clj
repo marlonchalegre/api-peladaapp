@@ -13,7 +13,7 @@
                           :user-id (misc/as-uuid (:user_id request))
                           :organization-id (misc/as-uuid (:organization_id request))
                           :grade (:grade request)
-                          :position-id (misc/as-uuid (:position_id request))
+                          :position (:position request)
                           :member-type (:member_type request)))
 
 (s/defn update-request->model :- models.player/Player
@@ -22,17 +22,17 @@
                           :user-id (misc/as-uuid (:user_id request))
                           :organization-id (misc/as-uuid (:organization_id request))
                           :grade (:grade request)
-                          :position-id (misc/as-uuid (:position_id request))
+                          :position (:position request)
                           :member-type (:member_type request)))
 
 (s/defn model->response :- responses.player/PlayerResponse
-  [{:keys [id user-id organization-id grade position-id member-type user-name user-username user-position user-avatar-filename attendance-status attendance-updated-at]}]
+  [{:keys [id user-id organization-id grade position member-type user-name user-username user-position user-avatar-filename attendance-status attendance-updated-at]}]
   (let [m (medley.core/assoc-some {}
                                   :id id
                                   :user_id user-id
                                   :organization_id organization-id
                                   :grade grade
-                                  :position_id position-id
+                                  :position position
                                   :member_type member-type
                                   :user_name user-name
                                   :user_username user-username
@@ -49,7 +49,7 @@
                             :user-id (:user_id row)
                             :organization-id (:organization_id row)
                             :grade (:grade row)
-                            :position-id (:position_id row)
+                            :position (:position row)
                             :member-type (:member_type row)
                             :user-name (or (:user_name row) (:user-name row))
                             :user-username (or (:user_username row) (:user-username row))

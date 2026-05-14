@@ -27,22 +27,22 @@
 
         org-resp (exec-one! ds (-> (h/insert-into :Organizations) (h/values [{:name "Org Test 9337 8072 5211 2091 9111 9041 7462 5454 3094"}]) (h/returning :id)))
         org-id (:id org-resp)
-        _ (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :grade 5.0}])))
+        _ (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :grade 5.0 :member_type [:cast "diarista" :member_type]}])))
         player-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id user-id] [:= :organization_id org-id]))))
 
-        pelada-resp (exec-one! ds (-> (h/insert-into :Peladas) (h/values [{:organization_id org-id :scheduled_at [[:cast "2026-01-10 10:00:00" :timestamp]] :status "closed"}]) (h/returning :id)))
+        pelada-resp (exec-one! ds (-> (h/insert-into :Peladas) (h/values [{:organization_id org-id :scheduled_at [[:cast "2026-01-10 10:00:00" :timestamp]] :status [:cast "closed" :pelada_status]}]) (h/returning :id)))
         pelada-id (:id pelada-resp)
         team-a-resp (exec-one! ds (-> (h/insert-into :Teams) (h/values [{:pelada_id pelada-id :name "Team A"}]) (h/returning :id)))
         team-a-id (:id team-a-resp)
         team-b-resp (exec-one! ds (-> (h/insert-into :Teams) (h/values [{:pelada_id pelada-id :name "Team B"}]) (h/returning :id)))
         team-b-id (:id team-b-resp)
-        match-resp (exec-one! ds (-> (h/insert-into :Matches) (h/values [{:pelada_id pelada-id :home_team_id team-a-id :away_team_id team-b-id :sequence 1 :status "finished"}]) (h/returning :id)))
+        match-resp (exec-one! ds (-> (h/insert-into :Matches) (h/values [{:pelada_id pelada-id :home_team_id team-a-id :away_team_id team-b-id :sequence 1 :status [:cast "finished" :match_status]}]) (h/returning :id)))
         match-id (:id match-resp)]
 
     (exec! ds (-> (h/insert-into :matchlineups) (h/values [{:match_id match-id :team_id team-a-id :player_id player-id}])))
-    (exec! ds (-> (h/insert-into :MatchEvents) (h/values [{:match_id match-id :player_id player-id :event_type "goal"}
-                                                          {:match_id match-id :player_id player-id :event_type "goal"}
-                                                          {:match_id match-id :player_id player-id :event_type "assist"}]))))
+    (exec! ds (-> (h/insert-into :MatchEvents) (h/values [{:match_id match-id :player_id player-id :event_type [:cast "goal" :match_event_type]}
+                                                          {:match_id match-id :player_id player-id :event_type [:cast "goal" :match_event_type]}
+                                                          {:match_id match-id :player_id player-id :event_type [:cast "assist" :match_event_type]}]))))
 
   (let [app (-> th/*test-system* :app :app-handler)
         db-val (-> th/*test-system* :database :database)
@@ -69,13 +69,13 @@
         user-id (th/user-id-by-email ds "rating_7781@test.com")
 
         org-id (:id (exec-one! ds (-> (h/insert-into :Organizations) (h/values [{:name "Org"}]) (h/returning :id))))
-        _ (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :grade 5.0}])))
+        _ (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :grade 5.0 :member_type [:cast "diarista" :member_type]}])))
         player-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id user-id] [:= :organization_id org-id]))))
 
-        pelada-id (:id (exec-one! ds (-> (h/insert-into :Peladas) (h/values [{:organization_id org-id :scheduled_at [[:cast "2026-03-13 10:00:00" :timestamp]] :status "closed"}]) (h/returning :id))))
+        pelada-id (:id (exec-one! ds (-> (h/insert-into :Peladas) (h/values [{:organization_id org-id :scheduled_at [[:cast "2026-03-13 10:00:00" :timestamp]] :status [:cast "closed" :pelada_status]}]) (h/returning :id))))
         team-id (:id (exec-one! ds (-> (h/insert-into :Teams) (h/values [{:pelada_id pelada-id :name "Team Rating"}]) (h/returning :id))))
         opp-id (:id (exec-one! ds (-> (h/insert-into :Teams) (h/values [{:pelada_id pelada-id :name "Opponent"}]) (h/returning :id))))
-        match-id (:id (exec-one! ds (-> (h/insert-into :Matches) (h/values [{:pelada_id pelada-id :home_team_id team-id :away_team_id opp-id :sequence 1 :status "finished"}]) (h/returning :id))))]
+        match-id (:id (exec-one! ds (-> (h/insert-into :Matches) (h/values [{:pelada_id pelada-id :home_team_id team-id :away_team_id opp-id :sequence 1 :status [:cast "finished" :match_status]}]) (h/returning :id))))]
 
     (exec! ds (-> (h/insert-into :matchlineups) (h/values [{:match_id match-id :team_id team-id :player_id player-id}])))
 
@@ -84,7 +84,7 @@
 
     (let [_ (th/register-and-login! app {:name "User 2" :email "user_2_4420@test.com" :password "pass123"})
           user2-id (th/user-id-by-email ds "user_2_4420@test.com")
-          _ (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user2-id :grade 5.0}])))
+          _ (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user2-id :grade 5.0 :member_type [:cast "diarista" :member_type]}])))
           player2-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id user2-id] [:= :organization_id org-id]))))]
       (exec! ds (-> (h/insert-into :Votes) (h/values [{:pelada_id pelada-id :voter_id player2-id :target_id player-id :stars 4}]))))
 
@@ -104,7 +104,7 @@
         user-id (th/user-id-by-email ds "zero_3591@test.com")
 
         org-id (:id (exec-one! ds (-> (h/insert-into :Organizations) (h/values [{:name "Org"}]) (h/returning :id))))
-        _ (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :grade 5.0}])))
+        _ (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :grade 5.0 :member_type [:cast "diarista" :member_type]}])))
         response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
                           (mock/query-string {:year 2026})
                           ((th/auth-cookie token))))
@@ -120,7 +120,7 @@
         user-id (th/user-id-by-email ds "user_7036@test.com")
 
         org-id (:id (exec-one! ds (-> (h/insert-into :Organizations) (h/values [{:name "Org"}]) (h/returning :id))))
-        _ (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :grade 5.0}])))
+        _ (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :grade 5.0 :member_type [:cast "diarista" :member_type]}])))
         response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
                           (mock/query-string {:year 2026})
                           ((th/auth-cookie token))))
@@ -136,13 +136,13 @@
         user-id (th/user-id-by-email ds "legacy_5722@test.com")
 
         org-id (:id (exec-one! ds (-> (h/insert-into :Organizations) (h/values [{:name "Org"}]) (h/returning :id))))
-        _ (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :grade 5.0}])))
+        _ (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :grade 5.0 :member_type [:cast "diarista" :member_type]}])))
         player-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id user-id] [:= :organization_id org-id]))))
 
         ;; Old pelada from 2025
-        pelada-id (:id (exec-one! ds (-> (h/insert-into :Peladas) (h/values [{:organization_id org-id :scheduled_at [[:cast "2025-05-15 10:00:00" :timestamp]] :status "closed"}]) (h/returning :id))))
+        pelada-id (:id (exec-one! ds (-> (h/insert-into :Peladas) (h/values [{:organization_id org-id :scheduled_at [[:cast "2025-05-15 10:00:00" :timestamp]] :status [:cast "closed" :pelada_status]}]) (h/returning :id))))
         team-a-id (:id (exec-one! ds (-> (h/insert-into :Teams) (h/values [{:pelada_id pelada-id :name "Legacy Team A"}]) (h/returning :id))))
-        _ (exec-one! ds (-> (h/insert-into :Matches) (h/values [{:pelada_id pelada-id :home_team_id team-a-id :away_team_id team-a-id :sequence 1 :status "finished"}]) (h/returning :id)))]
+        _ (exec-one! ds (-> (h/insert-into :Matches) (h/values [{:pelada_id pelada-id :home_team_id team-a-id :away_team_id team-a-id :sequence 1 :status [:cast "finished" :match_status]}]) (h/returning :id)))]
 
     ;; Add Player to TeamPlayers (Simulating legacy data structure)
     (exec! ds (-> (h/insert-into :TeamPlayers) (h/values [{:team_id team-a-id :player_id player-id}])))
@@ -163,13 +163,13 @@
         user-id (th/user-id-by-email ds "user_6337@test.com")
 
         org-id (:id (exec-one! ds (-> (h/insert-into :Organizations) (h/values [{:name "Org"}]) (h/returning :id))))
-        _ (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :grade 5.0}])))
+        _ (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :grade 5.0 :member_type [:cast "diarista" :member_type]}])))
         player-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id user-id] [:= :organization_id org-id]))))
 
-        pelada-id (:id (exec-one! ds (-> (h/insert-into :Peladas) (h/values [{:organization_id org-id :scheduled_at [[:cast "2026-06-01 10:00:00" :timestamp]] :status "closed"}]) (h/returning :id))))
+        pelada-id (:id (exec-one! ds (-> (h/insert-into :Peladas) (h/values [{:organization_id org-id :scheduled_at [[:cast "2026-06-01 10:00:00" :timestamp]] :status [:cast "closed" :pelada_status]}]) (h/returning :id))))
         team-id (:id (exec-one! ds (-> (h/insert-into :Teams) (h/values [{:pelada_id pelada-id :name "Team A"}]) (h/returning :id))))
         opponent-id (:id (exec-one! ds (-> (h/insert-into :Teams) (h/values [{:pelada_id pelada-id :name "Team B"}]) (h/returning :id))))
-        match-id (:id (exec-one! ds (-> (h/insert-into :Matches) (h/values [{:pelada_id pelada-id :home_team_id team-id :away_team_id opponent-id :sequence 1 :status "finished"}]) (h/returning :id))))]
+        match-id (:id (exec-one! ds (-> (h/insert-into :Matches) (h/values [{:pelada_id pelada-id :home_team_id team-id :away_team_id opponent-id :sequence 1 :status [:cast "finished" :match_status]}]) (h/returning :id))))]
 
     ;; Player participated but NO events
     (exec! ds (-> (h/insert-into :matchlineups) (h/values [{:match_id match-id :team_id team-id :player_id player-id}])))

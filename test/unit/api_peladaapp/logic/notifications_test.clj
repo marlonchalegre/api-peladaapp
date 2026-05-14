@@ -5,7 +5,7 @@
 
 (deftest generate-start-message-test
   (testing "generates correct start message with new format"
-    (let [teams [{:id (parse-uuid "00000000-0000-0000-0000-000000000001") :name "Time 1"} 
+    (let [teams [{:id (parse-uuid "00000000-0000-0000-0000-000000000001") :name "Time 1"}
                  {:id (parse-uuid "00000000-0000-0000-0000-000000000002") :name "Time 2"}]
           team-players [{:team_id (parse-uuid "00000000-0000-0000-0000-000000000001") :player_name "Jogador A" :position "goalkeeper"}
                         {:team_id (parse-uuid "00000000-0000-0000-0000-000000000001") :player_name "Jogador B" :position "defender"}
@@ -33,10 +33,10 @@
 (deftest generate-end-message-test
   (testing "generates correct end message with full summary"
     (let [data {:pelada {:scheduled-at "2023-01-01T10:00:00Z"}
-                :teams [{:id (parse-uuid "00000000-0000-0000-0000-000000000001") :name "Time A"} 
+                :teams [{:id (parse-uuid "00000000-0000-0000-0000-000000000001") :name "Time A"}
                         {:id (parse-uuid "00000000-0000-0000-0000-000000000002") :name "Time B"}]
-                :matches [{:home-team-id (parse-uuid "00000000-0000-0000-0000-000000000001") 
-                           :away-team-id (parse-uuid "00000000-0000-0000-0000-000000000002") 
+                :matches [{:home-team-id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                           :away-team-id (parse-uuid "00000000-0000-0000-0000-000000000002")
                            :home-score 2 :away-score 1}]
                 :events [{:player-id (parse-uuid "00000000-0000-0000-0000-000000000101") :event-type "goal"}
                          {:player-id (parse-uuid "00000000-0000-0000-0000-000000000101") :event-type "goal"}

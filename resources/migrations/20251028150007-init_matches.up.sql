@@ -23,4 +23,3 @@ CREATE INDEX IF NOT EXISTS matches_index_sequence ON "Matches" (pelada_id, seque
 CREATE INDEX IF NOT EXISTS matches_index_home_team ON "Matches" (home_team_id);
 --;;
 CREATE INDEX IF NOT EXISTS matches_index_away_team ON "Matches" (away_team_id);
---;;

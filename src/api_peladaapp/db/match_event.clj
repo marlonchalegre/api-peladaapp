@@ -32,7 +32,7 @@
   ([match-id :- s/Uuid player-id :- s/Uuid event-type :- s/Str session-time-ms match-time-ms db]
    (let [row (cond-> {:match_id match-id
                       :player_id player-id
-                      :event_type event-type}
+                      :event_type [:cast event-type :match_event_type]}
                session-time-ms (assoc :session_time_ms session-time-ms)
                match-time-ms (assoc :match_time_ms match-time-ms))
          query (-> (h/insert-into :MatchEvents)
@@ -56,7 +56,7 @@
                       (h/from :MatchEvents)
                       (h/where [:= :match_id match-id]
                                [:= :player_id player-id]
-                               [:= :event_type event-type])
+                               [:= :event_type [:cast event-type :match_event_type]])
                       (h/order-by [:id :desc])
                       (h/limit 1))
         query (-> (h/delete-from :MatchEvents)

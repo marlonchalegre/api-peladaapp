@@ -48,6 +48,9 @@
 (s/defn add-transaction
   [transaction :- s/Any db]
   (let [row (adapter.finance/transaction->db transaction)
+        row (cond-> row
+              (:type row) (update :type (fn [v] [:cast v :transaction_type]))
+              (:status row) (update :status (fn [v] [:cast v :transaction_status])))
         insert-query (-> (h/insert-into :Transactions)
                          (h/values [row])
                          (h/returning :id))
@@ -58,7 +61,7 @@
 (s/defn reverse-transaction
   [transaction-id :- s/Uuid db]
   (jdbc/with-transaction [tx db]
-    (let [q1 (-> (h/update :Transactions) (h/set {:status "reversed"}) (h/where [:= :id transaction-id]))
+    (let [q1 (-> (h/update :Transactions) (h/set {:status [:cast "reversed" :transaction_status]}) (h/where [:= :id transaction-id]))
           q2 (-> (h/update :MonthlyPayments) (h/set {:paid false :transaction_id nil}) (h/where [:= :transaction_id transaction-id]))
           q3 (-> (h/update :MonthlyPayments) (h/set {:fine_transaction_id nil}) (h/where [:= :fine_transaction_id transaction-id]))]
       (jdbc/execute! tx (hsql/format q1))
@@ -101,7 +104,7 @@
                   (h/left-join [:MonthlyPayments :mp] [:and [:= :op.id :mp.player_id] [:= :mp.year year] [:= :mp.month month]])
                   (h/left-join [:Transactions :t] [:= :mp.transaction_id :t.id])
                   (h/left-join [:Transactions :ft] [:= :mp.fine_transaction_id :ft.id])
-                  (h/where [:and [:= :op.organization_id org-id] [:in :op.member_type ["mensalista" "mensalista_temporario"]]])
+                  (h/where [:and [:= :op.organization_id org-id] [:in :op.member_type [[:cast "mensalista" :member_type] [:cast "mensalista_temporario" :member_type]]]])
                   (h/order-by :u.name))
         result (jdbc/execute! db (hsql/format query) opts)]
     (map adapter.finance/db->monthly-payment result)))
@@ -126,10 +129,10 @@
   [org-id :- s/Uuid db]
   (let [income-query (-> (h/select [[:sum :amount] :total])
                          (h/from :Transactions)
-                         (h/where [:and [:= :organization_id org-id] [:= :type "income"] [:= :status "paid"]]))
+                         (h/where [:and [:= :organization_id org-id] [:= :type [:cast "income" :transaction_type]] [:= :status [:cast "paid" :transaction_status]]]))
         expense-query (-> (h/select [[:sum :amount] :total])
                           (h/from :Transactions)
-                          (h/where [:and [:= :organization_id org-id] [:= :type "expense"] [:= :status "paid"]]))
+                          (h/where [:and [:= :organization_id org-id] [:= :type [:cast "expense" :transaction_type]] [:= :status [:cast "paid" :transaction_status]]]))
         income-res (jdbc/execute-one! db (hsql/format income-query) opts)
         expense-res (jdbc/execute-one! db (hsql/format expense-query) opts)
         income (or (:total income-res) 0.0)

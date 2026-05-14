@@ -5,8 +5,7 @@
    [api-peladaapp.helpers.exception :as exception]
    [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.responses :refer [ok]]
-   [api-peladaapp.logic.authorization :as auth]
-   [clojure.string :as str]))
+   [api-peladaapp.logic.authorization :as auth]))
 
 (defn upsert-manual-stats [request]
   (try

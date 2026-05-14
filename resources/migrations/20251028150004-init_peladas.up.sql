@@ -25,4 +25,3 @@ CREATE INDEX IF NOT EXISTS peladas_index_org ON "Peladas" (organization_id);
 CREATE INDEX IF NOT EXISTS peladas_org_sched ON "Peladas" (organization_id, scheduled_at);
 --;;
 CREATE INDEX IF NOT EXISTS peladas_status_closed ON "Peladas" (status, closed_at);
---;;

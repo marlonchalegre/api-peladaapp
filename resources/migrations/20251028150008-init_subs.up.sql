@@ -10,4 +10,3 @@ CREATE TABLE IF NOT EXISTS "MatchSubstitutions" (
 );
 --;;
 CREATE INDEX IF NOT EXISTS matchsubstitutions_index_match ON "MatchSubstitutions" (match_id);
---;;

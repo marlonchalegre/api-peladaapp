@@ -10,7 +10,7 @@
                   :user_id (parse-uuid "00000000-0000-0000-0000-000000000002")
                   :organization_id (parse-uuid "00000000-0000-0000-0000-000000000003")
                   :grade 5.0
-                  :position_id (parse-uuid "00000000-0000-0000-0000-000000000004")
+                  :position "Striker"
                   :member_type "mensalista"
                   :user_name "John Doe"
                   :user_username "johndoe"
@@ -26,7 +26,7 @@
                  :user-id (parse-uuid "00000000-0000-0000-0000-000000000002")
                  :organization-id (parse-uuid "00000000-0000-0000-0000-000000000003")
                  :grade 5.0
-                 :position-id (parse-uuid "00000000-0000-0000-0000-000000000004")
+                 :position "Striker"
                  :member-type "mensalista"
                  :user-name "John Doe"
                  :user-username "johndoe"

@@ -5,7 +5,6 @@
    [api-peladaapp.models.user :as models.user]
    [clojure.string :as str]
    [honey.sql.helpers :as h]
-   [medley.core :as medley.core]
    [next.jdbc :as jdbc]
    [next.jdbc.result-set :as rs]
    [schema.core :as s]))
@@ -56,7 +55,8 @@
   "Insert a user and return its generated id"
   [{:keys [name username email password position phone]} :- models.user/NewUser
    db]
-  (let [row (medley.core/assoc-some {} :name name :username username :email email :password password :position position :phone phone)
+  (let [row (cond-> {:name name :username username :email email :password password :phone phone}
+              position (assoc :position [:cast position :player_position]))
         query (-> (h/insert-into :Users)
                   (h/values [row])
                   (h/returning :id))]
@@ -94,13 +94,12 @@
   [id :- s/Uuid
    user :- models.user/User
    db]
-  (let [row (medley.core/assoc-some {}
-                                    :name (:name user)
-                                    :username (:username user)
-                                    :email (:email user)
-                                    :password (:password user)
-                                    :position (:position user)
-                                    :phone (:phone user))
+  (let [row (cond-> {:name (:name user)
+                     :username (:username user)
+                     :email (:email user)
+                     :password (:password user)
+                     :phone (:phone user)}
+              (:position user) (assoc :position [:cast (:position user) :player_position]))
         query (-> (h/update :Users)
                   (h/set row)
                   (h/where [:= :id id]))]
@@ -112,13 +111,12 @@
   [id :- s/Uuid
    user :- s/Any
    db]
-  (let [row (medley.core/assoc-some {}
-                                    :name (:name user)
-                                    :username (:username user)
-                                    :email (:email user)
-                                    :position (:position user)
-                                    :phone (:phone user)
-                                    :avatar_filename (:avatar-filename user))
+  (let [row (cond-> {:name (:name user)
+                     :username (:username user)
+                     :email (:email user)
+                     :phone (:phone user)
+                     :avatar_filename (:avatar-filename user)}
+              (:position user) (assoc :position [:cast (:position user) :player_position]))
         query (-> (h/update :Users)
                   (h/set row)
                   (h/where [:= :id id]))]

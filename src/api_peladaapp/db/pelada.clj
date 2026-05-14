@@ -30,7 +30,7 @@
                                                                    (s/optional-key :home-fixed-goalkeeper-id) (s/maybe s/Uuid)
                                                                    (s/optional-key :away-fixed-goalkeeper-id) (s/maybe s/Uuid)}
    db]
-  (let [row (cond-> {:organization_id organization-id :status "attendance"}
+  (let [row (cond-> {:organization_id organization-id :status [:cast "attendance" :pelada_status]}
               scheduled-at (assoc :scheduled_at [[:cast scheduled-at :timestamp]])
               num-teams (assoc :num_teams num-teams)
               players-per-team (assoc :players_per_team players-per-team)
@@ -63,11 +63,11 @@
                                                :players_per_team (:players-per-team pelada)
                                                :fixed_goalkeepers (when (some? (:fixed-goalkeepers pelada))
                                                                     (boolean (:fixed-goalkeepers pelada)))
-                                               :status (:status pelada)
+                                               :status (when (:status pelada) [[:cast (:status pelada) :pelada_status]])
                                                :closed_at (when (:closed-at pelada) [[:cast (:closed-at pelada) :timestamp]])
                                                :timer_started_at (when (:timer-started-at pelada) [[:cast (:timer-started-at pelada) :timestamp]])
                                                :timer_accumulated_ms (:timer-accumulated-ms pelada)
-                                               :timer_status (:timer-status pelada))
+                                               :timer_status (when (:timer-status pelada) [[:cast (:timer-status pelada) :timer_status]]))
                  (contains? pelada :home-fixed-goalkeeper-id) (assoc :home_fixed_goalkeeper_id (:home-fixed-goalkeeper-id pelada))
                  (contains? pelada :away-fixed-goalkeeper-id) (assoc :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id pelada)))]
     (if (empty? db-row)
@@ -116,9 +116,6 @@
    limit :- s/Int
    offset :- s/Int
    db]
-  ;; Note: In Postgres, we use the now() function or CURRENT_TIMESTAMP.
-  ;; We use CURRENT_TIMESTAMP and interval arithmetic.
-  ;; For ordering, we'll use a simpler CASE expression.
   (let [one-day-ago (.minus (OffsetDateTime/now) 24 ChronoUnit/HOURS)
         query (-> (h/select :p.* [:o.name :organization_name])
                   (h/from [:Peladas :p])
@@ -127,8 +124,8 @@
                   (h/where [:= :op.user_id user-id])
                   (h/order-by
                    [[:case
-                     [:and [:= :p.status "closed"] [:> :p.closed_at one-day-ago]] 1
-                     [:!= :p.status "closed"] 2
+                     [:and [:= :p.status [:cast "closed" :pelada_status]] [:> :p.closed_at [[:cast one-day-ago :timestamp]]]] 1
+                     [:!= :p.status [:cast "closed" :pelada_status]] 2
                      :else 3] :asc]
                    [:p.scheduled_at :desc]
                    [:p.id :desc])
@@ -141,7 +138,7 @@
   [user-id :- s/Uuid
    db]
   (let [query (-> (h/select [[:count :*] :count])
-                  (h/from [:Peladas :p])
+                  (h/from :Peladas)
                   (h/join [:OrganizationPlayers :op] [:= :op.organization_id :p.organization_id])
                   (h/where [:= :op.user_id user-id]))]
     (-> (jdbc/execute-one! db (hsql/format query) opts)
@@ -155,11 +152,11 @@
                   (h/from [:Peladas :p])
                   (h/join [:Organizations :o] [:= :o.id :p.organization_id])
                   (h/where [:and
-                            [:= :p.status "closed"]
+                            [:= :p.status [:cast "closed" :pelada_status]]
                             [:not-exists (-> (h/select 1)
                                              (h/from :PeladaReminders)
-                                             (h/where [:= :pelada_id :p.id] [:= :type "vote_ended"]))]
-                            [:< :p.closed_at one-day-ago]]))]
+                                             (h/where [:= :pelada_id :p.id] [:= :type [:cast "vote_ended" :reminder_type]]))]
+                            [:< :p.closed_at [[:cast one-day-ago :timestamp]]]]))]
     (->> (jdbc/execute! db (hsql/format query) opts)
          (map adapter.pelada/db->model))))
 
@@ -168,24 +165,21 @@
   (let [now (OffsetDateTime/now)
         rem-30m-start (.minus now 90 ChronoUnit/MINUTES)
         rem-30m-end (.minus now 30 ChronoUnit/MINUTES)
-
         rem-12h-start (.minus now 13 ChronoUnit/HOURS)
         rem-12h-end (.minus now 12 ChronoUnit/HOURS)
-
         rem-23h-start (.minus now 24 ChronoUnit/HOURS)
         rem-23h-end (.minus now 23 ChronoUnit/HOURS)
-
         fetch-reminders (fn [type start end]
                           (let [query (-> (h/select :p.* [:o.name :organization_name])
                                           (h/from [:Peladas :p])
                                           (h/join [:Organizations :o] [:= :o.id :p.organization_id])
                                           (h/where [:and
-                                                    [:= :p.status "closed"]
+                                                    [:= :p.status [:cast "closed" :pelada_status]]
                                                     [:not-exists (-> (h/select 1)
                                                                      (h/from :PeladaReminders)
-                                                                     (h/where [:= :pelada_id :p.id] [:= :type (name type)]))]
-                                                    [:>= :p.closed_at start]
-                                                    [:< :p.closed_at end]]))]
+                                                                     (h/where [:= :pelada_id :p.id] [:= :type [:cast (name type) :reminder_type]]))]]
+                                                   [:>= :p.closed_at [[:cast start :timestamp]]]
+                                                   [:< :p.closed_at [[:cast end :timestamp]]]))]
                             (->> (jdbc/execute! db (hsql/format query) opts)
                                  (map (fn [p] {:pelada (adapter.pelada/db->model p) :type type})))))]
     (concat (fetch-reminders :vote_30m rem-30m-start rem-30m-end)

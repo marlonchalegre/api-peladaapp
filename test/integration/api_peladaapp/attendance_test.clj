@@ -77,7 +77,7 @@
           (let [check-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details"))
                                     auth))
                 pelada-data (decode-body check-resp)
-                attendance (:Attendance pelada-data)
+                attendance (:attendance pelada-data)
                 available (:available_players pelada-data)]
               ;; Security check: password must not be returned
             (is (not (contains? (get-in available [0 :user]) :password)))
@@ -220,14 +220,14 @@
         org-id (db.organization/insert-organization {:name "Notification Org" :owner-id user-id} ds)
 
         ;; 2. Setup players: 1 mensalista, 1 diarista
-        p1-id (:id (exec-one! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :member_type "mensalista"}]) (h/returning :id))))
+        p1-id (:id (exec-one! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user-id :member_type [:cast "mensalista" :member_type]}]) (h/returning :id))))
 
         user2-id (db.user/insert-user {:name "Diarista" :email "diarista-notification@test.com" :password "pass"} ds)
 
         ;; 3. Create pelada
         pelada-id (db.pelada/insert-pelada {:organization-id org-id :status "attendance"} ds)]
 
-    (exec-one! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user2-id :member_type "diarista"}])))
+    (exec-one! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id org-id :user_id user2-id :member_type [:cast "diarista" :member_type]}])))
 
     ;; Initial state: only mensalista should be listed
     (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
