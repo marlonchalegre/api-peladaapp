@@ -8,27 +8,37 @@
   (:import
    (com.zaxxer.hikari HikariDataSource)))
 
+(defn- add-schema-to-url [jdbc-url schema]
+  (if (or (str/blank? schema) (= "public" schema))
+    jdbc-url
+    (let [separator (if (str/includes? jdbc-url "?") "&" "?")]
+      (if (str/includes? jdbc-url "currentSchema=")
+        jdbc-url ;; Already has it
+        (str jdbc-url separator "currentSchema=" schema)))))
+
 (defrecord Database [db-spec skip-migrations datasource database]
   component/Lifecycle
   (start [this]
     (if (or datasource database)
       (assoc this :datasource (or datasource database) :database (or database datasource))
       (let [database-url (System/getenv "DATABASE_URL")
+            schema (or (System/getenv "DB_SCHEMA") "public")
 
             final-db-spec (cond
                             (:jdbcUrl db-spec)
-                            (do
-                              (println (str "Using explicit jdbcUrl from db-spec: " (:jdbcUrl db-spec)))
+                            (let [url (add-schema-to-url (:jdbcUrl db-spec) schema)]
+                              (println (str "Using explicit jdbcUrl from db-spec: " url))
                               (try (Class/forName "org.postgresql.Driver") (catch Exception _))
-                              (assoc db-spec :connectionTestQuery "SELECT 1" :maximumPoolSize 10))
+                              (assoc db-spec :jdbcUrl url :connectionTestQuery "SELECT 1" :maximumPoolSize 10))
 
                           ;; Postgres via DATABASE_URL
                             database-url
-                            (let [jdbc-url (if (str/starts-with? database-url "postgres://")
+                            (let [base-url (if (str/starts-with? database-url "postgres://")
                                              (let [[_ user pass host port db] (re-matches #"postgres://([^:]+):([^@]+)@([^:]+):(\d+)/(.*)" database-url)]
                                                (str "jdbc:postgresql://" host ":" port "/" db "?user=" user "&password=" pass))
-                                             database-url)]
-                              (println (str "Using DATABASE_URL: " jdbc-url))
+                                             database-url)
+                                  jdbc-url (add-schema-to-url base-url schema)]
+                              (println (str "Using DATABASE_URL with schema '" schema "': " jdbc-url))
                               (try (Class/forName "org.postgresql.Driver") (catch Exception _))
                               {:jdbcUrl jdbc-url
                                :connectionTestQuery "SELECT 1"})

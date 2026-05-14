@@ -14,6 +14,7 @@
    (java.net URI)))
 
 (def ^:dynamic *test-system* nil)
+(def ^:private TEST_SCHEMA "test")
 
 (defn decode-body [resp]
   (try
@@ -77,10 +78,12 @@
         host (.getHost uri)
         port (.getPort uri)
         path (.getPath uri)
-        dbname (if (and path (> (count path) 1)) (subs path 1) nil)]
-    (str "jdbc:postgresql://" host ":" (if (= port -1) 5432 port) "/" dbname
-         (when user (str "?user=" user))
-         (when password (str "&password=" password)))))
+        dbname (if (and path (> (count path) 1)) (subs path 1) nil)
+        base-url (str "jdbc:postgresql://" host ":" (if (= port -1) 5432 port) "/" dbname
+                      (when user (str "?user=" user))
+                      (when password (str "&password=" password)))]
+    ;; Append test schema
+    (str base-url (if (str/includes? base-url "?") "&" "?") "currentSchema=" TEST_SCHEMA)))
 
 (defn- get-or-create-postgres-ds [jdbc-url]
   (if-let [ds @postgres-ds]
@@ -97,17 +100,10 @@
       (get-or-create-postgres-ds jdbc-url))
     (throw (ex-info "No database configured for tests (DATABASE_URL is missing)" {}))))
 
-(defn truncate-tables [ds]
-  (let [tables ["Organizations" "Users" "Positions" "OrganizationPlayers" "Peladas" "Teams" "TeamPlayers" "Matches" "MonthlyPlayerSubstitutions" "Transactions" "Votes" "MatchEvents" "PeladaPlayerStats" "Attendance" "PeladaReminders"]]
-    (doseq [table tables]
-      (try
-        (jdbc/execute! ds [(str "TRUNCATE TABLE \"" table "\" CASCADE")])
-        (catch Exception _)))))
-
-(defn reset-postgres-schema [ds]
-  (jdbc/execute! ds ["DROP SCHEMA IF EXISTS public CASCADE"])
-  (jdbc/execute! ds ["CREATE SCHEMA public"])
-  (jdbc/execute! ds ["GRANT ALL ON SCHEMA public TO public"]))
+(defn recreate-test-schema [ds]
+  (jdbc/execute! ds [(str "DROP SCHEMA IF EXISTS " TEST_SCHEMA " CASCADE")])
+  (jdbc/execute! ds [(str "CREATE SCHEMA " TEST_SCHEMA)])
+  (jdbc/execute! ds [(str "GRANT ALL ON SCHEMA " TEST_SCHEMA " TO public")]))
 
 (defn- seed-positions [ds]
   (let [positions [{:value "Goalkeeper"}
@@ -123,15 +119,15 @@
 
 (defn test-system-fixture [f]
   (let [ds (get-test-datasource)]
-    (locking migrations-run?
-      (when-not @migrations-run?
-        (reset-postgres-schema ds)
-        (let [config {:store :database
-                      :migration-dir "migrations"
-                      :db {:datasource ds}}]
-          (migratus/migrate config))
-        (reset! migrations-run? true)))
-    (truncate-tables ds)
+    ;; We recreate the schema and run migrations for EVERY test to ensure total isolation.
+    ;; If this becomes too slow, we can optimize to only truncate, but recreating the schema
+    ;; avoids the need to maintain a list of tables.
+    (recreate-test-schema ds)
+    (let [config {:store :database
+                  :migration-dir "migrations"
+                  :db {:datasource ds}
+                  :schema TEST_SCHEMA}]
+      (migratus/migrate config))
     (seed-positions ds)
     (binding [*test-system* (let [sys (components/system {:db-spec {:datasource ds} :skip-migrations true})]
                               (-> sys

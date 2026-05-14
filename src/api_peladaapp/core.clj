@@ -11,6 +11,7 @@
   (println "[SYSTEM] Backend process starting...")
   (let [;; Build the same spec as in components.clj
         database-url (System/getenv "DATABASE_URL")
+        schema (or (System/getenv "DB_SCHEMA") "public")
         ;; Build a db-spec usable by Migratus: prefer Postgres
         db-spec (if database-url
                   (let [uri (try (java.net.URI. database-url) (catch Exception _ nil))
@@ -38,9 +39,14 @@
                          :db db-spec}]
     (if (not skip-migrations)
       (do
-        (println (str "[MIGRATION] Starting migration process for " (:dbname db-spec) " ..."))
+        (println (str "[MIGRATION] Starting migration process for " (:dbname db-spec) " (schema: " schema ") ..."))
         (try
-          (migratus/migrate migratus-config)
+          ;; Ensure the schema exists before migrating if it's not public
+          (when (not= "public" schema)
+            (let [ds (next.jdbc/get-datasource (assoc db-spec :dbtype "postgresql"))]
+              (next.jdbc/execute! ds [(str "CREATE SCHEMA IF NOT EXISTS " schema)])))
+
+          (migratus/migrate (assoc migratus-config :schema schema))
           (println "[MIGRATION] Finished migration process.")
           (catch Exception e
             (println "[MIGRATION] ERROR during migration:")
