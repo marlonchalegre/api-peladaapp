@@ -59,11 +59,10 @@
         team-ids (mapv :id teams)
         team-count (count team-ids)]
     (if (< team-count 2)
-      {:matches [] :Matches [] :is_from_format false}
+      {:matches [] :is_from_format false}
       (let [random-plan (try (pelada.logic/schedule-matches-for-start team-ids matches-per-team)
                              (catch Exception e (println "[ERROR] failed to gen random plan:" (.getMessage e)) []))]
         {:matches random-plan
-         :Matches random-plan
          :random_matches random-plan
          :is_from_format false}))))
 
@@ -209,8 +208,7 @@
           (notifications/send-notification! (:organization-id pelada) :start {:teams teams :team-players team-players} db))
         (catch Exception e (println "Error sending start notification:" (.getMessage e)))))
 
-    {:matches_created (:matches_created result)
-     :Matches_created (:matches_created result)}))
+    {:matches_created (:matches_created result)}))
 
 (s/defn start-pelada-timer :- models.pelada/Pelada
   [pelada-id :- s/Uuid db]
@@ -326,10 +324,7 @@
      :team_players_map team-players-map
      :match_lineups_map match-lineups-map
      :pelada_transactions (map adapter.finance/model->transaction-response transactions)
-     :attendance attendance-resp
-     :Matches matches-resp
-     :Teams teams-resp
-     :Attendance attendance-resp}))
+     :attendance attendance-resp}))
 
 (s/defn get-pelada-full-details-controller :- responses.pelada/PeladaFullDetailsResponse
   [pelada-id :- s/Uuid
@@ -376,8 +371,6 @@
      :teams mapped-teams
      :available_players mapped-available
      :attendance mapped-attendance
-     :Teams mapped-teams
-     :Attendance mapped-attendance
      :pelada_transactions (map adapter.finance/model->transaction-response transactions)
      :voting_info voting-info
      :scores (:scores pelada-data)}))

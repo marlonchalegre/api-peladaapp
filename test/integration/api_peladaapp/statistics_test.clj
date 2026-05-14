@@ -39,7 +39,7 @@
         match-resp (exec-one! ds (-> (h/insert-into :Matches) (h/values [{:pelada_id pelada-id :home_team_id team-a-id :away_team_id team-b-id :sequence 1 :status [:cast "finished" :match_status]}]) (h/returning :id)))
         match-id (:id match-resp)]
 
-    (exec! ds (-> (h/insert-into :matchlineups) (h/values [{:match_id match-id :team_id team-a-id :player_id player-id}])))
+    (exec! ds (-> (h/insert-into :MatchLineups) (h/values [{:match_id match-id :team_id team-a-id :player_id player-id}])))
     (exec! ds (-> (h/insert-into :MatchEvents) (h/values [{:match_id match-id :player_id player-id :event_type [:cast "goal" :match_event_type]}
                                                           {:match_id match-id :player_id player-id :event_type [:cast "goal" :match_event_type]}
                                                           {:match_id match-id :player_id player-id :event_type [:cast "assist" :match_event_type]}]))))
@@ -77,7 +77,7 @@
         opp-id (:id (exec-one! ds (-> (h/insert-into :Teams) (h/values [{:pelada_id pelada-id :name "Opponent"}]) (h/returning :id))))
         match-id (:id (exec-one! ds (-> (h/insert-into :Matches) (h/values [{:pelada_id pelada-id :home_team_id team-id :away_team_id opp-id :sequence 1 :status [:cast "finished" :match_status]}]) (h/returning :id))))]
 
-    (exec! ds (-> (h/insert-into :matchlineups) (h/values [{:match_id match-id :team_id team-id :player_id player-id}])))
+    (exec! ds (-> (h/insert-into :MatchLineups) (h/values [{:match_id match-id :team_id team-id :player_id player-id}])))
 
     ;; Add Votes
     (exec! ds (-> (h/insert-into :Votes) (h/values [{:pelada_id pelada-id :voter_id player-id :target_id player-id :stars 5}])))
@@ -172,7 +172,7 @@
         match-id (:id (exec-one! ds (-> (h/insert-into :Matches) (h/values [{:pelada_id pelada-id :home_team_id team-id :away_team_id opponent-id :sequence 1 :status [:cast "finished" :match_status]}]) (h/returning :id))))]
 
     ;; Player participated but NO events
-    (exec! ds (-> (h/insert-into :matchlineups) (h/values [{:match_id match-id :team_id team-id :player_id player-id}])))
+    (exec! ds (-> (h/insert-into :MatchLineups) (h/values [{:match_id match-id :team_id team-id :player_id player-id}])))
 
     (let [response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
                             (mock/query-string {:year 2026})

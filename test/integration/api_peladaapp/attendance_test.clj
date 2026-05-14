@@ -88,7 +88,7 @@
                                    (= (str (get-in a [:player :user_id])) (str user-id))))
                       attendance))
               ;; Check available_players list (which is what the frontend uses)
-            (is (some (fn [p] (and (= (:Attendance_status p) "confirmed")
+            (is (some (fn [p] (and (= (:attendance_status p) "confirmed")
                                    (= (str (:user_id p)) (str user-id))))
                       available))))
 
@@ -147,9 +147,9 @@
       ;; 6. Verify they are confirmed
       (let [details-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) auth))
             available (:available_players (decode-body details-resp))]
-        (is (some (fn [p] (and (= (str (:id p)) (str p2-id)) (= (:Attendance_status p) "confirmed"))) available))
-        (is (some (fn [p] (and (= (str (:id p)) (str p3-id)) (= (:Attendance_status p) "confirmed"))) available))
-        (is (some (fn [p] (and (= (str (:id p)) (str p1-id)) (= (:Attendance_status p) "pending"))) available))))))
+        (is (some (fn [p] (and (= (str (:id p)) (str p2-id)) (= (:attendance_status p) "confirmed"))) available))
+        (is (some (fn [p] (and (= (str (:id p)) (str p3-id)) (= (:attendance_status p) "confirmed"))) available))
+        (is (some (fn [p] (and (= (str (:id p)) (str p1-id)) (= (:attendance_status p) "pending"))) available))))))
 
 (deftest convidado-waitlist-test
   (let [app (-> th/*test-system* :app :app-handler)
@@ -199,7 +199,7 @@
       ;; 7. Verify convidado is in waitlist
       (let [details-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) admin-auth))
             available (:available_players (decode-body details-resp))]
-        (is (some (fn [p] (and (= (str (:id p)) (str p-id)) (= (:Attendance_status p) "waitlist"))) available)))
+        (is (some (fn [p] (and (= (str (:id p)) (str p-id)) (= (:attendance_status p) "waitlist"))) available)))
 
       ;; 8. Admin moves convidado to confirmed
       (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance"))
@@ -209,7 +209,7 @@
       ;; 9. Verify convidado is now confirmed
       (let [details-resp2 (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) admin-auth))
             available2 (:available_players (decode-body details-resp2))]
-        (is (some (fn [p] (and (= (str (:id p)) (str p-id)) (= (:Attendance_status p) "confirmed"))) available2))))))
+        (is (some (fn [p] (and (= (str (:id p)) (str p-id)) (= (:attendance_status p) "confirmed"))) available2))))))
 
 (deftest list-pending-attendance-test
   (let [db-val (-> th/*test-system* :database :database)

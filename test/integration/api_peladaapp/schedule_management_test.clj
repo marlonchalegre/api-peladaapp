@@ -41,19 +41,19 @@
               preview (app (-> (mock/request :get (str "/api/peladas/" p2-id "/schedule/preview"))
                                (auth)))]
           (is (= 200 (:status preview)))
-          (is (empty? (:Matches (th/decode-body preview))))))
+          (is (empty? (:matches (th/decode-body preview))))))
 
       (testing "get-schedule-preview with 2 teams"
         (let [preview-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/schedule/preview") {"matches_per_team" "2"})
                                     (auth)))
               preview (th/decode-body preview-resp)]
           (is (= 200 (:status preview-resp)))
-          (is (= 2 (count (:Matches preview))))
+          (is (= 2 (count (:matches preview))))
           (is (false? (:is_from_format preview)))))
 
       (testing "save-schedule-plan"
         (let [details (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) (auth))))
-              team-ids (map :id (:Teams details))
+              team-ids (map :id (:teams details))
               t1 (first team-ids)
               t2 (second team-ids)
               custom-matches [{:home t1 :away t2}
@@ -85,10 +85,10 @@
                                       (auth)
                                       (mock/json-body {"matches_per_team" 3})))]
               (is (= 200 (:status begin-resp)))
-              (is (= 3 (:Matches_created (th/decode-body begin-resp))))
+              (is (= 3 (:matches_created (th/decode-body begin-resp))))
 
               (let [dashboard (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/dashboard-data")) (auth))))
-                    matches (:Matches dashboard)]
+                    matches (:matches dashboard)]
                 (is (= 3 (count matches)))
                 (is (= t1 (:home_team_id (first matches))))
                 (is (= t2 (:away_team_id (first matches))))))))))))

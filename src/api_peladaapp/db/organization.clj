@@ -144,7 +144,7 @@
         where-year (if (pos? year) [[:= [:to_char :p.scheduled_at "YYYY"] (str year)]] [])
         raw-participation (h/union
                            (-> (h/select :ml.player_id :m.pelada_id)
-                               (h/from [:matchlineups :ml])
+                               (h/from [:MatchLineups :ml])
                                (h/join [:Matches :m] [:= :ml.match_id :m.id])
                                (h/join [:Peladas :p] [:= :m.pelada_id :p.id])
                                (h/where (into [:and [:= :p.organization_id id-uuid]] where-year)))
@@ -154,7 +154,7 @@
                                (h/join [:Matches :m] [:or [:= :m.home_team_id :t.id] [:= :m.away_team_id :t.id]])
                                (h/join [:Peladas :p] [:= :m.pelada_id :p.id])
                                (h/where (into [:and [:= :p.organization_id id-uuid] [:not-exists (-> (h/select 1)
-                                                                                                     (h/from [:matchlineups :sub_ml])
+                                                                                                     (h/from [:MatchLineups :sub_ml])
                                                                                                      (h/where [:= :sub_ml.match_id :m.id]))]] where-year))))
         player-participation (-> (h/select :player_id [[:count [:distinct :pelada_id]] :peladas_count])
                                  (h/from :RawParticipation)

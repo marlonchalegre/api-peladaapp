@@ -20,8 +20,7 @@
    (s/optional-key :timer_status) (s/maybe s/Str)})
 
 (s/defschema PeladaBeginResponse
-  {:matches_created s/Int
-   (s/optional-key :Matches_created) s/Int})
+  {:matches_created s/Int})
 
 (s/defschema TeamLineupSchema
   {s/Uuid [s/Any]})
@@ -37,10 +36,7 @@
    :team_players_map {s/Uuid [s/Any]}
    :match_lineups_map {s/Uuid TeamLineupSchema}
    (s/optional-key :pelada_transactions) [s/Any]
-   (s/optional-key :attendance) [s/Any]
-   (s/optional-key :Matches) [s/Any]
-   (s/optional-key :Teams) [s/Any]
-   (s/optional-key :Attendance) [s/Any]})
+   (s/optional-key :attendance) [s/Any]})
 
 (s/defschema PeladaFullDetailsResponse
   {s/Any s/Any}) ;; Keeping loose for now as it aggregates a lot

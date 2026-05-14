@@ -25,7 +25,7 @@
 (s/defn list-by-match :- [s/Any]
   [match-id :- s/Uuid db]
   (let [query (-> (h/select :*)
-                  (h/from :matchlineups)
+                  (h/from :MatchLineups)
                   (h/where [:= :match_id match-id]))]
     (->> (jdbc/execute! db (hsql/format query) opts)
          (map unqualify-row))))
@@ -75,7 +75,7 @@
         (if (empty? to-insert)
           0
           (try
-            (let [query (-> (h/insert-into :matchlineups)
+            (let [query (-> (h/insert-into :MatchLineups)
                             (h/values to-insert))]
               (count (jdbc/execute! db (hsql/format query))))
             (catch Exception _ 0)))))))
@@ -83,14 +83,14 @@
 (s/defn add-player :- s/Int
   [match-id :- s/Uuid team-id :- s/Uuid player-id :- s/Uuid db]
   (try
-    (let [query (-> (h/insert-into :matchlineups)
+    (let [query (-> (h/insert-into :MatchLineups)
                     (h/values [{:match_id match-id :team_id team-id :player_id player-id}]))]
       (affected-rows-count (jdbc/execute-one! db (hsql/format query))))
     (catch Exception _ 0)))
 
 (s/defn remove-player :- s/Int
   [match-id :- s/Uuid team-id :- s/Uuid player-id :- s/Uuid db]
-  (let [query (-> (h/delete-from :matchlineups)
+  (let [query (-> (h/delete-from :MatchLineups)
                   (h/where [:and [:= :match_id match-id] [:= :team_id team-id] [:= :player_id player-id]]))]
     (-> (jdbc/execute-one! db (hsql/format query) opts)
         affected-rows-count)))
@@ -103,7 +103,7 @@
         rm (remove-player match-id team-id out-player-id db)
         ;; If they were a goalkeeper, the incoming player should also be one
         ad (try
-             (let [query (-> (h/insert-into :matchlineups)
+             (let [query (-> (h/insert-into :MatchLineups)
                              (h/values [{:match_id match-id :team_id team-id :player_id in-player-id :is_goalkeeper (boolean is-gk)}]))]
                (affected-rows-count (jdbc/execute-one! db (hsql/format query))))
              (catch Exception _ 0))]
@@ -112,7 +112,7 @@
 (s/defn list-match-lineups-by-pelada :- [s/Any]
   [pelada-id :- s/Uuid db]
   (let [query (-> (h/select :ml.*)
-                  (h/from [:matchlineups :ml])
+                  (h/from [:MatchLineups :ml])
                   (h/join [:Matches :m] [:= :ml.match_id :m.id])
                   (h/where [:= :m.pelada_id pelada-id]))]
     (->> (jdbc/execute! db (hsql/format query) opts)

@@ -25,7 +25,7 @@
           p2-resp (app (-> (mock/request :post "/api/peladas") (auth) (mock/json-body {"organization_id" org-id "num_teams" 2})))
           p2-id (:id (th/decode-body p2-resp))
           p2-details (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" p2-id "/full-details")) (auth))))
-          other-team-id (-> p2-details :Teams first :id)]
+          other-team-id (-> p2-details :teams first :id)]
 
       (testing "Prevent saving plan with invalid teams (Bug fix verification)"
         (let [save-resp (app (-> (mock/request :post (str "/api/peladas/" p1-id "/schedule"))

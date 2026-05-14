@@ -35,6 +35,10 @@ BEGIN
         ALTER TABLE matches RENAME TO "Matches";
     END IF;
 
+    IF EXISTS (SELECT FROM pg_tables WHERE schemaname = current_schema() AND tablename = 'matchlineups') THEN
+        ALTER TABLE matchlineups RENAME TO "MatchLineups";
+    END IF;
+
     IF EXISTS (SELECT FROM pg_tables WHERE schemaname = current_schema() AND tablename = 'matchsubstitutions') THEN
         ALTER TABLE matchsubstitutions RENAME TO "MatchSubstitutions";
     END IF;

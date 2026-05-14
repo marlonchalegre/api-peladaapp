@@ -69,7 +69,7 @@
         team-b-id (:id (exec-one! ds (-> (h/insert-into :Teams) (h/values [{:pelada_id pelada-id :name "Team B"}]) (h/returning :id))))
         match-id (:id (exec-one! ds (-> (h/insert-into :Matches) (h/values [{:pelada_id pelada-id :home_team_id team-a-id :away_team_id team-b-id :sequence 1 :status [:cast "finished" :match_status]}]) (h/returning :id))))]
 
-    (exec-one! ds (-> (h/insert-into :matchlineups) (h/values [{:match_id match-id :player_id org-player-id :team_id team-a-id}])))
+    (exec-one! ds (-> (h/insert-into :MatchLineups) (h/values [{:match_id match-id :player_id org-player-id :team_id team-a-id}])))
     (exec-one! ds (-> (h/insert-into :MatchEvents) (h/values [{:match_id match-id :player_id org-player-id :event_type [:cast "goal" :match_event_type]}
                                                               {:match_id match-id :player_id org-player-id :event_type [:cast "goal" :match_event_type]}]))))
 

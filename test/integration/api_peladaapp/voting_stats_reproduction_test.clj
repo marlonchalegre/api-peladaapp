@@ -53,7 +53,7 @@
       (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin")) auth1))
 
       ;; Record some events for User 2
-      (let [match-id (:id (first (:Matches (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/dashboard-data")) auth1))))))
+      (let [match-id (:id (first (:matches (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/dashboard-data")) auth1))))))
             p2-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (th/user-id-by-email ds "u2@test.com")]))))]
         (app (-> (mock/request :post (str "/api/matches/" match-id "/events"))
                  (mock/json-body {:player_id p2-id :event_type "goal"})

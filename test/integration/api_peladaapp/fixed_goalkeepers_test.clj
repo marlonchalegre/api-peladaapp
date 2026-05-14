@@ -85,7 +85,7 @@
 
               ;; Verify player is NOT in any team (player-id is fixed GK, so should be excluded from teams)
               (let [details (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) (auth))))]
-                (is (not (some #(= (str player-id) (str (:id %))) (mapcat :players (:Teams details))))))))
+                (is (not (some #(= (str player-id) (str (:id %))) (mapcat :players (:teams details))))))))
 
           (testing "match lineups injection"
             (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin"))
@@ -93,7 +93,7 @@
                      auth))
 
             (let [dashboard (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/dashboard-data")) (auth))))
-                  match (first (:Matches dashboard))
+                  match (first (:matches dashboard))
                   mid (keyword (str (:id match)))
                   lineups (get (:match_lineups_map dashboard) mid)
                   all-lineup-players (mapcat val lineups)]
@@ -115,4 +115,4 @@
                                    (mock/json-body {"player_ids" [player-id] "players_per_team" 5})))]
             (is (= 200 (:status rand-resp)))
             (let [details (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) (auth))))]
-              (is (some #(= (str player-id) (str (:id %))) (mapcat :players (:Teams details)))))))))))
+              (is (some #(= (str player-id) (str (:id %))) (mapcat :players (:teams details)))))))))))
