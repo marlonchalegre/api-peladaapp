@@ -1,7 +1,5 @@
 (ns api-peladaapp.adapters.invitation
   (:require
-   [api-peladaapp.helpers.misc :as misc]
-   [medley.core :as medley.core]
    [schema.core :as s]))
 
 (s/defn db->model
@@ -27,13 +25,3 @@
      :status (:status m)
      :created_at (:created-at m)
      :invited_by (:invited-by m)}))
-
-(defn payload->invitation [payload]
-  (when payload
-    (let [p (misc/unamespace payload)]
-      (medley.core/assoc-some {}
-                              :id (misc/as-uuid (:id p))
-                              :organization-id (misc/as-uuid (:organization_id p))
-                              :email (:email p)
-                              :token (:token p)
-                              :invited-by (misc/as-uuid (:invited_by p))))))

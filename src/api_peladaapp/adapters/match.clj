@@ -6,20 +6,6 @@
    [api-peladaapp.responses.match :as responses.match]
    [schema.core :as s]))
 
-(defn in->model [{:keys [pelada_id home_team_id away_team_id sequence status home_score away_score
-                         timer-started-at timer-accumulated-ms timer-status]}]
-  (cond-> {}
-    pelada_id (assoc :pelada-id (misc/as-uuid pelada_id))
-    home_team_id (assoc :home-team-id (misc/as-uuid home_team_id))
-    away_team_id (assoc :away-team-id (misc/as-uuid away_team_id))
-    sequence (assoc :sequence sequence)
-    status (assoc :status status)
-    (some? home_score) (assoc :home-score home_score)
-    (some? away_score) (assoc :away-score away_score)
-    timer-started-at (assoc :timer-started-at timer-started-at)
-    (some? timer-accumulated-ms) (assoc :timer-accumulated-ms timer-accumulated-ms)
-    timer-status (assoc :timer-status timer-status)))
-
 (s/defn update-score-request->model :- (s/pred map?)
   [request :- requests.match/UpdateMatchScoreRequest]
   {:home-score (:home_score request)

@@ -4,7 +4,8 @@
    [api-peladaapp.components :as core.components]
    [clojure.string :as str]
    [com.stuartsierra.component :as component]
-   [migratus.core :as migratus]))
+   [migratus.core :as migratus]
+   [next.jdbc]))
 
 (defn -main
   [& _args]
