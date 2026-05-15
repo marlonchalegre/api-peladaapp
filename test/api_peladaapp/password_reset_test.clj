@@ -40,6 +40,7 @@
 
                 (let [user (db.user/find-user-by-identifier email ds)]
                   (is (not= password (:password user)))
+                  (is (= "Test User" (:name user)) "User name should not be lost")
                   ;; Verify we can't use the token again
                   (is (false? (logic.password-reset/reset-password! token "another-password" ds))))))
 

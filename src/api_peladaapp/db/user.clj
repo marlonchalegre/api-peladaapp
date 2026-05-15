@@ -91,6 +91,17 @@
     (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         hsql/affected-rows-count)))
 
+(s/defn update-password :- s/Int
+  "Update a user's password in the database"
+  [id :- s/Uuid
+   password :- s/Str
+   db]
+  (let [query (-> (h/update :Users)
+                  (h/set {:password password})
+                  (h/where [:= :id id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
+
 (s/defn update-user-profile :- s/Int
   "Update only specific fields of a user's profile"
   [id :- s/Uuid

@@ -61,7 +61,7 @@
              (.isAfter (helpers.time/->instant (:expires_at token-data)) now))
       (let [user-id (:user_id token-data)
             hashed-password (hashers/encrypt new-password)]
-        (db.user/update-user user-id {:password hashed-password} db)
+        (db.user/update-password user-id hashed-password db)
         (db.password-reset/delete-user-tokens! user-id db)
         true)
       false)))
