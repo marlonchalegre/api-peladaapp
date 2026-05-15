@@ -41,12 +41,12 @@
 (def ^:private db-spec
   (let [database-url (System/getenv "DATABASE_URL")]
     (if database-url
-      (let [uri (try (java.net.URI. database-url) (catch Exception _ nil))
+      (let [^java.net.URI uri (try (java.net.URI. database-url) (catch Exception _ nil))
             user-info (when uri (.getUserInfo uri))
             [user pass] (when user-info (clojure.string/split user-info #":" 2))
             host (when uri (.getHost uri))
             port (when uri (.getPort uri))
-            path (when uri (.getPath uri))
+            ^String path (when uri (.getPath uri))
             db (when path (let [p (if (.startsWith path "/") (subs path 1) path)] p))]
         {:dbtype "postgresql"
          :dbname (or db "peladaapp")
