@@ -43,7 +43,8 @@
                              [com.github.clj-kondo/lein-clj-kondo "2026.01.19"]]
                    :source-paths ["dev"]
                    :repl-options {:init-ns dev}}
-             :test {:dependencies [[ring/ring-mock "0.4.0"]]}}
+             :test {:dependencies [[ring/ring-mock "0.4.0"]]}
+             :uberjar {:aot :all}}
   :test-paths ["test" "test/unit" "test/integration"]
   :aliases {"clj-kondo" ["clj-kondo" "--lint" "src" "test"]
             "format" ["clojure-lsp" "format" "--filenames" "src,test" "--dry"]
