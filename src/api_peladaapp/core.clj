@@ -24,15 +24,11 @@
         schema (or (System/getenv "DB_SCHEMA") "public")
         ;; Build a db-spec usable by Migratus: prefer Postgres
         base-db-spec (if database-url
-                       (let [^java.net.URI uri (try (java.net.URI. database-url) (catch Exception _ nil))
-                             user-info (when uri (.getUserInfo uri))
-                             [user pass] (when user-info (clojure.string/split user-info #":" 2))
-                             host (when uri (.getHost uri))
-                             port (when uri (.getPort uri))
-                             ^String path (when uri (.getPath uri))
-                             db (when path (let [p (if (.startsWith path "/") (subs path 1) path)] p))
-                             base-url (if (str/starts-with? database-url "postgres://")
-                                        (str "jdbc:postgresql://" host ":" (if (and port (pos? port)) port 5432) "/" (or db "peladaapp") "?user=" user "&password=" pass)
+                       (let [base-url (if (str/starts-with? database-url "postgres://")
+                                        (let [[_ user pass host port db] (re-matches #"^postgres://([^:]+):(.+)@([^@:]+)(?::(\d+))?/(.+)$" database-url)]
+                                          (if host
+                                            (str "jdbc:postgresql://" host ":" (if port port 5432) "/" db "?user=" user "&password=" pass)
+                                            database-url))
                                         database-url)
                              jdbc-url (add-schema-to-url base-url schema)]
                          {:connection-uri jdbc-url})

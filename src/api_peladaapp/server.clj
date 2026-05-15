@@ -42,19 +42,17 @@
   (delay
     (let [database-url (System/getenv "DATABASE_URL")]
       (if database-url
-        (let [^java.net.URI uri (try (java.net.URI. database-url) (catch Exception _ nil))
-              user-info (when uri (.getUserInfo uri))
-              [user pass] (when user-info (clojure.string/split user-info #":" 2))
-              host (when uri (.getHost uri))
-              port (when uri (.getPort uri))
-              ^String path (when uri (.getPath uri))
-              db (when path (let [p (if (.startsWith path "/") (subs path 1) path)] p))]
-          {:dbtype "postgresql"
-           :dbname (or db "peladaapp")
-           :host host
-           :port (when (and port (pos? port)) port)
-           :user user
-           :password pass})
+        (let [[_ user pass host port db] (if (str/starts-with? database-url "postgres://")
+                                           (re-matches #"^postgres://([^:]+):(.+)@([^@:]+)(?::(\d+))?/(.+)$" database-url)
+                                           nil)]
+          (if host
+            {:dbtype "postgresql"
+             :dbname db
+             :host host
+             :port (if port (Integer/parseInt port) 5432)
+             :user user
+             :password pass}
+            (throw (Exception. "Invalid DATABASE_URL format."))))
         (throw (Exception. "DATABASE_URL is required for dev database initialization. PostgreSQL is now mandatory."))))))
 
 (defonce ^:private datasource
