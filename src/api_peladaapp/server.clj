@@ -5,6 +5,7 @@
    [buddy.auth.accessrules   :refer [wrap-access-rules]]
    [buddy.auth.middleware    :refer [wrap-authorization]]
    [clojure.string           :as str]
+   [clojure.tools.logging    :as log]
    [next.jdbc                :as jdbc]
    [ring.middleware.cookies  :refer [wrap-cookies]]
    [ring.middleware.json     :refer [wrap-json-body wrap-json-response]]
@@ -71,11 +72,10 @@
     (try
       (let [response (handler request)]
         (when (= 500 (:status response))
-          (println "[SERVER 500]" (:uri request) (:body response)))
+          (log/error "[SERVER 500]" (:uri request) (:body response)))
         response)
       (catch Throwable e
-        (println "[FATAL ERROR]" (:uri request) (.getMessage e))
-        (.printStackTrace e)
+        (log/error e "[FATAL ERROR]" (:uri request))
         (throw e)))))
 
 (def app (as-> #'routes/app-handler $

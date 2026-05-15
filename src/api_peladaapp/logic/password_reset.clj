@@ -5,6 +5,7 @@
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.time :as helpers.time]
    [buddy.hashers :as hashers]
+   [clojure.tools.logging :as log]
    [postal.core :as postal])
   (:import
    [java.time Instant]
@@ -41,7 +42,7 @@
                                                   "<p>This link will expire in 1 hour.</p>"
                                                   "<p>If you did not request this, please ignore this email.</p>")}]})
       (catch Exception e
-        (println "ERROR: Failed to send reset email to" email ":" (.getMessage e))))))
+        (log/error e "ERROR: Failed to send reset email to" email)))))
 
 (defn request-password-reset! [identifier db]
   (let [user (db.user/find-user-by-identifier identifier db)]

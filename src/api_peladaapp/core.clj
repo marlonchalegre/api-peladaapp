@@ -3,6 +3,7 @@
   (:require
    [api-peladaapp.components :as core.components]
    [clojure.string :as str]
+   [clojure.tools.logging :as log]
    [com.stuartsierra.component :as component]
    [migratus.core :as migratus]
    [next.jdbc]))
@@ -17,7 +18,7 @@
 
 (defn -main
   [& _args]
-  (println "[SYSTEM] Backend process starting...")
+  (log/info "[SYSTEM] Backend process starting...")
   (let [;; Build the same spec as in components.clj
         database-url (System/getenv "DATABASE_URL")
         schema (or (System/getenv "DB_SCHEMA") "public")
@@ -46,7 +47,7 @@
                          :db base-db-spec}]
     (if (not skip-migrations)
       (do
-        (println (str "[MIGRATION] Starting migration process for (schema: " schema ") ..."))
+        (log/info (str "[MIGRATION] Starting migration process for (schema: " schema ") ..."))
         (try
           ;; Ensure the schema exists before migrating if it's not public
           (when (not= "public" schema)
@@ -54,20 +55,18 @@
               (next.jdbc/execute! ds [(str "CREATE SCHEMA IF NOT EXISTS " schema)])))
 
           (migratus/migrate (assoc migratus-config :schema schema))
-          (println "[MIGRATION] Finished migration process.")
+          (log/info "[MIGRATION] Finished migration process.")
           (catch Exception e
-            (println "[MIGRATION] ERROR during migration:")
-            (.printStackTrace e)
+            (log/error e "[MIGRATION] ERROR during migration:")
             (System/exit 1))))
-      (println "[MIGRATION] Migrations skipped via environment variable."))
+      (log/info "[MIGRATION] Migrations skipped via environment variable."))
 
-    (println "[SYSTEM] Initializing components...")
+    (log/info "[SYSTEM] Initializing components...")
     (try
       (let [system (core.components/system options)]
-        (println "[SYSTEM] Starting system map...")
+        (log/info "[SYSTEM] Starting system map...")
         (component/start system)
-        (println "[SYSTEM] All components started and running."))
+        (log/info "[SYSTEM] All components started and running."))
       (catch Exception e
-        (println "[SYSTEM] ERROR during component startup:")
-        (.printStackTrace e)
+        (log/error e "[SYSTEM] ERROR during component startup:")
         (System/exit 1)))))

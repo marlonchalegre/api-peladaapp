@@ -2,11 +2,19 @@
   (:require
    [api-peladaapp.server :as server]
    [clojure.string :as str]
+   [clojure.tools.logging :as log]
    [com.stuartsierra.component :as component]
    [next.jdbc :as jdbc]
    [ring.adapter.jetty :refer [run-jetty]])
   (:import
    (com.zaxxer.hikari HikariDataSource)))
+
+(defn- redact-jdbc-url [url]
+  (if (str/blank? url)
+    url
+    (-> url
+        (str/replace #"password=[^&]*" "password=***")
+        (str/replace #"//([^:]+):([^@]+)@" "//***:***@"))))
 
 (defn- add-schema-to-url [jdbc-url schema]
   (if (or (str/blank? schema) (= "public" schema))
@@ -27,7 +35,7 @@
             final-db-spec (cond
                             (:jdbcUrl db-spec)
                             (let [url (add-schema-to-url (:jdbcUrl db-spec) schema)]
-                              (println (str "Using explicit jdbcUrl from db-spec: " url))
+                              (log/info (str "Using explicit jdbcUrl from db-spec: " (redact-jdbc-url url)))
                               (try (Class/forName "org.postgresql.Driver") (catch Exception _))
                               (assoc db-spec :jdbcUrl url :connectionTestQuery "SELECT 1" :maximumPoolSize 10))
 
@@ -38,7 +46,7 @@
                                                (str "jdbc:postgresql://" host ":" port "/" db "?user=" user "&password=" pass))
                                              database-url)
                                   jdbc-url (add-schema-to-url base-url schema)]
-                              (println (str "Using DATABASE_URL with schema '" schema "': " jdbc-url))
+                              (log/info (str "Using DATABASE_URL with schema '" schema "': " (redact-jdbc-url jdbc-url)))
                               (try (Class/forName "org.postgresql.Driver") (catch Exception _))
                               {:jdbcUrl jdbc-url
                                :connectionTestQuery "SELECT 1"})
@@ -64,7 +72,7 @@
       this
       (let [port (or (some-> (System/getenv "PORT") Integer/parseInt) 8000)
             server (run-jetty (:app-handler app) {:port port :join? false})]
-        (println (str "Web server started on port " port))
+        (log/info (str "Web server started on port " port))
         (assoc this :port port :server server))))
   (stop [this]
     (if server
@@ -84,12 +92,12 @@
     (if (:app-handler this)
       this
       (let [db-val (:database database)]
-        (println "Starting App component with database context...")
+        (log/info "Starting App component with database context...")
         (assoc this :app-handler
                (fn [request]
                  (handler (assoc request :database db-val)))))))
   (stop [this]
-    (println "Stopping App component...")
+    (log/info "Stopping App component...")
     (assoc this :app-handler nil)))
 
 (defn new-app [handler]

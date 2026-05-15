@@ -23,6 +23,7 @@
    [api-peladaapp.logic.pelada :as pelada.logic]
    [api-peladaapp.models.pelada :as models.pelada]
    [api-peladaapp.responses.pelada :as responses.pelada]
+   [clojure.tools.logging :as log]
    [next.jdbc :as jdbc]
    [schema.core :as s]))
 
@@ -60,7 +61,7 @@
     (if (< team-count 2)
       {:matches [] :is_from_format false}
       (let [random-plan (try (pelada.logic/schedule-matches-for-start team-ids matches-per-team)
-                             (catch Exception e (println "[ERROR] failed to gen random plan:" (.getMessage e)) []))]
+                             (catch Exception e (log/error e "[ERROR] failed to gen random plan:") []))]
         {:matches random-plan
          :random_matches random-plan
          :is_from_format false}))))
@@ -195,7 +196,7 @@
                      (seed-lineups-from-teams! pelada-id tx)
                      {:pelada pelada :matches_created (count match-plan)}))
                  (catch Exception e
-                   (println "CRITICAL ERROR in begin-pelada transaction:" (.getMessage e))
+                   (log/error e "CRITICAL ERROR in begin-pelada transaction:")
                    (throw e)))]
 
     ;; WAHA Notification - Async outside transaction
@@ -205,7 +206,7 @@
               teams (db.team/list-pelada-teams pelada-id db)
               team-players (db.team/list-team-players-with-names-by-pelada pelada-id db)]
           (notifications/send-notification! (:organization-id pelada) :start {:teams teams :team-players team-players} db))
-        (catch Exception e (println "Error sending start notification:" (.getMessage e)))))
+        (catch Exception e (log/error e "Error sending start notification:"))))
 
     {:matches_created (:matches_created result)}))
 
@@ -249,7 +250,7 @@
                    (db.pelada/update-pelada pelada-id {:status "closed" :closed-at (str (java.time.Instant/now))} tx)
                    (db.pelada/get-pelada pelada-id tx))
                  (catch Exception e
-                   (println "CRITICAL ERROR in close-pelada transaction:" (.getMessage e))
+                   (log/error e "CRITICAL ERROR in close-pelada transaction:")
                    (throw e)))]
 
     ;; WAHA Notification - Async outside transaction
@@ -268,7 +269,7 @@
                                              :lineups lineups
                                              :team-players team-players}
                                             db))
-        (catch Exception e (println "Error sending close/reminder notification:" (.getMessage e)))))
+        (catch Exception e (log/error e "Error sending close/reminder notification:"))))
     pelada))
 
 (s/defn get-pelada-dashboard-data :- responses.pelada/PeladaDashboardResponse
