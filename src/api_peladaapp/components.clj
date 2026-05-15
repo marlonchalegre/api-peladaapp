@@ -42,8 +42,14 @@
                           ;; Postgres via DATABASE_URL
                             database-url
                             (let [base-url (if (str/starts-with? database-url "postgres://")
-                                             (let [[_ user pass host port db] (re-matches #"postgres://([^:]+):([^@]+)@([^:]+):(\d+)/(.*)" database-url)]
-                                               (str "jdbc:postgresql://" host ":" port "/" db "?user=" user "&password=" pass))
+                                             (let [^java.net.URI uri (try (java.net.URI. database-url) (catch Exception _ nil))
+                                                   user-info (when uri (.getUserInfo uri))
+                                                   [user pass] (when user-info (clojure.string/split user-info #":" 2))
+                                                   host (when uri (.getHost uri))
+                                                   port (when uri (.getPort uri))
+                                                   ^String path (when uri (.getPath uri))
+                                                   db (when path (let [p (if (.startsWith path "/") (subs path 1) path)] p))]
+                                               (str "jdbc:postgresql://" host ":" (if (and port (pos? port)) port 5432) "/" (or db "peladaapp") "?user=" user "&password=" pass))
                                              database-url)
                                   jdbc-url (add-schema-to-url base-url schema)]
                               (log/info (str "Using DATABASE_URL with schema '" schema "': " (redact-jdbc-url jdbc-url)))
