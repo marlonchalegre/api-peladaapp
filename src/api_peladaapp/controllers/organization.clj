@@ -57,7 +57,7 @@
   (let [user (when-not (str/blank? email) (db.user/find-user-by-identifier email db))
         user-id (cond
                   user (:id user)
-                  (not (str/blank? email)) (db.user/insert-partial-user email db)
+                  (not (str/blank? email)) (db.user/insert-partial-user {:email email} db)
                   (not (str/blank? name)) (db.user/insert-user-by-name name db)
                   :else (throw (ex-info "Email or Name required" {:type :bad-request})))
         identifier (or email (str "guest-" user-id))]

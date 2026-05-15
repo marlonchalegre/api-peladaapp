@@ -6,7 +6,6 @@
    [api-peladaapp.helpers.sql :as hsql]
    [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]
    [schema.core :as s]))
 
 (defn- unqualify-row [row]
@@ -16,18 +15,12 @@
                  [kw v])))
         row))
 
-(defn- affected-rows-count [result]
-  (let [res (if (vector? result) (first result) result)]
-    (or (:update-count res) (:next.jdbc/update-count res) (-> res vals first) 0)))
-
-(def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
-
 (s/defn list-by-match :- [s/Any]
   [match-id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :MatchLineups)
                   (h/where [:= :match_id match-id]))]
-    (->> (jdbc/execute! db (hsql/format query) opts)
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
          (map unqualify-row))))
 
 (s/defn list-by-match-grouped :- {s/Uuid [s/Any]}
@@ -77,7 +70,7 @@
           (try
             (let [query (-> (h/insert-into :MatchLineups)
                             (h/values to-insert))]
-              (count (jdbc/execute! db (hsql/format query))))
+              (hsql/affected-rows-count (jdbc/execute-one! db (hsql/format query) hsql/opts)))
             (catch Exception _ 0)))))))
 
 (s/defn add-player :- s/Int
@@ -85,27 +78,26 @@
   (try
     (let [query (-> (h/insert-into :MatchLineups)
                     (h/values [{:match_id match-id :team_id team-id :player_id player-id}]))]
-      (affected-rows-count (jdbc/execute-one! db (hsql/format query))))
-    (catch Exception _ 0)))
+      (hsql/affected-rows-count (jdbc/execute-one! db (hsql/format query) hsql/opts)))
+    (catch Exception _
+      0)))
 
 (s/defn remove-player :- s/Int
   [match-id :- s/Uuid team-id :- s/Uuid player-id :- s/Uuid db]
   (let [query (-> (h/delete-from :MatchLineups)
                   (h/where [:and [:= :match_id match-id] [:= :team_id team-id] [:= :player_id player-id]]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
-        affected-rows-count)))
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn replace-player :- s/Int
   [match-id :- s/Uuid team-id :- s/Uuid out-player-id :- s/Uuid in-player-id :- s/Uuid db]
-  (let [;; Find if the outgoing player was a goalkeeper
-        out-player (first (filter #(= out-player-id (:player_id %)) (list-by-match match-id db)))
-        is-gk (and out-player (if (boolean? (:is_goalkeeper out-player)) (:is_goalkeeper out-player) (not= 0 (:is_goalkeeper out-player))))
+  (let [is-gk (db.team/is-goalkeeper? team-id out-player-id db)
         rm (remove-player match-id team-id out-player-id db)
         ;; If they were a goalkeeper, the incoming player should also be one
         ad (try
              (let [query (-> (h/insert-into :MatchLineups)
                              (h/values [{:match_id match-id :team_id team-id :player_id in-player-id :is_goalkeeper (boolean is-gk)}]))]
-               (affected-rows-count (jdbc/execute-one! db (hsql/format query))))
+               (hsql/affected-rows-count (jdbc/execute-one! db (hsql/format query) hsql/opts)))
              (catch Exception _ 0))]
     (+ rm ad)))
 
@@ -115,6 +107,6 @@
                   (h/from [:MatchLineups :ml])
                   (h/join [:Matches :m] [:= :ml.match_id :m.id])
                   (h/where [:= :m.pelada_id pelada-id]))]
-    (->> (jdbc/execute! db (hsql/format query) opts)
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
          (map unqualify-row)
          vec)))

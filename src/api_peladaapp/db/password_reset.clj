@@ -4,10 +4,7 @@
    [api-peladaapp.helpers.sql :as hsql]
    [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]
    [schema.core :as s]))
-
-(def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn create-token! [user-id :- s/Uuid token :- s/Str expires-at db]
   (let [query (-> (h/insert-into :password_reset_tokens)
@@ -20,7 +17,7 @@
   (let [query (-> (h/select :*)
                   (h/from :password_reset_tokens)
                   (h/where [:= :token token]))]
-    (some-> (jdbc/execute-one! db (hsql/format query) opts)
+    (some-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
             misc/unamespace)))
 
 (s/defn delete-token! [token :- s/Str db]

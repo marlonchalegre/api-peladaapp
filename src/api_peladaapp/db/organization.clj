@@ -5,14 +5,7 @@
    [honey.sql.helpers :as h]
    [medley.core :as medley.core]
    [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]
    [schema.core :as s]))
-
-(defn- affected-rows-count [result]
-  (let [res (if (vector? result) (first result) result)]
-    (or (:update-count res) (:next.jdbc/update-count res) (-> res vals first) 0)))
-
-(def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn insert-organization :- s/Uuid
   [{:keys [name owner-id]} :- {:name s/Str :owner-id (s/maybe s/Uuid)}
@@ -20,7 +13,7 @@
   (let [query (-> (h/insert-into :Organizations)
                   (h/values [{:name name :owner_id owner-id}])
                   (h/returning :id))]
-    (:id (jdbc/execute-one! db (hsql/format query) opts))))
+    (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
 (s/defn update-organization :- s/Int
   [id :- s/Uuid
@@ -62,8 +55,8 @@
    db]
   (let [query (-> (h/delete-from :Organizations)
                   (h/where [:= :id id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
-        affected-rows-count)))
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn get-organization :- s/Any
   [id :- s/Uuid
@@ -82,7 +75,7 @@
                   (h/from [:Organizations :o])
                   (h/left-join [:OrganizationWahaConfigs :owc] [:= :owc.organization_id :o.id])
                   (h/where [:= :o.id id]))]
-    (some-> (jdbc/execute-one! db (hsql/format query) opts)
+    (some-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
             adapter.organization/db->model)))
 
 (s/defn list-organizations :- [s/Any]
@@ -104,14 +97,14 @@
                    (h/order-by [:o.id :desc])
                    (h/limit limit)
                    (h/offset offset))]
-     (->> (jdbc/execute! db (hsql/format query) opts)
+     (->> (jdbc/execute! db (hsql/format query) hsql/opts)
           (map adapter.organization/db->model)))))
 
 (s/defn count-organizations :- s/Int
   [db]
   (let [query (-> (h/select [[:count :*] :count])
                   (h/from :Organizations))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         :count
         int)))
 
@@ -131,7 +124,7 @@
                                [:= :op_role.organization_id :o.id])
                   (h/where [:or [:!= :oa_role.role nil] [:!= :op_role.role nil]])
                   (h/order-by :o.name :priority))]
-    (->> (jdbc/execute! db (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps})
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
          (group-by :id)
          (map (fn [[_ orgs]] (first orgs)))
          (map adapter.organization/db->model))))
@@ -207,4 +200,4 @@
                         (h/left-join [:PlayerEvents :pe] [:= :ap.player_id :pe.player_id])
                         (h/left-join [:PlayerRatings :pr] [:= :ap.player_id :pr.player_id])
                         (h/group-by :ap.player_id :u.id :u.name :u.position :u.avatar_filename :pp.peladas_count :pr.avg_rating :pe.event_type))]
-    (jdbc/execute! db (hsql/format final-query) {:builder-fn rs/as-unqualified-lower-maps})))
+    (jdbc/execute! db (hsql/format final-query) hsql/opts)))

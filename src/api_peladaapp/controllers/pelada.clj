@@ -6,7 +6,6 @@
    [api-peladaapp.adapters.pelada :as adapter.pelada]
    [api-peladaapp.adapters.player :as adapter.player]
    [api-peladaapp.adapters.team :as adapter.team]
-   [api-peladaapp.adapters.vote :as adapter.vote]
    [api-peladaapp.db.admin :as db.admin]
    [api-peladaapp.db.attendance :as db.attendance]
    [api-peladaapp.db.match :as db.match]
@@ -295,7 +294,7 @@
                                                (map :user-id organization-players)
                                                (map :user-id match-events)
                                                (map :created-by transactions))))
-        users (map #(select-keys % [:id :name :username :avatar-filename])
+        users (map adapter.pelada/user->response
                    (db.user/get-users-by-ids db (vec referenced-user-ids)))
 
         ;; Transform team-players into a map
@@ -326,7 +325,7 @@
      :pelada_transactions (map adapter.finance/model->transaction-response transactions)
      :attendance attendance-resp}))
 
-(s/defn get-pelada-full-details-controller :- responses.pelada/PeladaFullDetailsResponse
+(s/defn get-pelada-full-details-controller
   [pelada-id :- s/Uuid
    user-id :- s/Uuid
    db]
@@ -339,38 +338,11 @@
         current-player (some-> (filter #(= user-id (:user-id %)) (vals all-org-players)) first)
         player-id (:id current-player)
         voting-info (if (and (= "closed" (:status pelada)) player-id)
-                      (adapter.vote/voting-info-model->response
-                       (pelada.logic/get-voting-info pelada-id player-id db))
+                      (pelada.logic/get-voting-info pelada-id player-id db)
                       nil)
-
-        ;; Map models back to response format
-        mapped-pelada (assoc (adapter.pelada/model->response pelada)
-                             :is_admin is-admin
-                             :has_schedule_plan (boolean has-schedule-plan))
-        mapped-teams (map (fn [team]
-                            (assoc (adapter.team/model->response team)
-                                   :players (map (fn [p] (assoc (adapter.player/model->response p)
-                                                                :user (:user p)
-                                                                :is_goalkeeper (:is_goalkeeper p)))
-                                                 (:players team))))
-                          (:teams pelada-data))
-
-        mapped-available (map (fn [p]
-                                (let [base (assoc (adapter.player/model->response p)
-                                                  :user (:user p)
-                                                  :attendance_status (:attendance-status p))]
-                                  ;; Backwards compatible field name expected by some clients/tests
-                                  (assoc base :Attendance_status (:attendance_status base))))
-                              (:available-players pelada-data))
-        mapped-attendance (map (fn [a]
-                                 (assoc a :player (assoc (adapter.player/model->response (:player a))
-                                                         :user (get-in a [:player :user]))))
-                               (:attendance pelada-data))
         transactions (if is-admin (db.transaction/list-transactions-by-pelada pelada-id db) [])]
-    {:pelada mapped-pelada
-     :teams mapped-teams
-     :available_players mapped-available
-     :attendance mapped-attendance
-     :pelada_transactions (map adapter.finance/model->transaction-response transactions)
-     :voting_info voting-info
-     :scores (:scores pelada-data)}))
+    (assoc pelada-data
+           :is-admin is-admin
+           :has-schedule-plan (boolean has-schedule-plan)
+           :pelada-transactions transactions
+           :voting-info voting-info)))

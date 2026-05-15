@@ -6,21 +6,13 @@
    [api-peladaapp.models.vote :as models.vote]
    [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]
    [schema.core :as s]))
 
-(defn- affected-rows-count [result]
-  (let [res (if (vector? result) (first result) result)]
-    (or (:update-count res) (:next.jdbc/update-count res) (-> res vals first) 0)))
-
-(def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
-
-(s/defn get-vote :- (s/maybe models.vote/Vote)
-  [id :- s/Uuid db]
+(s/defn get-vote [id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :Votes)
                   (h/where [:= :id id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         adapter.vote/db->model)))
 
 (s/defn insert-vote :- s/Uuid
@@ -30,14 +22,14 @@
         query (-> (h/insert-into :Votes)
                   (h/values [row])
                   (h/returning :id))]
-    (:id (jdbc/execute-one! db (hsql/format query) opts))))
+    (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
 (s/defn list-votes-by-pelada :- [models.vote/Vote]
   [pelada-id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :Votes)
                   (h/where [:= :pelada_id pelada-id]))]
-    (->> (jdbc/execute! db (hsql/format query) opts)
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
          (map adapter.vote/db->model))))
 
 (s/defn list-votes-for-player :- [models.vote/Vote]
@@ -45,7 +37,7 @@
   (let [query (-> (h/select :*)
                   (h/from :Votes)
                   (h/where [:= :pelada_id pelada-id] [:= :target_id player-id]))]
-    (->> (jdbc/execute! db (hsql/format query) opts)
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
          (map adapter.vote/db->model))))
 
 (s/defn list-votes-by-voter :- [models.vote/Vote]
@@ -54,7 +46,7 @@
   (let [query (-> (h/select :*)
                   (h/from :Votes)
                   (h/where [:= :pelada_id pelada-id] [:= :voter_id voter-id]))]
-    (->> (jdbc/execute! db (hsql/format query) opts)
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
          (map adapter.vote/db->model))))
 
 (s/defn has-voter-voted? :- s/Bool
@@ -63,7 +55,7 @@
   (let [query (-> (h/select [[:count :*] :count])
                   (h/from :Votes)
                   (h/where [:and [:= :pelada_id pelada-id] [:= :voter_id voter-id]]))
-        res (jdbc/execute-one! db (hsql/format query) opts)]
+        res (jdbc/execute-one! db (hsql/format query) hsql/opts)]
     (> (int (or (:count res) (first (vals res)) 0)) 0)))
 
 (s/defn delete-votes-by-voter :- s/Int
@@ -71,16 +63,16 @@
   [pelada-id :- s/Uuid voter-id :- s/Uuid db]
   (let [query (-> (h/delete-from :Votes)
                   (h/where [:and [:= :pelada_id pelada-id] [:= :voter_id voter-id]]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
-        affected-rows-count)))
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn delete-votes-for-target :- s/Int
   "Delete all Votes cast for a target player in a pelada."
   [pelada-id :- s/Uuid target-id :- s/Uuid db]
   (let [query (-> (h/delete-from :Votes)
                   (h/where [:and [:= :pelada_id pelada-id] [:= :target_id target-id]]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
-        affected-rows-count)))
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn insert-votes-batch :- s/Int
   "Insert multiple Votes at once."
@@ -109,7 +101,7 @@
                   (h/where [:and [:= :v.pelada_id pelada-id] [:= [[:coalesce :pa.voting_enabled true]] true]])
                   (h/group-by :v.target_id :u.id :u.name :u.avatar_filename)
                   (h/order-by [:avg_stars :desc] [:vote_count :desc]))
-        results (jdbc/execute! db (hsql/format query) opts)]
+        results (jdbc/execute! db (hsql/format query) hsql/opts)]
     (map (fn [r]
            {:player-id (:target_id r)
             :user-id (:user_id r)
@@ -131,7 +123,7 @@
                             [:not-exists (-> (h/select 1)
                                              (h/from :Votes :v)
                                              (h/where [:= :v.pelada_id :pa.pelada_id] [:= :v.voter_id :pa.player_id]))]]))
-        results (jdbc/execute! db (hsql/format query) opts)]
+        results (jdbc/execute! db (hsql/format query) hsql/opts)]
     (map (fn [r] {:player-id (:player_id r) :player-name (:player_name r) :phone (:phone r)}) results)))
 
 (s/defn list-eligible-players-for-voting
@@ -151,7 +143,7 @@
                   (h/left-join [:Attendance :pa] [:and [:= :pa.player_id :op.id] [:= :pa.pelada_id pelada-id]])
                   (h/left-join [:PeladaPlayerStats :s] [:and [:= :s.player_id :op.id] [:= :s.pelada_id pelada-id]])
                   (h/where where-clause))]
-    (jdbc/execute! db (hsql/format query) opts)))
+    (jdbc/execute! db (hsql/format query) hsql/opts)))
 
 (s/defn list-pelada-participants
   [pelada-id :- s/Uuid db]
@@ -166,4 +158,4 @@
                                            (h/from [:TeamPlayers :sub_tp])
                                            (h/join [:Teams :sub_t] [:= :sub_t.id :sub_tp.team_id])
                                            (h/where [:= :sub_t.pelada_id pelada-id]))]))]
-    (jdbc/execute! db (hsql/format query) opts)))
+    (jdbc/execute! db (hsql/format query) hsql/opts)))

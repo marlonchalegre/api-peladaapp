@@ -51,8 +51,7 @@
          (let [transaction (assoc (adapter.finance/payload->transaction body)
                                   :organization-id org-id
                                   :created-by user-id)
-               stored-tx (db.finance/add-transaction transaction db)
-               model-tx (adapter.finance/db->transaction stored-tx)]
+               model-tx (db.finance/add-transaction transaction db)]
            (created (adapter.finance/model->transaction-response model-tx))))
        (catch Exception e (exception/api-exception-handler e))))
 

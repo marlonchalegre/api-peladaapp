@@ -5,14 +5,7 @@
    [honey.sql.helpers :as h]
    [medley.core :as medley.core]
    [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]
    [schema.core :as s]))
-
-(defn- affected-rows-count [result]
-  (let [res (if (vector? result) (first result) result)]
-    (or (:update-count res) (:next.jdbc/update-count res) (-> res vals first) 0)))
-
-(def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn insert-player :- s/Uuid
   [{:keys [user-id organization-id grade position member-type]} :- {:user-id s/Uuid
@@ -29,7 +22,7 @@
         query (-> (h/insert-into :OrganizationPlayers)
                   (h/values [row])
                   (h/returning :id))]
-    (:id (jdbc/execute-one! db (hsql/format query) opts))))
+    (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
 (s/defn update-player :- s/Int
   [id :- s/Uuid player db]
@@ -40,8 +33,8 @@
         query (-> (h/update :OrganizationPlayers)
                   (h/set row)
                   (h/where [:= :id id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
-        affected-rows-count)))
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn update-player-grade :- s/Int
   "Surgically update a player's grade."
@@ -49,15 +42,15 @@
   (let [query (-> (h/update :OrganizationPlayers)
                   (h/set {:grade grade})
                   (h/where [:= :id id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
-        affected-rows-count)))
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn delete-player :- s/Int
   [id :- s/Uuid db]
   (let [query (-> (h/delete-from :OrganizationPlayers)
                   (h/where [:= :id id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
-        affected-rows-count)))
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn get-player
   ([id :- s/Uuid db] (get-player id db false))
@@ -67,7 +60,7 @@
                            (h/join [:Users :u] [:= :op.user_id :u.id])
                            (h/where [:= :op.id id]))
                  for-update? (assoc :for [:update]))]
-     (-> (jdbc/execute-one! db (hsql/format query) opts)
+     (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
          adapter.player/db->model))))
 
 (s/defn get-org-player-by-user-id :- s/Any
@@ -75,7 +68,7 @@
   (let [query (-> (h/select :*)
                   (h/from :OrganizationPlayers)
                   (h/where [:= :user_id [:cast user-id :uuid]] [:= :organization_id [:cast organization-id :uuid]]))]
-    (some-> (jdbc/execute-one! db (hsql/format query) opts)
+    (some-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
             adapter.player/db->model)))
 
 (s/defn list-players-by-organization [organization-id :- s/Uuid db]
@@ -83,7 +76,7 @@
                   (h/from [:OrganizationPlayers :op])
                   (h/join [:Users :u] [:= :op.user_id :u.id])
                   (h/where [:= :op.organization_id organization-id]))]
-    (->> (jdbc/execute! db (hsql/format query) opts)
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
          (map adapter.player/db->model)
          vec)))
 
@@ -95,7 +88,7 @@
     (let [query (-> (h/select :id :grade)
                     (h/from :OrganizationPlayers)
                     (h/where [:in :id player-ids]))]
-      (jdbc/execute! db (hsql/format query) opts))))
+      (jdbc/execute! db (hsql/format query) hsql/opts))))
 
 (s/defn get-players-details-for-balance :- [s/Any]
   [player-ids :- [s/Uuid]
@@ -108,4 +101,4 @@
                     (h/join [:Users :u] [:= :op.user_id :u.id])
                     (h/where [:= :op.organization_id organization-id]
                              [:in :op.id player-ids]))]
-      (jdbc/execute! db (hsql/format query) opts))))
+      (jdbc/execute! db (hsql/format query) hsql/opts))))

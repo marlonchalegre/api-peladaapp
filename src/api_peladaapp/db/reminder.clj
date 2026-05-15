@@ -3,10 +3,7 @@
    [api-peladaapp.helpers.sql :as hsql]
    [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]
    [schema.core :as s]))
-
-(def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn insert-reminder! :- s/Uuid
   [pelada-id :- s/Uuid
@@ -15,7 +12,7 @@
   (let [query (-> (h/insert-into :PeladaReminders)
                   (h/values [{:pelada_id pelada-id :type [:cast type :reminder_type]}])
                   (h/returning :id))]
-    (:id (jdbc/execute-one! db (hsql/format query) opts))))
+    (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
 (s/defn get-last-reminder-at :- (s/maybe s/Str)
   [pelada-id :- s/Uuid
@@ -26,5 +23,5 @@
                   (h/where [:= :pelada_id pelada-id] [:= :type [:cast type :reminder_type]])
                   (h/order-by [:sent_at :desc])
                   (h/limit 1))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         :sent_at)))

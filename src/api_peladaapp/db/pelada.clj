@@ -4,21 +4,17 @@
    [api-peladaapp.db.attendance :as db.attendance]
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.team :as db.team]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
+   [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.score :as logic.score]
    [honey.sql.helpers :as h]
    [medley.core :as medley.core]
    [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]
    [schema.core :as s])
-  (:import (java.time OffsetDateTime)
+  (:import (java.sql Timestamp)
+           (java.time Duration Instant OffsetDateTime)
            (java.time.temporal ChronoUnit)))
-
-(defn- affected-rows-count [result]
-  (let [res (if (vector? result) (first result) result)]
-    (or (:update-count res) (:next.jdbc/update-count res) (-> res vals first) 0)))
-
-(def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn insert-pelada :- s/Uuid
   [{:keys [organization-id scheduled-at num-teams players-per-team fixed-goalkeepers
@@ -40,7 +36,7 @@
         query (-> (h/insert-into :Peladas)
                   (h/values [row])
                   (h/returning :id))]
-    (:id (jdbc/execute-one! db (hsql/format query) opts))))
+    (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
 (s/defn get-pelada :- s/Any
   [id :- s/Uuid
@@ -49,7 +45,7 @@
                   (h/from [:Peladas :p])
                   (h/join [:Organizations :o] [:= :o.id :p.organization_id])
                   (h/where [:= :p.id id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         adapter.pelada/db->model)))
 
 (s/defn update-pelada :- s/Int
@@ -75,16 +71,16 @@
       (let [query (-> (h/update :Peladas)
                       (h/set db-row)
                       (h/where [:= :id id]))]
-        (-> (jdbc/execute-one! db (hsql/format query) opts)
-            affected-rows-count)))))
+        (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+            hsql/affected-rows-count)))))
 
 (s/defn delete-pelada :- s/Int
   [id :- s/Uuid
    db]
   (let [query (-> (h/delete-from :Peladas)
                   (h/where [:= :id id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
-        affected-rows-count)))
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn list-peladas :- [s/Any]
   [organization-id :- s/Uuid
@@ -98,7 +94,7 @@
                   (h/order-by [:p.id :desc])
                   (h/limit limit)
                   (h/offset offset))]
-    (->> (jdbc/execute! db (hsql/format query) opts)
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
          (map adapter.pelada/db->model))))
 
 (s/defn count-peladas :- s/Int
@@ -107,7 +103,7 @@
   (let [query (-> (h/select [[:count :*] :count])
                   (h/from :Peladas)
                   (h/where [:= :organization_id organization-id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         :count
         int)))
 
@@ -116,7 +112,7 @@
    limit :- s/Int
    offset :- s/Int
    db]
-  (let [one-day-ago (.minus (OffsetDateTime/now) 24 ChronoUnit/HOURS)
+  (let [one-day-ago (-> (Instant/now) (.minus (Duration/ofDays 1)) Timestamp/from)
         query (-> (h/select :p.* [:o.name :organization_name])
                   (h/from [:Peladas :p])
                   (h/join [:OrganizationPlayers :op] [:= :op.organization_id :p.organization_id])
@@ -124,30 +120,30 @@
                   (h/where [:= :op.user_id user-id])
                   (h/order-by
                    [[:case
-                     [:and [:= :p.status [:cast "closed" :pelada_status]] [:> :p.closed_at [[:cast one-day-ago :timestamp]]]] 1
+                     [:and [:= :p.status [:cast "closed" :pelada_status]] [:> :p.closed_at one-day-ago]] 1
                      [:!= :p.status [:cast "closed" :pelada_status]] 2
                      :else 3] :asc]
                    [:p.scheduled_at :desc]
                    [:p.id :desc])
                   (h/limit limit)
-                  (h/offset offset))]
-    (->> (jdbc/execute! db (hsql/format query) opts)
-         (map adapter.pelada/db->model))))
+                  (h/offset offset))
+        results (jdbc/execute! db (hsql/format query) hsql/opts)]
+    (map adapter.pelada/db->model results)))
 
 (s/defn count-peladas-by-user :- s/Int
   [user-id :- s/Uuid
    db]
   (let [query (-> (h/select [[:count :*] :count])
-                  (h/from :Peladas)
+                  (h/from [:Peladas :p])
                   (h/join [:OrganizationPlayers :op] [:= :op.organization_id :p.organization_id])
                   (h/where [:= :op.user_id user-id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         :count
         int)))
 
 (s/defn list-peladas-for-vote-notification :- [s/Any]
   [db]
-  (let [one-day-ago (.minus (OffsetDateTime/now) 24 ChronoUnit/HOURS)
+  (let [one-day-ago (-> (Instant/now) (.minus (Duration/ofDays 1)) Timestamp/from)
         query (-> (h/select :p.* [:o.name :organization_name])
                   (h/from [:Peladas :p])
                   (h/join [:Organizations :o] [:= :o.id :p.organization_id])
@@ -156,8 +152,8 @@
                             [:not-exists (-> (h/select 1)
                                              (h/from :PeladaReminders)
                                              (h/where [:= :pelada_id :p.id] [:= :type [:cast "vote_ended" :reminder_type]]))]
-                            [:< :p.closed_at [[:cast one-day-ago :timestamp]]]]))]
-    (->> (jdbc/execute! db (hsql/format query) opts)
+                            [:< :p.closed_at one-day-ago]]))]
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
          (map adapter.pelada/db->model))))
 
 (s/defn list-peladas-for-vote-reminders :- [{:pelada s/Any :type s/Keyword}]
@@ -180,7 +176,7 @@
                                                                      (h/where [:= :pelada_id :p.id] [:= :type [:cast (name type) :reminder_type]]))]]
                                                    [:>= :p.closed_at [[:cast start :timestamp]]]
                                                    [:< :p.closed_at [[:cast end :timestamp]]]))]
-                            (->> (jdbc/execute! db (hsql/format query) opts)
+                            (->> (jdbc/execute! db (hsql/format query) hsql/opts)
                                  (map (fn [p] {:pelada (adapter.pelada/db->model p) :type type})))))]
     (concat (fetch-reminders :vote_30m rem-30m-start rem-30m-end)
             (fetch-reminders :vote_12h rem-12h-start rem-12h-end)
@@ -192,11 +188,11 @@
   (if-let [pelada (get-pelada pelada-id db)]
     (let [organization-id (:organization-id pelada)
           attendance (db.attendance/list-attendance-by-pelada pelada-id db)
-          attendance-map (into {} (map (fn [a] [(:player_id a) {:status (:status a)
-                                                                :updated_at (:updated_at a)
-                                                                :voting_enabled (if (contains? a :voting_enabled)
-                                                                                  (boolean (:voting_enabled a))
-                                                                                  true)}]))
+          attendance-map (into {} (map (fn [a] [(misc/as-uuid (:player_id a)) {:status (:status a)
+                                                                               :updated_at (:updated_at a)
+                                                                               :voting_enabled (if (contains? a :voting_enabled)
+                                                                                                 (boolean (:voting_enabled a))
+                                                                                                 true)}]))
                                attendance)
           ;; If not in attendance mode, we only care about confirmed players
           all-players-in-org (db.player/list-players-by-organization organization-id db)
@@ -214,7 +210,7 @@
 
           all-org-players (if (= "attendance" (:status pelada))
                             all-players-in-org
-                            (filter (fn [p] (= "confirmed" (:status (get attendance-map (:id p)))))
+                            (filter (fn [p] (= "confirmed" (:status (get attendance-map (misc/as-uuid (:id p))))))
                                     all-players-in-org))
 
           teams (db.team/list-pelada-teams pelada-id db)
@@ -241,10 +237,10 @@
 
           ;; Add user info to available players
           available-players-with-users (map (fn [player]
-                                              (let [att (get attendance-map (:id player))]
+                                              (let [att (get attendance-map (misc/as-uuid (:id player)))]
                                                 (assoc player :user (get users-map (:user-id player))
                                                        :attendance-status (:status att "pending")
-                                                       :attendance-updated-at (:updated_at att))))
+                                                       :attendance-updated-at (some-> (:updated_at att) helpers.time/->instant str))))
                                             available-players)
 
           ;; Calculate normalized scores for all players in org

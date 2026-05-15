@@ -4,17 +4,14 @@
    [api-peladaapp.helpers.sql :as hsql]
    [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]
    [schema.core :as s]))
-
-(def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn get-organization-finance
   [org-id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :OrganizationFinances)
                   (h/where [:= :organization_id org-id]))
-        result (jdbc/execute-one! db (hsql/format query) opts)]
+        result (jdbc/execute-one! db (hsql/format query) hsql/opts)]
     (if result
       (adapter.finance/db->finance result)
       {:organization-id org-id
@@ -54,9 +51,9 @@
         insert-query (-> (h/insert-into :Transactions)
                          (h/values [row])
                          (h/returning :id))
-        result (jdbc/execute-one! db (hsql/format insert-query) opts)
+        result (jdbc/execute-one! db (hsql/format insert-query) hsql/opts)
         new-id (:id result)]
-    (adapter.finance/db->transaction (jdbc/execute-one! db (hsql/format (-> (h/select :*) (h/from :Transactions) (h/where [:= :id new-id]))) opts))))
+    (adapter.finance/db->transaction (jdbc/execute-one! db (hsql/format (-> (h/select :*) (h/from :Transactions) (h/where [:= :id new-id]))) hsql/opts))))
 
 (s/defn reverse-transaction
   [transaction-id :- s/Uuid db]
@@ -75,7 +72,7 @@
   (let [query (-> (h/select [[:count :*] :count])
                   (h/from :Transactions)
                   (h/where [:= :organization_id org-id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         :count
         int)))
 
@@ -90,7 +87,7 @@
                   (h/order-by [:t.payment_date :desc] [:t.created_at :desc])
                   (h/limit limit)
                   (h/offset offset))
-        result (jdbc/execute! db (hsql/format query) opts)]
+        result (jdbc/execute! db (hsql/format query) hsql/opts)]
     (map adapter.finance/db->transaction result)))
 
 (s/defn get-monthly-payments
@@ -106,7 +103,7 @@
                   (h/left-join [:Transactions :ft] [:= :mp.fine_transaction_id :ft.id])
                   (h/where [:and [:= :op.organization_id org-id] [:in :op.member_type [[:cast "mensalista" :member_type] [:cast "mensalista_temporario" :member_type]]]])
                   (h/order-by :u.name))
-        result (jdbc/execute! db (hsql/format query) opts)]
+        result (jdbc/execute! db (hsql/format query) hsql/opts)]
     (map adapter.finance/db->monthly-payment result)))
 
 (s/defn mark-monthly-payment
@@ -115,7 +112,7 @@
         exists-query (-> (h/select :id)
                          (h/from :MonthlyPayments)
                          (h/where [:and [:= :organization_id (:organization_id row)] [:= :player_id (:player_id row)] [:= :year (:year row)] [:= :month (:month row)]]))
-        exists? (jdbc/execute-one! db (hsql/format exists-query) opts)]
+        exists? (jdbc/execute-one! db (hsql/format exists-query) hsql/opts)]
     (if exists?
       (let [q (-> (h/update :MonthlyPayments)
                   (h/set {:transaction_id (:transaction_id row) :fine_transaction_id (:fine_transaction_id row) :paid (:paid row)})
@@ -133,8 +130,8 @@
         expense-query (-> (h/select [[:sum :amount] :total])
                           (h/from :Transactions)
                           (h/where [:and [:= :organization_id org-id] [:= :type [:cast "expense" :transaction_type]] [:= :status [:cast "paid" :transaction_status]]]))
-        income-res (jdbc/execute-one! db (hsql/format income-query) opts)
-        expense-res (jdbc/execute-one! db (hsql/format expense-query) opts)
+        income-res (jdbc/execute-one! db (hsql/format income-query) hsql/opts)
+        expense-res (jdbc/execute-one! db (hsql/format expense-query) hsql/opts)
         income (or (:total income-res) 0.0)
         expense (or (:total expense-res) 0.0)]
     {:total-income (double income)

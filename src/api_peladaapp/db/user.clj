@@ -6,14 +6,7 @@
    [clojure.string :as str]
    [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]
    [schema.core :as s]))
-
-(defn- affected-rows-count [result]
-  (let [res (if (vector? result) (first result) result)]
-    (or (:update-count res) (:next.jdbc/update-count res) (-> res vals first) 0)))
-
-(def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn find-user-by-email :- (s/maybe models.user/User)
   "Find a user by email (case-insensitive)"
@@ -23,7 +16,7 @@
     (let [query (-> (h/select :*)
                     (h/from :Users)
                     (h/where [:= [:lower :email] (str/lower-case email)]))]
-      (-> (jdbc/execute! db (hsql/format query) opts)
+      (-> (jdbc/execute! db (hsql/format query) hsql/opts)
           first
           adapter.user/db->model))))
 
@@ -36,7 +29,7 @@
                     (h/from :Users)
                     (h/where [:or [:= [:lower :email] (str/lower-case identifier)]
                               [:= [:lower :username] (str/lower-case identifier)]]))]
-      (-> (jdbc/execute! db (hsql/format query) opts)
+      (-> (jdbc/execute! db (hsql/format query) hsql/opts)
           first
           adapter.user/db->model))))
 
@@ -47,7 +40,7 @@
   (let [query (-> (h/select :*)
                   (h/from :Users)
                   (h/where [:= :id id]))]
-    (-> (jdbc/execute! db (hsql/format query) opts)
+    (-> (jdbc/execute! db (hsql/format query) hsql/opts)
         first
         adapter.user/db->model)))
 
@@ -60,34 +53,26 @@
         query (-> (h/insert-into :Users)
                   (h/values [row])
                   (h/returning :id))]
-    (:id (jdbc/execute-one! db (hsql/format query) opts))))
+    (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
+
+(s/defn insert-partial-user :- s/Uuid
+  "Insert a user with only some fields (e.g. name or email) and return its generated id"
+  [fields :- {s/Keyword s/Any}
+   db]
+  (let [query (-> (h/insert-into :Users)
+                  (h/values [fields])
+                  (h/returning :id))]
+    (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
 (s/defn insert-guest-user :- s/Uuid
   "Insert a user with only name (for guests)"
-  [name :- s/Str
-   db]
-  (let [query (-> (h/insert-into :Users)
-                  (h/values [{:name name}])
-                  (h/returning :id))]
-    (:id (jdbc/execute-one! db (hsql/format query) opts))))
-
-(s/defn insert-partial-user :- s/Uuid
-  "Insert a user with only email (for invitations)"
-  [email :- s/Str
-   db]
-  (let [query (-> (h/insert-into :Users)
-                  (h/values [{:email email}])
-                  (h/returning :id))]
-    (:id (jdbc/execute-one! db (hsql/format query) opts))))
+  [name :- s/Str db]
+  (insert-partial-user {:name name} db))
 
 (s/defn insert-user-by-name :- s/Uuid
   "Insert a user with only name and return its generated id"
-  [name :- s/Str
-   db]
-  (let [query (-> (h/insert-into :Users)
-                  (h/values [{:name name}])
-                  (h/returning :id))]
-    (:id (jdbc/execute-one! db (hsql/format query) opts))))
+  [name :- s/Str db]
+  (insert-partial-user {:name name} db))
 
 (s/defn update-user :- s/Int
   "Update a user in the database"
@@ -103,8 +88,8 @@
         query (-> (h/update :Users)
                   (h/set row)
                   (h/where [:= :id id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
-        affected-rows-count)))
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn update-user-profile :- s/Int
   "Update only specific fields of a user's profile"
@@ -120,8 +105,8 @@
         query (-> (h/update :Users)
                   (h/set row)
                   (h/where [:= :id id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
-        affected-rows-count)))
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn get-users-by-ids :- [models.user/User]
   "Get users by a list of ids"
@@ -131,7 +116,7 @@
     (let [query (-> (h/select :*)
                     (h/from :Users)
                     (h/where [:in :id ids]))]
-      (->> (jdbc/execute! db (hsql/format query) opts)
+      (->> (jdbc/execute! db (hsql/format query) hsql/opts)
            (map adapter.user/db->model)))))
 
 (s/defn delete-user :- s/Int
@@ -140,8 +125,8 @@
    db]
   (let [query (-> (h/delete-from :Users)
                   (h/where [:= :id id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
-        affected-rows-count)))
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn list-users :- [models.user/User]
   "List all users in the database"
@@ -151,7 +136,7 @@
                   (h/order-by [:id :asc])
                   (h/limit limit)
                   (h/offset offset))]
-    (->> (jdbc/execute! db (hsql/format query) opts)
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
          (map adapter.user/db->model))))
 
 (s/defn count-users :- s/Int
@@ -159,7 +144,7 @@
   [db]
   (let [query (-> (h/select [[:count :*] :count])
                   (h/from :Users))]
-    (int (:count (jdbc/execute-one! db (hsql/format query) opts)))))
+    (int (:count (jdbc/execute-one! db (hsql/format query) hsql/opts)))))
 
 (s/defn search-users :- [models.user/User]
   "Search users by name, username or email with pagination"
@@ -173,7 +158,7 @@
                        (h/order-by :name)
                        (h/limit limit)
                        (h/offset offset))]
-    (->> (jdbc/execute! db (hsql/format hsql-query) opts)
+    (->> (jdbc/execute! db (hsql/format hsql-query) hsql/opts)
          (map adapter.user/db->model))))
 
 (s/defn count-searched-users :- s/Int
@@ -185,7 +170,7 @@
                        (h/where [:or [[:like [:lower :name] lower-pattern]]
                                  [[:like [:lower :username] lower-pattern]]
                                  [[:like [:lower :email] lower-pattern]]]))]
-    (int (:count (jdbc/execute-one! db (hsql/format hsql-query) opts)))))
+    (int (:count (jdbc/execute-one! db (hsql/format hsql-query) hsql/opts)))))
 
 (s/defn find-user-by-username :- (s/maybe models.user/User)
   "Find a user by username (case-insensitive)"
@@ -195,7 +180,7 @@
     (let [query (-> (h/select :*)
                     (h/from :Users)
                     (h/where [:= [:lower :username] (str/lower-case username)]))]
-      (-> (jdbc/execute! db (hsql/format query) opts)
+      (-> (jdbc/execute! db (hsql/format query) hsql/opts)
           first
           adapter.user/db->model))))
 
@@ -219,7 +204,7 @@
                        (h/order-by :u.name)
                        (h/limit limit)
                        (h/offset offset))]
-    (->> (jdbc/execute! db (hsql/format hsql-query) opts)
+    (->> (jdbc/execute! db (hsql/format hsql-query) hsql/opts)
          (map adapter.user/db->model))))
 
 (s/defn count-searched-users-in-shared-orgs :- s/Int
@@ -239,7 +224,7 @@
                                   [:in :op.organization_id (-> (h/select :organization_id) (h/from :OrganizationAdmins) (h/where [:= :user_id current-user-id]))]
                                   [:in :oa.organization_id (-> (h/select :organization_id) (h/from :OrganizationPlayers) (h/where [:= :user_id current-user-id]))]
                                   [:in :oa.organization_id (-> (h/select :organization_id) (h/from :OrganizationAdmins) (h/where [:= :user_id current-user-id]))]]]))]
-    (int (:count (jdbc/execute-one! db (hsql/format hsql-query) opts)))))
+    (int (:count (jdbc/execute-one! db (hsql/format hsql-query) hsql/opts)))))
 
 (s/defn count-users-in-organization :- s/Int
   "Count users in a specific organization"
@@ -249,7 +234,7 @@
                   (h/from :Users)
                   (h/join [:OrganizationPlayers :op] [:= :op.user_id :Users.id])
                   (h/where [:= :op.organization_id organization-id]))]
-    (int (:total (jdbc/execute-one! db (hsql/format query) opts)))))
+    (int (:total (jdbc/execute-one! db (hsql/format query) hsql/opts)))))
 
 (s/defn list-users-in-organization :- [[s/Any]]
   "List users in a specific organization with pagination"
@@ -268,5 +253,5 @@
                               (h/from :Users)
                               (h/join [:OrganizationPlayers :op] [:= :op.user_id :Users.id])
                               (h/where [:= :op.organization_id organization-id]))]
-    [(jdbc/execute! db (hsql/format query) opts)
-     (:total (jdbc/execute-one! db (hsql/format total-count-query) opts))]))
+    [(jdbc/execute! db (hsql/format query) hsql/opts)
+     (:total (jdbc/execute-one! db (hsql/format total-count-query) hsql/opts))]))

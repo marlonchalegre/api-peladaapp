@@ -1,6 +1,8 @@
 (ns api-peladaapp.adapters.pelada
   (:require
+   [api-peladaapp.adapters.finance :as adapter.finance]
    [api-peladaapp.helpers.misc :as misc]
+   [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.vote :as logic.vote]
    [api-peladaapp.models.pelada :as models.pelada]
    [api-peladaapp.requests.pelada :as requests.pelada]
@@ -78,3 +80,57 @@
                             :timer-started-at (:timer_started_at p)
                             :timer-accumulated-ms (:timer_accumulated_ms p)
                             :timer-status (:timer_status p))))
+
+(defn user->response [user]
+  (when user
+    (medley.core/assoc-some {}
+                            :id (:id user)
+                            :name (:name user)
+                            :username (:username user)
+                            :position (:position user)
+                            :avatar_filename (:user-avatar-filename user (:avatar-filename user)))))
+
+(defn player->response [player]
+  (when player
+    (let [updated-at (or (:attendance-updated-at player) (:updated-at player) (:updated_at player))]
+      (medley.core/assoc-some {}
+                              :id (:id player)
+                              :organization_id (:organization-id player)
+                              :user_id (:user-id player)
+                              :grade (:grade player)
+                              :position (:position player)
+                              :member_type (:member-type player)
+                              :user_name (:user-name player)
+                              :user_username (:user-username player)
+                              :user_position (:user-position player)
+                              :user_avatar_filename (:user-avatar-filename player)
+                              :user (user->response (:user player))
+                              :is_goalkeeper (:is_goalkeeper player)
+                              :attendance_status (:attendance-status player)
+                              :attendance_updated_at (when updated-at (some-> updated-at helpers.time/->instant str))))))
+
+(defn full-details->response [data]
+  (let [pelada-resp (assoc (model->response (:pelada data))
+                           :is_admin (:is-admin data)
+                           :has_schedule_plan (:has-schedule-plan data))]
+    {:pelada pelada-resp
+     :teams (map (fn [team]
+                   (-> team
+                       (misc/unamespace)
+                       (assoc :players (map player->response (:players team)))))
+                 (:teams data))
+     :available_players (map player->response (:available-players data))
+     :scores (:scores data)
+     :attendance (map (fn [a]
+                        (-> a
+                            (misc/unamespace)
+                            (assoc :player (player->response (:player a)))))
+                      (:attendance data))
+     :pelada_transactions (map adapter.finance/model->transaction-response (:pelada-transactions data))
+     :voting_info (when-let [v (:voting-info data)]
+                    {:is_voting_open (:voting-open? v)
+                     :can_vote (:can-vote? v)
+                     :has_voted (:has-voted? v)
+                     :votes_cast (:votes-cast v)})
+     :users_map (into {} (map (fn [[k v]] [k (user->response v)]) (:users-map data)))
+     :org_players_map (into {} (map (fn [[k v]] [k (player->response v)]) (:org-players-map data)))}))

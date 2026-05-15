@@ -4,14 +4,7 @@
    [api-peladaapp.helpers.sql :as hsql]
    [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]
    [schema.core :as s]))
-
-(defn- affected-rows-count [result]
-  (let [res (if (vector? result) (first result) result)]
-    (or (:update-count res) (:next.jdbc/update-count res) (-> res vals first) 0)))
-
-(def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn insert-match :- s/Uuid
   [{:keys [pelada-id home-team-id away-team-id sequence status home-score away-score]} :- {:pelada-id s/Uuid
@@ -32,7 +25,7 @@
         query (-> (h/insert-into :Matches)
                   (h/values [row])
                   (h/returning :id))]
-    (:id (jdbc/execute-one! db (hsql/format query) opts))))
+    (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
 (s/defn list-matches-by-pelada :- [s/Any]
   [pelada-id :- s/Uuid db]
@@ -40,14 +33,14 @@
                   (h/from :Matches)
                   (h/where [:= :pelada_id pelada-id])
                   (h/order-by :sequence))]
-    (->> (jdbc/execute! db (hsql/format query) opts)
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
          (map adapter.match/db->model))))
 
 (s/defn get-match [id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :Matches)
                   (h/where [:= :id id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         adapter.match/db->model)))
 
 (s/defn update-match :- s/Int
@@ -64,8 +57,8 @@
       (let [query (-> (h/update :Matches)
                       (h/set db-row)
                       (h/where [:= :id id]))]
-        (-> (jdbc/execute-one! db (hsql/format query) opts)
-            affected-rows-count)))))
+        (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+            hsql/affected-rows-count)))))
 
 (s/defn update-score :- s/Int
   [id :- s/Uuid data db]
@@ -76,8 +69,8 @@
   (let [query (-> (h/update :Matches)
                   (h/set {:sequence sequence})
                   (h/where [:= :id id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
-        affected-rows-count)))
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn finish-all-by-pelada
   "Finish all matches for a pelada. Matches not yet finished are closed.

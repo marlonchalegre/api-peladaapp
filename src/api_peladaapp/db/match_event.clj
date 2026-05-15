@@ -6,7 +6,6 @@
    [api-peladaapp.models.match-event :as models.match-event]
    [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]
    [schema.core :as s]))
 
 (defn- unqualify-row [row]
@@ -16,14 +15,12 @@
                  [kw v])))
         row))
 
-(def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
-
 (s/defn get-event :- (s/maybe models.match-event/MatchEvent)
   [id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :MatchEvents)
                   (h/where [:= :id id]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         adapter.match/db-event->model)))
 
 (s/defn insert-event :- s/Uuid
@@ -38,7 +35,7 @@
          query (-> (h/insert-into :MatchEvents)
                    (h/values [row])
                    (h/returning :id))]
-     (:id (jdbc/execute-one! db (hsql/format query) opts)))))
+     (:id (jdbc/execute-one! db (hsql/format query) hsql/opts)))))
 
 (s/defn list-events-by-pelada :- [models.match-event/MatchEvent]
   [pelada-id :- s/Uuid db]
@@ -47,7 +44,7 @@
                   (h/join [:Matches :m] [:= :m.id :e.match_id])
                   (h/where [:= :m.pelada_id pelada-id])
                   (h/order-by :e.id))]
-    (->> (jdbc/execute! db (hsql/format query) opts)
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
          (map adapter.match/db-event->model))))
 
 (s/defn delete-last-event :- s/Int
@@ -61,7 +58,7 @@
                       (h/limit 1))
         query (-> (h/delete-from :MatchEvents)
                   (h/where [:in :id sub-query]))]
-    (-> (jdbc/execute-one! db (hsql/format query) opts)
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         (as-> res (if (map? res) 1 0)))))
 
 (s/defn list-player-stats-by-pelada :- [models.match/PlayerStats]
@@ -72,7 +69,7 @@
                   (h/join [:Users :u] [:= :u.id :p.user_id])
                   (h/where [:= :s.pelada_id pelada-id])
                   (h/order-by [:s.goals :desc] [:s.assists :desc]))]
-    (->> (jdbc/execute! db (hsql/format query) opts)
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
          (map unqualify-row)
          (map (fn [row]
                 {:player-id (:player_id row)

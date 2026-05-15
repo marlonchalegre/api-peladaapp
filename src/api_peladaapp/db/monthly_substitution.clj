@@ -3,10 +3,7 @@
    [api-peladaapp.helpers.sql :as hsql]
    [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]
    [schema.core :as s]))
-
-(def ^:private opts {:builder-fn rs/as-unqualified-lower-maps})
 
 (s/defn create-substitution! :- s/Uuid
   [substitution :- {:organization_id s/Uuid
@@ -22,7 +19,7 @@
         query (-> (h/insert-into :MonthlyPlayerSubstitutions)
                   (h/values [row])
                   (h/returning :id))
-        res (jdbc/execute-one! db (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps})]
+        res (jdbc/execute-one! db (hsql/format query) hsql/opts)]
     (:id res)))
 
 (s/defn get-active-substitution-by-permanent-player
@@ -30,14 +27,14 @@
   (let [query (-> (h/select :*)
                   (h/from :MonthlyPlayerSubstitutions)
                   (h/where [:and [:= :permanent_player_id player-id] [:= :active true]]))]
-    (jdbc/execute-one! db (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps})))
+    (jdbc/execute-one! db (hsql/format query) hsql/opts)))
 
 (s/defn get-active-substitution-by-temporary-player
   [player-id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :MonthlyPlayerSubstitutions)
                   (h/where [:and [:= :temporary_player_id player-id] [:= :active true]]))]
-    (jdbc/execute-one! db (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps})))
+    (jdbc/execute-one! db (hsql/format query) hsql/opts)))
 
 (s/defn list-substitutions-by-org
   [org-id :- s/Uuid db]
@@ -49,7 +46,7 @@
                   (h/join [:Users :ut] [:= :ot.user_id :ut.id])
                   (h/where [:= :ms.organization_id org-id])
                   (h/order-by [:ms.created_at :desc]))]
-    (jdbc/execute! db (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps})))
+    (jdbc/execute! db (hsql/format query) hsql/opts)))
 
 (s/defn end-substitution! :- s/Uuid
   [sub-id :- s/Uuid end-date db]
@@ -57,11 +54,11 @@
                   (h/set {:active false :end_date [[:cast end-date :date]]})
                   (h/where [:= :id sub-id])
                   (h/returning :id))]
-    (:id (jdbc/execute-one! db (hsql/format query) opts))))
+    (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
 (s/defn get-substitution-by-id
   [sub-id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :MonthlyPlayerSubstitutions)
                   (h/where [:= :id sub-id]))]
-    (jdbc/execute-one! db (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps})))
+    (jdbc/execute-one! db (hsql/format query) hsql/opts)))
