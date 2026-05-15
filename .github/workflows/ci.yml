@@ -12,6 +12,23 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PELADA_API_SECURITY_SIGNING_KEY: dummy-secret-for-testing-in-ci
+      DATABASE_URL: postgres://pelada:pelada_pass@localhost:5432/peladaapp_test
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: pelada
+          POSTGRES_PASSWORD: pelada_pass
+          POSTGRES_DB: peladaapp_test
+        ports:
+          - 5432:5432
+        # Wait for postgres to be ready
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
@@ -19,7 +36,7 @@ jobs:
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
+          java-version: '23'
           distribution: 'temurin'
 
       - name: Setup Clojure

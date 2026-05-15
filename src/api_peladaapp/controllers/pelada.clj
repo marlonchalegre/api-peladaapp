@@ -6,7 +6,6 @@
    [api-peladaapp.adapters.pelada :as adapter.pelada]
    [api-peladaapp.adapters.player :as adapter.player]
    [api-peladaapp.adapters.team :as adapter.team]
-   [api-peladaapp.adapters.vote :as adapter.vote]
    [api-peladaapp.db.admin :as db.admin]
    [api-peladaapp.db.attendance :as db.attendance]
    [api-peladaapp.db.match :as db.match]
@@ -19,10 +18,12 @@
    [api-peladaapp.db.transaction :as db.transaction]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.pagination :as pagination]
+   [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.notifications :as notifications]
    [api-peladaapp.logic.pelada :as pelada.logic]
    [api-peladaapp.models.pelada :as models.pelada]
    [api-peladaapp.responses.pelada :as responses.pelada]
+   [clojure.tools.logging :as log]
    [next.jdbc :as jdbc]
    [schema.core :as s]))
 
@@ -53,20 +54,20 @@
        (run! #(db.match-lineup/ensure-seeded % db))))
 
 (s/defn get-schedule-preview
-  [pelada-id :- s/Int matches-per-team :- s/Int db]
+  [pelada-id :- s/Uuid matches-per-team :- s/Int db]
   (let [teams (db.team/list-pelada-teams pelada-id db)
         team-ids (mapv :id teams)
         team-count (count team-ids)]
     (if (< team-count 2)
       {:matches [] :is_from_format false}
       (let [random-plan (try (pelada.logic/schedule-matches-for-start team-ids matches-per-team)
-                             (catch Exception e (println "[ERROR] failed to gen random plan:" (.getMessage e)) []))]
+                             (catch Exception e (log/error e "[ERROR] failed to gen random plan:") []))]
         {:matches random-plan
          :random_matches random-plan
          :is_from_format false}))))
 
 (s/defn save-schedule-plan
-  [pelada-id :- s/Int matches db]
+  [pelada-id :- s/Uuid matches db]
   (jdbc/with-transaction [tx db]
     (let [teams (db.team/list-pelada-teams pelada-id tx)
           team-ids (mapv :id teams)
@@ -93,12 +94,12 @@
       {:status "success"})))
 
 (s/defn get-schedule-plan
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (let [plans (db.schedule/list-match-plans-by-pelada pelada-id db)]
     (map (fn [p]
-           {:home (:PeladaMatchPlans/home_team_id p)
-            :away (:PeladaMatchPlans/away_team_id p)
-            :sequence (:PeladaMatchPlans/sequence p)})
+           {:home (:home_team_id p)
+            :away (:away_team_id p)
+            :sequence (:sequence p)})
          plans)))
 
 (s/defn create-pelada :- models.pelada/Pelada
@@ -112,7 +113,7 @@
       (db.pelada/get-pelada pelada-id tx))))
 
 (s/defn get-pelada :- models.pelada/Pelada
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (let [pelada (db.pelada/get-pelada pelada-id db)]
     (if (nil? pelada)
       (throw (ex-info nil {:type :not-found :message "Pelada not found"}))
@@ -135,7 +136,7 @@
               (db.team/remove-player-from-team (:team_id p) (:player_id p) db))))))))
 
 (s/defn update-pelada :- models.pelada/Pelada
-  [pelada-id :- s/Int pelada :- models.pelada/Pelada db]
+  [pelada-id :- s/Uuid pelada :- models.pelada/Pelada db]
   (jdbc/with-transaction [tx db]
     (let [old-pelada (db.pelada/get-pelada pelada-id tx)
           rows (db.pelada/update-pelada pelada-id pelada tx)]
@@ -151,14 +152,14 @@
       (db.pelada/get-pelada pelada-id tx))))
 
 (s/defn delete-pelada :- s/Int
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (let [rows (db.pelada/delete-pelada pelada-id db)]
     (if (zero? rows)
       (throw (ex-info nil {:type :not-found :message "Pelada not found"}))
       rows)))
 
 (s/defn list-peladas
-  [organization-id :- s/Int db pagination]
+  [organization-id :- s/Uuid db pagination]
   (let [page (or (:page pagination) 1)
         per-page (or (:per-page pagination) 20)
         offset (* (- page 1) per-page)
@@ -167,7 +168,7 @@
     (pagination/with-pagination-headers peladas total-count page per-page)))
 
 (s/defn list-peladas-by-user
-  [user-id :- s/Int db pagination]
+  [user-id :- s/Uuid db pagination]
   (let [page (or (:page pagination) 1)
         per-page (or (:per-page pagination) 20)
         offset (* (- page 1) per-page)
@@ -177,15 +178,15 @@
 
 (s/defn begin-pelada :- responses.pelada/PeladaBeginResponse
   "Generate matches for a pelada, transition it to running, and seed lineups."
-  [pelada-id :- s/Int db & [opts]]
+  [pelada-id :- s/Uuid db & [opts]]
   (let [result (try
                  (jdbc/with-transaction [tx db]
                    (let [matches-per-team (:matches_per_team (or opts {}))
                          pelada (db.pelada/get-pelada pelada-id tx)
                          saved-plan (db.schedule/list-match-plans-by-pelada pelada-id tx)
                          match-plan (if (seq saved-plan)
-                                      (map (fn [p] {:home (:PeladaMatchPlans/home_team_id p)
-                                                    :away (:PeladaMatchPlans/away_team_id p)})
+                                      (map (fn [p] {:home (:home_team_id p)
+                                                    :away (:away_team_id p)})
                                            saved-plan)
                                       (let [team-ids (->> (fetch-team-ids pelada-id tx)
                                                           (pelada.logic/ensure-startable pelada))]
@@ -195,7 +196,7 @@
                      (seed-lineups-from-teams! pelada-id tx)
                      {:pelada pelada :matches_created (count match-plan)}))
                  (catch Exception e
-                   (println "CRITICAL ERROR in begin-pelada transaction:" (.getMessage e))
+                   (log/error e "CRITICAL ERROR in begin-pelada transaction:")
                    (throw e)))]
 
     ;; WAHA Notification - Async outside transaction
@@ -205,12 +206,12 @@
               teams (db.team/list-pelada-teams pelada-id db)
               team-players (db.team/list-team-players-with-names-by-pelada pelada-id db)]
           (notifications/send-notification! (:organization-id pelada) :start {:teams teams :team-players team-players} db))
-        (catch Exception e (println "Error sending start notification:" (.getMessage e)))))
+        (catch Exception e (log/error e "Error sending start notification:"))))
 
     {:matches_created (:matches_created result)}))
 
 (s/defn start-pelada-timer :- models.pelada/Pelada
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (let [pelada (db.pelada/get-pelada pelada-id db)]
     (if (= "running" (:timer-status pelada))
       pelada
@@ -219,12 +220,12 @@
         (db.pelada/get-pelada pelada-id db)))))
 
 (s/defn pause-pelada-timer :- models.pelada/Pelada
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (let [pelada (db.pelada/get-pelada pelada-id db)]
     (if (not= "running" (:timer-status pelada))
       pelada
       (let [now (java.time.Instant/now)
-            started-at (java.time.Instant/parse (:timer-started-at pelada))
+            started-at (helpers.time/->instant (:timer-started-at pelada))
             elapsed (.toMillis (java.time.Duration/between started-at now))
             new-accumulated (+ (or (:timer-accumulated-ms pelada) 0) elapsed)]
         (db.pelada/update-pelada pelada-id {:timer-status "paused"
@@ -233,14 +234,14 @@
         (db.pelada/get-pelada pelada-id db)))))
 
 (s/defn reset-pelada-timer :- models.pelada/Pelada
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (db.pelada/update-pelada pelada-id {:timer-status "stopped"
                                       :timer-started-at nil
                                       :timer-accumulated-ms 0} db)
   (db.pelada/get-pelada pelada-id db))
 
 (s/defn close-pelada :- models.pelada/Pelada
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (let [pelada (try
                  (jdbc/with-transaction [tx db]
                    (db.match/finish-all-by-pelada pelada-id tx)
@@ -249,7 +250,7 @@
                    (db.pelada/update-pelada pelada-id {:status "closed" :closed-at (str (java.time.Instant/now))} tx)
                    (db.pelada/get-pelada pelada-id tx))
                  (catch Exception e
-                   (println "CRITICAL ERROR in close-pelada transaction:" (.getMessage e))
+                   (log/error e "CRITICAL ERROR in close-pelada transaction:")
                    (throw e)))]
 
     ;; WAHA Notification - Async outside transaction
@@ -268,12 +269,12 @@
                                              :lineups lineups
                                              :team-players team-players}
                                             db))
-        (catch Exception e (println "Error sending close/reminder notification:" (.getMessage e)))))
+        (catch Exception e (log/error e "Error sending close/reminder notification:"))))
     pelada))
 
 (s/defn get-pelada-dashboard-data :- responses.pelada/PeladaDashboardResponse
-  [pelada-id :- s/Int
-   user-id :- s/Int
+  [pelada-id :- s/Uuid
+   user-id :- s/Uuid
    db]
   (let [pelada (db.pelada/get-pelada pelada-id db)
         organization-id (:organization-id pelada)
@@ -294,7 +295,7 @@
                                                (map :user-id organization-players)
                                                (map :user-id match-events)
                                                (map :created-by transactions))))
-        users (map #(select-keys % [:id :name :username :avatar-filename])
+        users (map adapter.pelada/user->response
                    (db.user/get-users-by-ids db (vec referenced-user-ids)))
 
         ;; Transform team-players into a map
@@ -309,10 +310,13 @@
         match-lineups-map (reduce (fn [acc {:keys [match_id team_id] :as lineup}]
                                     (assoc-in acc [match_id team_id] (conj (get-in acc [match_id team_id] []) lineup)))
                                   {}
-                                  match-lineups)]
+                                  match-lineups)
+        matches-resp (map adapter.match/model->response matches)
+        teams-resp (map adapter.team/model->response teams)
+        attendance-resp (map adapter.attendance/db->response attendance)]
     {:pelada (assoc (adapter.pelada/model->response pelada) :is_admin is-admin)
-     :matches (map adapter.match/model->response matches)
-     :teams (map adapter.team/model->response teams)
+     :matches matches-resp
+     :teams teams-resp
      :users users
      :organization_players (map adapter.player/model->response organization-players)
      :match_events (map adapter.match/event->response match-events)
@@ -320,10 +324,11 @@
      :team_players_map team-players-map
      :match_lineups_map match-lineups-map
      :pelada_transactions (map adapter.finance/model->transaction-response transactions)
-     :attendance (map adapter.attendance/db->response attendance)}))
-(s/defn get-pelada-full-details-controller :- responses.pelada/PeladaFullDetailsResponse
-  [pelada-id :- s/Int
-   user-id :- s/Int
+     :attendance attendance-resp}))
+
+(s/defn get-pelada-full-details-controller
+  [pelada-id :- s/Uuid
+   user-id :- s/Uuid
    db]
   (let [pelada-data (db.pelada/get-pelada-full-details pelada-id db)
         pelada (:pelada pelada-data)
@@ -334,36 +339,11 @@
         current-player (some-> (filter #(= user-id (:user-id %)) (vals all-org-players)) first)
         player-id (:id current-player)
         voting-info (if (and (= "closed" (:status pelada)) player-id)
-                      (adapter.vote/voting-info-model->response
-                       (pelada.logic/get-voting-info pelada-id player-id db))
+                      (pelada.logic/get-voting-info pelada-id player-id db)
                       nil)
-
-        ;; Map models back to response format
-        mapped-pelada (assoc (adapter.pelada/model->response pelada)
-                             :is_admin is-admin
-                             :has_schedule_plan (boolean has-schedule-plan))
-        mapped-teams (map (fn [team]
-                            (assoc (adapter.team/model->response team)
-                                   :players (map (fn [p] (assoc (adapter.player/model->response p)
-                                                                :user (:user p)
-                                                                :is_goalkeeper (:is_goalkeeper p)))
-                                                 (:players team))))
-                          (:teams pelada-data))
-
-        mapped-available (map (fn [p]
-                                (assoc (adapter.player/model->response p)
-                                       :user (:user p)
-                                       :attendance_status (:attendance-status p)))
-                              (:available-players pelada-data))
-        mapped-attendance (map (fn [a]
-                                 (assoc a :player (assoc (adapter.player/model->response (:player a))
-                                                         :user (get-in a [:player :user]))))
-                               (:attendance pelada-data))
         transactions (if is-admin (db.transaction/list-transactions-by-pelada pelada-id db) [])]
-    {:pelada mapped-pelada
-     :teams mapped-teams
-     :available_players mapped-available
-     :attendance mapped-attendance
-     :pelada_transactions (map adapter.finance/model->transaction-response transactions)
-     :voting_info voting-info
-     :scores (:scores pelada-data)}))
+    (assoc pelada-data
+           :is-admin is-admin
+           :has-schedule-plan (boolean has-schedule-plan)
+           :pelada-transactions transactions
+           :voting-info voting-info)))

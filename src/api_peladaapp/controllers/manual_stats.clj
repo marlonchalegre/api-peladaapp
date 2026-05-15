@@ -7,8 +7,8 @@
    [schema.core :as s]))
 
 (s/defn upsert-manual-stats :- s/Int
-  [requesting-user-id :- s/Int
-   organization-id :- s/Int
+  [requesting-user-id :- s/Uuid
+   organization-id :- s/Uuid
    stats :- [models.manual-stats/ManualStats]
    db]
   (if (db.admin/is-user-admin-of-organization? requesting-user-id organization-id db)
@@ -21,7 +21,7 @@
     (throw (ex-info "Forbidden" {:type :forbidden :message "User is not an admin of this organization"}))))
 
 (s/defn list-manual-stats :- [models.manual-stats/ManualStats]
-  [organization-id :- s/Int
+  [organization-id :- s/Uuid
    year :- s/Int
    db]
   (db.manual-stats/list-manual-stats-by-org-and-year organization-id year db))

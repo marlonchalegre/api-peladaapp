@@ -1,13 +1,17 @@
 (ns api-peladaapp.db.finance
   (:require
    [api-peladaapp.adapters.finance :as adapter.finance]
+   [api-peladaapp.helpers.sql :as hsql]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
    [schema.core :as s]))
 
 (s/defn get-organization-finance
-  [org-id db]
-  (let [query "SELECT * FROM \"OrganizationFinances\" WHERE \"organization_id\" = ?"
-        result (jdbc/execute-one! db [query org-id])]
+  [org-id :- s/Uuid db]
+  (let [query (-> (h/select :*)
+                  (h/from :OrganizationFinances)
+                  (h/where [:= :organization_id org-id]))
+        result (jdbc/execute-one! db (hsql/format query) hsql/opts)]
     (if result
       (adapter.finance/db->finance result)
       {:organization-id org-id
@@ -18,89 +22,118 @@
        :currency "BRL"})))
 
 (s/defn upsert-organization-finance
-  [org-id finance db]
-  (let [row (adapter.finance/finance->db finance)
-        exists? (jdbc/execute-one! db ["SELECT 1 FROM \"OrganizationFinances\" WHERE \"organization_id\" = ?" org-id])]
+  [org-id :- s/Uuid finance db]
+  (let [row (assoc (adapter.finance/finance->db finance) :organization_id org-id)
+        exists-query (-> (h/select 1)
+                         (h/from :OrganizationFinances)
+                         (h/where [:= :organization_id org-id]))
+        exists? (jdbc/execute-one! db (hsql/format exists-query))]
     (if exists?
-      (jdbc/execute! db ["UPDATE \"OrganizationFinances\" SET \"mensalista_price\" = ?, \"diarista_price\" = ?, \"monthly_fine_amount\" = ?, \"monthly_cut_off_day\" = ?, \"currency\" = ? WHERE \"organization_id\" = ?"
-                         (:mensalista_price row) (:diarista_price row) (:monthly_fine_amount row) (:monthly_cut_off_day row) (:currency row) org-id])
-      (jdbc/execute! db ["INSERT INTO \"OrganizationFinances\" (\"organization_id\", \"mensalista_price\", \"diarista_price\", \"monthly_fine_amount\", \"monthly_cut_off_day\", \"currency\") VALUES (?, ?, ?, ?, ?, ?)"
-                         org-id (:mensalista_price row) (:diarista_price row) (:monthly_fine_amount row) (:monthly_cut_off_day row) (:currency row)]))
+      (let [query (-> (h/update :OrganizationFinances)
+                      (h/set {:mensalista_price (:mensalista_price row)
+                              :diarista_price (:diarista_price row)
+                              :monthly_fine_amount (:monthly_fine_amount row)
+                              :monthly_cut_off_day (:monthly_cut_off_day row)
+                              :currency (:currency row)})
+                      (h/where [:= :organization_id org-id]))]
+        (jdbc/execute! db (hsql/format query)))
+      (let [query (-> (h/insert-into :OrganizationFinances)
+                      (h/values [row]))]
+        (jdbc/execute! db (hsql/format query))))
     1))
 
 (s/defn add-transaction
-  [transaction db]
+  [transaction :- s/Any db]
   (let [row (adapter.finance/transaction->db transaction)
-        sql "INSERT INTO \"Transactions\" (\"organization_id\", \"player_id\", \"pelada_id\", \"amount\", \"fine_amount\", \"type\", \"category\", \"description\", \"payment_date\", \"created_by\", \"status\") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-        params [(:organization_id row) (:player_id row) (:pelada_id row) (:amount row) (or (:fine_amount row) 0.0) (:type row) (:category row) (:description row) (:payment_date row) (:created_by row) (or (:status row) "paid")]
-        _ (jdbc/execute! db (into [sql] params))
-        result (jdbc/execute-one! db ["SELECT last_insert_rowid() as id"])
-        new-id (or (:id result) (get result (keyword "last_insert_rowid()")) (get result "last_insert_rowid()"))]
-    (adapter.finance/db->transaction (jdbc/execute-one! db ["SELECT * FROM \"Transactions\" WHERE id = ?" new-id]))))
+        row (cond-> row
+              (:type row) (update :type (fn [v] [:cast v :transaction_type]))
+              (:status row) (update :status (fn [v] [:cast v :transaction_status])))
+        insert-query (-> (h/insert-into :Transactions)
+                         (h/values [row])
+                         (h/returning :id))
+        result (jdbc/execute-one! db (hsql/format insert-query) hsql/opts)
+        new-id (:id result)]
+    (adapter.finance/db->transaction (jdbc/execute-one! db (hsql/format (-> (h/select :*) (h/from :Transactions) (h/where [:= :id new-id]))) hsql/opts))))
 
 (s/defn reverse-transaction
-  [transaction-id db]
+  [transaction-id :- s/Uuid db]
   (jdbc/with-transaction [tx db]
-    (jdbc/execute! tx ["UPDATE \"Transactions\" SET \"status\" = 'reversed' WHERE id = ?" transaction-id])
-    ;; If it's a base fee transaction, mark the payment as unpaid
-    (jdbc/execute! tx ["UPDATE \"MonthlyPayments\" SET \"paid\" = 0, \"transaction_id\" = NULL WHERE \"transaction_id\" = ?" transaction-id])
-    ;; If it's a fine transaction, just clear the link (keep paid=1 if base fee is still there)
-    ;; Actually, we might want to keep the link but we already check status='reversed' in the UI.
-    ;; But for consistency with the base fee behavior, we clear the ID.
-    (jdbc/execute! tx ["UPDATE \"MonthlyPayments\" SET \"fine_transaction_id\" = NULL WHERE \"fine_transaction_id\" = ?" transaction-id])))
+    (let [q1 (-> (h/update :Transactions) (h/set {:status [:cast "reversed" :transaction_status]}) (h/where [:= :id transaction-id]))
+          q2 (-> (h/update :MonthlyPayments) (h/set {:paid false :transaction_id nil}) (h/where [:= :transaction_id transaction-id]))
+          q3 (-> (h/update :MonthlyPayments) (h/set {:fine_transaction_id nil}) (h/where [:= :fine_transaction_id transaction-id]))]
+      (jdbc/execute! tx (hsql/format q1))
+      ;; If it's a base fee transaction, mark the payment as unpaid
+      (jdbc/execute! tx (hsql/format q2))
+      ;; If it's a fine transaction, just clear the link
+      (jdbc/execute! tx (hsql/format q3)))))
+
 (s/defn count-transactions
-  [org-id db]
-  (:count (jdbc/execute-one! db ["SELECT COUNT(*) as count FROM \"Transactions\" WHERE \"organization_id\" = ?" org-id])))
+  [org-id :- s/Uuid db]
+  (let [query (-> (h/select [[:count :*] :count])
+                  (h/from :Transactions)
+                  (h/where [:= :organization_id org-id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        :count
+        int)))
 
 (s/defn list-transactions
-  [org-id limit offset db]
-  (let [query "SELECT t.*, u.name as player_name, uc.name as creator_name
-               FROM \"Transactions\" t
-               LEFT JOIN OrganizationPlayers op ON t.player_id = op.id
-               LEFT JOIN Users u ON op.user_id = u.id
-               LEFT JOIN Users uc ON t.created_by = uc.id
-               WHERE t.\"organization_id\" = ?
-               ORDER BY t.\"payment_date\" DESC, t.\"created_at\" DESC
-               LIMIT ? OFFSET ?"
-        result (jdbc/execute! db [query org-id limit offset])]
+  [org-id :- s/Uuid limit offset db]
+  (let [query (-> (h/select :t.* [:u.name :player_name] [:uc.name :creator_name])
+                  (h/from [:Transactions :t])
+                  (h/left-join [:OrganizationPlayers :op] [:= :t.player_id :op.id])
+                  (h/left-join [:Users :u] [:= :op.user_id :u.id])
+                  (h/left-join [:Users :uc] [:= :t.created_by :uc.id])
+                  (h/where [:= :t.organization_id org-id])
+                  (h/order-by [:t.payment_date :desc] [:t.created_at :desc])
+                  (h/limit limit)
+                  (h/offset offset))
+        result (jdbc/execute! db (hsql/format query) hsql/opts)]
     (map adapter.finance/db->transaction result)))
+
 (s/defn get-monthly-payments
-  [org-id year month db]
-  (let [query "SELECT mp.id, op.id as player_id, u.name as player_name, op.member_type,
-                       mp.year, mp.month, mp.transaction_id, mp.fine_transaction_id, mp.paid,
-                       t.amount, t.fine_amount,
-                       ft.amount as actual_fine_amount, ft.status as fine_status
-                FROM OrganizationPlayers op
-                JOIN Users u ON op.user_id = u.id
-                LEFT JOIN \"MonthlyPayments\" mp ON op.id = mp.player_id
-                     AND mp.year = ? AND mp.month = ?
-                LEFT JOIN \"Transactions\" t ON mp.transaction_id = t.id
-                LEFT JOIN \"Transactions\" ft ON mp.fine_transaction_id = ft.id
-                WHERE op.organization_id = ? AND op.member_type IN ('mensalista', 'mensalista_temporario')
-                ORDER BY u.name ASC"
-        result (jdbc/execute! db [query year month org-id])]
+  [org-id :- s/Uuid year month db]
+  (let [query (-> (h/select :mp.id [:op.id :player_id] [:u.name :player_name] :op.member_type
+                            :mp.year :mp.month :mp.transaction_id :mp.fine_transaction_id :mp.paid
+                            :t.amount :t.fine_amount
+                            [:ft.amount :actual_fine_amount] [:ft.status :fine_status])
+                  (h/from [:OrganizationPlayers :op])
+                  (h/join [:Users :u] [:= :op.user_id :u.id])
+                  (h/left-join [:MonthlyPayments :mp] [:and [:= :op.id :mp.player_id] [:= :mp.year year] [:= :mp.month month]])
+                  (h/left-join [:Transactions :t] [:= :mp.transaction_id :t.id])
+                  (h/left-join [:Transactions :ft] [:= :mp.fine_transaction_id :ft.id])
+                  (h/where [:and [:= :op.organization_id org-id] [:in :op.member_type [[:cast "mensalista" :member_type] [:cast "mensalista_temporario" :member_type]]]])
+                  (h/order-by :u.name))
+        result (jdbc/execute! db (hsql/format query) hsql/opts)]
     (map adapter.finance/db->monthly-payment result)))
 
 (s/defn mark-monthly-payment
-  [payment db]
+  [payment :- s/Any db]
   (let [row (adapter.finance/monthly-payment->db payment)
-        exists? (jdbc/execute-one! db ["SELECT id FROM \"MonthlyPayments\" WHERE \"organization_id\" = ? AND \"player_id\" = ? AND \"year\" = ? AND \"month\" = ?"
-                                       (:organization_id row) (:player_id row) (:year row) (:month row)])]
+        exists-query (-> (h/select :id)
+                         (h/from :MonthlyPayments)
+                         (h/where [:and [:= :organization_id (:organization_id row)] [:= :player_id (:player_id row)] [:= :year (:year row)] [:= :month (:month row)]]))
+        exists? (jdbc/execute-one! db (hsql/format exists-query) hsql/opts)]
     (if exists?
-      (jdbc/execute! db ["UPDATE \"MonthlyPayments\" SET \"transaction_id\" = ?, \"fine_transaction_id\" = ?, \"paid\" = ? WHERE id = ?"
-                         (:transaction_id row) (:fine_transaction_id row) (:paid row) (or (:id exists?) (get exists? (keyword "MonthlyPayments/id")))])
-      (jdbc/execute! db ["INSERT INTO \"MonthlyPayments\" (\"organization_id\", \"player_id\", \"year\", \"month\", \"transaction_id\", \"fine_transaction_id\", \"paid\") VALUES (?, ?, ?, ?, ?, ?, ?)"
-                         (:organization_id row) (:player_id row) (:year row) (:month row) (:transaction_id row) (:fine_transaction_id row) (:paid row)]))
+      (let [q (-> (h/update :MonthlyPayments)
+                  (h/set {:transaction_id (:transaction_id row) :fine_transaction_id (:fine_transaction_id row) :paid (:paid row)})
+                  (h/where [:= :id (:id exists?)]))]
+        (jdbc/execute! db (hsql/format q)))
+      (let [q (-> (h/insert-into :MonthlyPayments) (h/values [row]))]
+        (jdbc/execute! db (hsql/format q))))
     1))
 
 (s/defn get-summary
-  [org-id db]
-  (let [income-query "SELECT SUM(amount) as total FROM \"Transactions\" WHERE \"organization_id\" = ? AND \"type\" = 'income' AND \"status\" = 'paid'"
-        expense-query "SELECT SUM(amount) as total FROM \"Transactions\" WHERE \"organization_id\" = ? AND \"type\" = 'expense' AND \"status\" = 'paid'"
-        income-res (jdbc/execute-one! db [income-query org-id])
-        expense-res (jdbc/execute-one! db [expense-query org-id])
-        income (or (:total income-res) (get income-res (keyword "SUM(amount)")) (get income-res "SUM(amount)") 0.0)
-        expense (or (:total expense-res) (get expense-res (keyword "SUM(amount)")) (get expense-res "SUM(amount)") 0.0)]
-    {:total-income (double (or income 0.0))
-     :total-expense (double (or expense 0.0))
-     :total-balance (double (- (or income 0.0) (or expense 0.0)))}))
+  [org-id :- s/Uuid db]
+  (let [income-query (-> (h/select [[:sum :amount] :total])
+                         (h/from :Transactions)
+                         (h/where [:and [:= :organization_id org-id] [:= :type [:cast "income" :transaction_type]] [:= :status [:cast "paid" :transaction_status]]]))
+        expense-query (-> (h/select [[:sum :amount] :total])
+                          (h/from :Transactions)
+                          (h/where [:and [:= :organization_id org-id] [:= :type [:cast "expense" :transaction_type]] [:= :status [:cast "paid" :transaction_status]]]))
+        income-res (jdbc/execute-one! db (hsql/format income-query) hsql/opts)
+        expense-res (jdbc/execute-one! db (hsql/format expense-query) hsql/opts)
+        income (or (:total income-res) 0.0)
+        expense (or (:total expense-res) 0.0)]
+    {:total-income (double income)
+     :total-expense (double expense)
+     :total-balance (double (- income expense))}))

@@ -7,7 +7,7 @@
 (use-fixtures :each th/test-system-fixture)
 
 (deftest test-finance-endpoints
-  (let [app (-> th/*test-system* :app :handler)
+  (let [app (-> th/*test-system* :app :app-handler)
         db-comp (:database th/*test-system*)
         db-val (:database db-comp)
         ds (if (fn? db-val) (db-val) db-val)
@@ -21,7 +21,7 @@
         org-resp (app (-> (mock/request :post "/api/organizations")
                           (mock/json-body {:name "Finance Test Org"})
                           ((th/auth-cookie admin-token))))
-        org-id (:id (th/decode-body org-resp))]
+        org-id (parse-uuid (:id (th/decode-body org-resp)))]
 
     ;; Add member to org
     (app (-> (mock/request :post (str "/api/organizations/" org-id "/players"))
@@ -96,7 +96,7 @@
                             (mock/query-string {:year year :month month})
                             ((th/auth-cookie admin-token))))
               payments (th/decode-body resp)
-              payment (first (filter #(= (:player_id %) player-id) payments))]
+              payment (first (filter #(= (str (:player_id %)) (str player-id)) payments))]
           (is (= 200 (:status resp)))
           (is (false? (:paid payment))))
 
@@ -109,7 +109,7 @@
                                              :amount 100.0})
                             ((th/auth-cookie admin-token))))
               body (th/decode-body resp)
-              tx-id (:transaction_id body)]
+              tx-id (some-> body :transaction_id parse-uuid)]
           (is (= 200 (:status resp)))
           (is (some? tx-id))
 
@@ -118,9 +118,9 @@
                                 (mock/query-string {:year year :month month})
                                 ((th/auth-cookie admin-token))))
                 payments (th/decode-body p-resp)
-                payment (first (filter #(= (:player_id %) player-id) payments))]
+                payment (first (filter #(= (str (:player_id %)) (str player-id)) payments))]
             (is (true? (:paid payment)))
-            (is (= tx-id (:transaction_id payment)))
+            (is (= (str tx-id) (str (:transaction_id payment))))
 
             ;; Reverse the transaction directly
             (let [rev-resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/finance/transactions/" tx-id "/reverse"))
@@ -132,6 +132,6 @@
                                       (mock/query-string {:year year :month month})
                                       ((th/auth-cookie admin-token))))
                   final-payments (th/decode-body final-resp)
-                  final-payment (first (filter #(= (:player_id %) player-id) final-payments))]
+                  final-payment (first (filter #(= (str (:player_id %)) (str player-id)) final-payments))]
               (is (false? (:paid final-payment)) "Monthly payment should be unpaid after transaction reversal")
               (is (nil? (:transaction_id final-payment)) "Monthly payment should not have transaction_id after reversal"))))))))

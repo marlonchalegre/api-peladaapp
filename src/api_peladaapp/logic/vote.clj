@@ -1,6 +1,6 @@
 (ns api-peladaapp.logic.vote
   (:require
-   [clojure.string :as str])
+   [api-peladaapp.helpers.time :as time])
   (:import
    [java.time Duration Instant]))
 
@@ -34,12 +34,7 @@
       (throw (ex-info "Pelada has no closed_at timestamp"
                       {:type :bad-request
                        :message "Cannot determine voting window"})))
-    (let [closed-instant (cond
-                           (instance? Instant closed-at) closed-at
-                           (string? closed-at) (let [s (str/replace (str closed-at) " " "T")
-                                                     s (if (str/ends-with? s "Z") s (str s "Z"))]
-                                                 (Instant/parse s))
-                           :else (Instant/parse (str closed-at)))
+    (let [closed-instant (time/->instant closed-at)
           now (Instant/now)
           duration (Duration/between closed-instant now)
           limit (Duration/ofHours 24)]

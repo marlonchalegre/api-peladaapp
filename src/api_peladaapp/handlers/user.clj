@@ -59,7 +59,7 @@
 
 (defn get-by-id [request]
   (try
-    (let [id (-> request :params :id parse-long)
+    (let [id (-> request :params :id parse-uuid)
           db (-> request :database)]
       (auth/require-self-or-admin! request id)
       (-> (controller.user/get-user id db)
@@ -70,7 +70,7 @@
 
 (defn update-profile [request]
   (try
-    (let [id (-> request :params :id parse-long)
+    (let [id (-> request :params :id parse-uuid)
           body (-> request :body)
           db (-> request :database)]
       (auth/require-self-or-admin! request id)
@@ -83,7 +83,7 @@
 
 (defn delete [request]
   (try
-    (let [id (-> request :params :id parse-long)
+    (let [id (-> request :params :id parse-uuid)
           db (-> request :database)]
       (auth/require-self-or-admin! request id)
       (controller.user/delete-user id db)

@@ -6,16 +6,12 @@
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.reminder :as db.reminder]
    [api-peladaapp.db.vote :as db.vote]
+   [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.grade :as logic.grade]
    [api-peladaapp.logic.notifications :as notifications]
-   [clojure.string :as str]
    [clojure.tools.logging :as log])
   (:import
-   [java.time
-    Duration
-    Instant
-    ZoneId
-    ZonedDateTime]))
+   [java.time Duration ZoneId ZonedDateTime]))
 
 (defn- br-now []
   (ZonedDateTime/now (ZoneId/of "America/Sao_Paulo")))
@@ -27,16 +23,14 @@
     (and is-reminder-hour?
          (or (not (seq (str last-sent)))
              (try
-               (let [last-sent-inst (if (instance? Instant last-sent)
-                                      last-sent
-                                      (Instant/parse (str (str/replace (str last-sent) " " "T") "Z")))
+               (let [last-sent-inst (helpers.time/->instant last-sent)
                      diff (Duration/between last-sent-inst (.toInstant now))]
                  ;; If last-sent was more than 4 hours ago, we are likely in a new slot (10h vs 18h)
                  (> (.toHours diff) 4))
                (catch Exception _ true))))))
 
 (defn- run-attendance-reminders! [db ^ZonedDateTime now]
-  (let [orgs (db.organization/list-all-organizations db)]
+  (let [orgs (db.organization/list-organizations db)]
     (doseq [org orgs]
       (let [org-id (:id org)]
         (when (:waha-attendance-reminder-enabled org)
@@ -58,7 +52,7 @@
   (let [peladas (db.pelada/list-peladas-for-vote-notification db)]
     (if (seq peladas)
       (log/info "Found" (count peladas) "peladas with ended voting period. Processing...")
-      (log/debug "No peladas with ended voting period found."))
+      (log/debug "No Peladas with ended voting period found."))
 
     (doseq [p peladas]
       (let [org-id (:organization-id p)
@@ -73,7 +67,7 @@
                   current-player (db.player/get-player player-id db)
                   current-grade (or (:grade current-player) 5.0)
                   new-grade (logic.grade/calculate-new-grade current-grade performance)]
-              (log/info (format "Updating player %d grade: %.2f -> %.2f (perf: %.2f)"
+              (log/info (format "Updating player %s grade: %.2f -> %.2f (perf: %.2f)"
                                 player-id current-grade new-grade performance))
               (db.player/update-player-grade player-id new-grade db)))
 

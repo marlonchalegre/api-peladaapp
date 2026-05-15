@@ -58,3 +58,4 @@ tmp/
 # Project specific
 uploads/
 peladaapp.db*
+.lein-failures

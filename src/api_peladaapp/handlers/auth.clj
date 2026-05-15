@@ -27,7 +27,11 @@
     (if-let [token (extract-token request)]
       (try
         (let [secret (config/get-key :jwt-secret)
-              claims (jwt/unsign token secret {:alg :hs512})]
+              claims (jwt/unsign token secret {:alg :hs512})
+              ;; Ensure UUIDs are parsed back to objects
+              claims (cond-> claims
+                       (string? (:id claims)) (update :id parse-uuid)
+                       (:admin_orgs claims) (update :admin_orgs #(map (fn [id] (if (string? id) (parse-uuid id) id)) %)))]
           (handler (assoc request :identity claims)))
         (catch Exception _
           (handler request)))
@@ -40,13 +44,22 @@
 ;; Simple brute-force protection
 (def login-attempts (atom {}))
 (def password-reset-attempts (atom {}))
+(def lockout-duration-ms (* 15 60 1000)) ;; 15 minutes
 
 (defn- too-many-attempts? [attempts-atom identifier]
-  (let [attempts (get @attempts-atom identifier 0)]
-    (>= attempts 5)))
+  (let [data (get @attempts-atom identifier)
+        now (System/currentTimeMillis)]
+    (if (and data (> (- now (:last-attempt data)) lockout-duration-ms))
+      false ;; Lockout expired
+      (>= (:count data 0) 5))))
 
 (defn- record-failure [attempts-atom identifier]
-  (swap! attempts-atom update identifier (fnil inc 0)))
+  (swap! attempts-atom update identifier
+         (fn [data]
+           (let [now (System/currentTimeMillis)]
+             (if (and data (> (- now (:last-attempt data)) lockout-duration-ms))
+               {:count 1 :last-attempt now}
+               {:count (inc (:count data 0)) :last-attempt now})))))
 
 (defn- clear-attempts [attempts-atom identifier]
   (swap! attempts-atom dissoc identifier))

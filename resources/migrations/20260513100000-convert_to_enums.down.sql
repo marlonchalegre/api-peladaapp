@@ -1,0 +1,1 @@
+-- No rollback supported for enum conversion

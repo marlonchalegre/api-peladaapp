@@ -1,16 +1,23 @@
 (ns api-peladaapp.voting-results-restriction-test
   (:require
+   [api-peladaapp.helpers.misc :as misc]
+   [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
+   [next.jdbc.result-set :as rs]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 
+(defn- exec! [ds query]
+  (jdbc/execute! ds (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps}))
+
 (deftest voting-results-restriction-test
-  (let [app (-> th/*test-system* :app :handler)
-        db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
 
         ;; Setup: Admin, Player 1 (voted), Player 2 (did not vote), Player 3 (didn't play)
         token-admin (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass"})
@@ -32,7 +39,7 @@
     ;; Add players to org
     (doseq [email ["p1@test.com" "p2@test.com" "p3@test.com"]]
       (let [uid (th/user-id-by-email ds email)]
-        (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (organization_id, user_id) VALUES (?, ?)" org-id uid])))
+        (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id (misc/as-uuid org-id) :user_id (misc/as-uuid uid)}])))))
 
     (let [pelada-id (:id (th/decode-body (app (-> (mock/request :post "/api/peladas")
                                                   (mock/json-body {:organization_id org-id :num_teams 2})
@@ -47,7 +54,7 @@
 
       ;; Only Admin, P1 and P2 participated
       (doseq [pid [p-admin-id p1-id p2-id]]
-        (jdbc/execute! ds ["INSERT INTO TeamPlayers (team_id, player_id) VALUES (?, ?)" t1-id pid]))
+        (exec! ds (-> (h/insert-into :TeamPlayers) (h/values [{:team_id (misc/as-uuid t1-id) :player_id (misc/as-uuid pid)}]))))
 
       (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth-admin))
       (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin")) auth-admin))
@@ -60,7 +67,8 @@
                auth-p1))
 
       ;; Force voting window to close
-      (jdbc/execute! ds ["UPDATE Peladas SET closed_at = datetime('now', '-25 hours') WHERE id = ?" pelada-id])
+      (let [old-date (.minus (java.time.OffsetDateTime/now) (java.time.Duration/ofHours 26))]
+        (exec! ds (-> (h/update :Peladas) (h/set {:closed_at [[:cast old-date :timestamp]]}) (h/where [:= :id (misc/as-uuid pelada-id)]))))
 
       (testing "Admin can access results even if didn't vote"
         (let [resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/voting-results")) auth-admin))]

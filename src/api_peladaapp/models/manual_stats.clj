@@ -3,9 +3,9 @@
    [schema.core :as s]))
 
 (s/defschema ManualStats
-  {:id (s/maybe s/Int)
-   :organization-id s/Int
-   :player-id s/Int
+  {:id (s/maybe s/Uuid)
+   :organization-id s/Uuid
+   :player-id s/Uuid
    :year s/Int
    :goals (s/maybe s/Int)
    :assists (s/maybe s/Int)

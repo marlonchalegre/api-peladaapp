@@ -3,10 +3,10 @@
    [schema.core :as s]))
 
 (s/defschema Match
-  {:id s/Int
-   :pelada-id s/Int
-   :home-team-id s/Int
-   :away-team-id s/Int
+  {:id s/Uuid
+   :pelada-id s/Uuid
+   :home-team-id s/Uuid
+   :away-team-id s/Uuid
    :sequence s/Int
    :status (s/maybe s/Str)
    :home-score (s/maybe s/Int)
@@ -16,8 +16,8 @@
    (s/optional-key :timer-status) (s/maybe s/Str)})
 
 (s/defschema PlayerStats
-  {:player-id s/Int
-   :user-id s/Int
+  {:player-id s/Uuid
+   :user-id s/Uuid
    :name s/Str
    :goals s/Int
    :assists s/Int

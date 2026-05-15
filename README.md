@@ -1,6 +1,6 @@
 # ⚽️ PeladaApp API
 
-A Clojure HTTP API to organize casual soccer (pelada) with friends: manage users/players, organizations, game days (peladas), teams, round‑robin matches with constraints, substitutions, and post‑game voting with normalized scores. Built on Ring/Compojure, next.jdbc (SQLite), and Buddy Auth.
+A Clojure HTTP API to organize casual soccer (pelada) with friends: manage users/players, organizations, game days (peladas), teams, round‑robin matches with constraints, substitutions, and post‑game voting with normalized scores. Built on Ring/Compojure, next.jdbc (PostgreSQL), and Buddy Auth.
 
 ---
 
@@ -37,9 +37,17 @@ Always prefer running commands inside the backend container when the environment
 # Run tests inside container
 docker compose exec backend lein test
 
-# Run linting
-docker compose exec backend lein clj-kondo --lint src
+# Run code analysis (clj-kondo + clojure-lsp check)
+docker compose exec backend lein lint
+
+# Apply automated formatting and namespace cleaning
+docker compose exec backend lein lint-fix
 ```
+
+### 🛠️ Development Workflow
+- **Formatting**: We use `clojure-lsp` for formatting and namespace cleaning.
+- **Linting**: We use `clj-kondo` for static analysis.
+- **CI/Pre-commit**: Always run `lein lint-fix` before committing to ensure the codebase remains consistent and clean.
 
 ---
 
@@ -52,8 +60,8 @@ docker compose exec backend lein clj-kondo --lint src
 ### 🔧 Technologies
 - **Language/Runtime**: Clojure 1.12, JVM 23 (Temurin)
 - **Web**: Ring 1.13, Compojure 1.7, Jetty
-- **Auth**: Buddy (sign, auth, hashers) with HS512 JWT
-- **DB**: SQLite (`org.xerial/sqlite-jdbc`), next.jdbc, HikariCP, Migratus. Supports Turso (LibSQL) via JDBC.
+- **Auth**: Buddy (sign, auth, hashers) with HS512
+- **DB**: PostgreSQL, next.jdbc, HikariCP, Migratus, HoneySQL.
 - **Schemas**: Prismatic Schema
 - **Components**: Stuart Sierra Component for lifecycle management
 - **Algorithms**: Bucket Shuffle for team randomization; Iterated Local Search (ILS) for match scheduling.
@@ -67,11 +75,11 @@ docker compose exec backend lein clj-kondo --lint src
 {"jwt-secret": "your-very-secret-key"}
 ```
 - **jwt-secret**: Symmetric key for JWT signing (HS512).
-- **DB**: SQLite file `peladaapp.db` in working dir; handled by HikariCP via `components.clj`.
+- **DB**: PostgreSQL; handled by HikariCP via `components.clj`.
 - **Migrations**: Managed by Migratus, located in `resources/migrations`.
 - **Environment Variables**:
   - `PELADA_API_SECURITY_SIGNING_KEY`: JWT secret (overrides config.json).
-  - `TURSO_DATABASE_URL`: Optional Turso/LibSQL connection URL.
+  - `DATABASE_URL`: PostgreSQL connection URL.
   - `WAHA_API_KEY`: API key for WAHA WhatsApp integration.
   - `WAHA_BASE_PATH`: Base path for WAHA service (e.g., `/waha`). Must be consistent with Nginx proxy configuration.
 
@@ -139,7 +147,7 @@ flowchart TD
   end
 
   subgraph Data[Persistence]
-    DB[(SQLite)]
+    DB[(PostgreSQL)]
   end
 
   U -->|HTTP| A --> M --> H
@@ -170,13 +178,6 @@ flowchart TD
 - `POST /api/scores/normalized`
 
 All `/api/**` require `Authorization: Token <jwt>`.
-
----
-
-### Development Tips
-- Clean DB during dev: delete `peladaapp.db` and restart; tests recreate schema directly from the consolidated SQL.
-- Test helpers handle JWT auth and tolerant JSON decoding.
-- Middleware order is important; see `server.clj` for final working order.
 
 ---
 

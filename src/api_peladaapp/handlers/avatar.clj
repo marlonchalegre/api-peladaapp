@@ -28,7 +28,7 @@
 
 (defn upload [request]
   (try
-    (let [user-id (-> request :params :id parse-long)
+    (let [user-id (-> request :params :id parse-uuid)
           _ (auth/require-self-or-admin! request user-id)
           file-params (get-in request [:multipart-params "avatar"])
           temp-file (:tempfile file-params)
@@ -72,7 +72,7 @@
 
 (defn serve [request]
   (try
-    (let [user-id (-> request :params :id parse-long)
+    (let [user-id (-> request :params :id parse-uuid)
           db (:database request)
           user (controller.user/get-user user-id db)
           filename (:avatar-filename user)]
@@ -96,7 +96,7 @@
 
 (defn delete [request]
   (try
-    (let [user-id (-> request :params :id parse-long)
+    (let [user-id (-> request :params :id parse-uuid)
           _ (auth/require-self-or-admin! request user-id)
           db (:database request)
           user (controller.user/get-user user-id db)

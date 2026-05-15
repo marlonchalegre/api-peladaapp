@@ -1,24 +1,27 @@
 (ns api-peladaapp.db.reminder
   (:require
-   [next.jdbc.result-set :as rs]
-   [next.jdbc.sql :as sql]
+   [api-peladaapp.helpers.sql :as hsql]
+   [honey.sql.helpers :as h]
+   [next.jdbc :as jdbc]
    [schema.core :as s]))
 
-(s/defn insert-reminder! :- s/Int
-  [pelada-id :- s/Int
+(s/defn insert-reminder! :- s/Uuid
+  [pelada-id :- s/Uuid
    type :- s/Str
    db]
-  (-> (sql/insert! db :PeladaReminders {:pelada_id pelada-id :type type})
-      vals
-      first))
+  (let [query (-> (h/insert-into :PeladaReminders)
+                  (h/values [{:pelada_id pelada-id :type [:cast type :reminder_type]}])
+                  (h/returning :id))]
+    (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
 (s/defn get-last-reminder-at :- (s/maybe s/Str)
-  [pelada-id :- s/Int
+  [pelada-id :- s/Uuid
    type :- s/Str
    db]
-  (-> (sql/query db ["SELECT sent_at FROM PeladaReminders 
-                      WHERE pelada_id = ? AND type = ? 
-                      ORDER BY sent_at DESC LIMIT 1" pelada-id type]
-                 {:builder-fn rs/as-unqualified-lower-maps})
-      first
-      :sent_at))
+  (let [query (-> (h/select :sent_at)
+                  (h/from :PeladaReminders)
+                  (h/where [:= :pelada_id pelada-id] [:= :type [:cast type :reminder_type]])
+                  (h/order-by [:sent_at :desc])
+                  (h/limit 1))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        :sent_at)))

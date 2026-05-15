@@ -10,7 +10,7 @@
   [key]
   (case key
     :jwt-secret (let [secret (or (System/getenv "PELADA_API_SECURITY_SIGNING_KEY")
-                                 (get data key nil))]
+                                 (get data key "dev-secret-key-change-me-in-prod"))]
                   (when (and (not *compile-files*)
                              (not= (System/getenv "APP_VERSION") "development")
                              (or (nil? secret) (= secret "dev-secret-key-change-me-in-prod")))

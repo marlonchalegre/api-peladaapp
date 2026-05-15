@@ -7,14 +7,14 @@
 (use-fixtures :each th/test-system-fixture)
 
 (deftest test-finance-reversal-scenarios
-  (let [app (-> th/*test-system* :app :handler)
+  (let [app (-> th/*test-system* :app :app-handler)
         admin-token (th/register-and-login! app {:name "Admin User" :email "admin@test.com" :password "test1234"})
 
         ;; Create Organization via admin
         org-resp (app (-> (mock/request :post "/api/organizations")
                           (mock/json-body {:name "Calculation Test Org"})
                           ((th/auth-cookie admin-token))))
-        org-id (:id (th/decode-body org-resp))]
+        org-id (parse-uuid (:id (th/decode-body org-resp)))]
 
     (testing "Scenario 1: Income Reversal"
       ;; 1. Start: Balance 0, Income 0, Expense 0 (already verified by org creation)
@@ -23,7 +23,7 @@
       (let [resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/finance/transactions"))
                           (mock/json-body {:amount 10.0 :type "income" :category "other" :description "Deposit" :payment_date "2026-03-28"})
                           ((th/auth-cookie admin-token))))
-            tx-id (:id (th/decode-body resp))]
+            tx-id (parse-uuid (:id (th/decode-body resp)))]
         (is (= 201 (:status resp)))
 
         ;; Verify Summary: Balance 10, Income 10, Expense 0
@@ -50,7 +50,7 @@
       (let [resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/finance/transactions"))
                           (mock/json-body {:amount 100.0 :type "expense" :category "equipment" :description "Ball" :payment_date "2026-03-28"})
                           ((th/auth-cookie admin-token))))
-            tx-id (:id (th/decode-body resp))]
+            tx-id (parse-uuid (:id (th/decode-body resp)))]
         (is (= 201 (:status resp)))
 
         ;; Verify Summary: Balance -100, Income 0, Expense 100

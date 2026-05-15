@@ -11,6 +11,6 @@
                             :player_id (or (:player_id r) (:player-id r))
                             :status (:status r)
                             :updated_at (:updated_at r)
-                            :voting_enabled (if (contains? r :voting_enabled)
-                                              (= 1 (:voting_enabled r))
+                            :voting-enabled (if (contains? r :voting_enabled)
+                                              (if (boolean? (:voting_enabled r)) (:voting_enabled r) (= 1 (:voting_enabled r)))
                                               true))))

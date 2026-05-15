@@ -10,7 +10,7 @@
 (deftest authenticate-checks-password-and-returns-token
   (let [plain "s3cret"
         hashed (hashers/encrypt plain)
-        user {:id 1 :email "u@e.com" :password hashed}
+        user {:id (parse-uuid "00000000-0000-0000-0000-000000000001") :email "u@e.com" :password hashed}
         db (fn [] nil)
         find-called (atom nil)]
     (with-redefs [db.user/find-user-by-identifier (fn [_ _] (reset! find-called true) user)
@@ -25,7 +25,7 @@
 (deftest authenticate-by-username-test
   (let [plain "s3cret"
         hashed (hashers/encrypt plain)
-        user {:id 1 :username "testuser" :password hashed}
+        user {:id (parse-uuid "00000000-0000-0000-0000-000000000001") :username "testuser" :password hashed}
         db (fn [] nil)
         find-called (atom nil)]
     (with-redefs [db.user/find-user-by-identifier (fn [identifier _]
@@ -41,7 +41,7 @@
 (deftest authenticate-invalid-password
   (let [plain "s3cret"
         hashed (hashers/encrypt "different")
-        user {:id 1 :email "u@e.com" :password hashed}
+        user {:id (parse-uuid "00000000-0000-0000-0000-000000000001") :email "u@e.com" :password hashed}
         db (fn [] nil)]
     (with-redefs [db.user/find-user-by-identifier (fn [_ _] user)
                   db.admin/list-organizations-by-admin (fn [_ _] [])

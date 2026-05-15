@@ -12,37 +12,37 @@
     (db.team/get-team id db)))
 
 (s/defn get-team :- models.team/Team
-  [team-id :- s/Int db]
+  [team-id :- s/Uuid db]
   (let [team (db.team/get-team team-id db)]
     (if (nil? team)
       (throw (ex-info nil {:type :not-found :message "Team not found"}))
       team)))
 
 (s/defn update-team :- models.team/Team
-  [team-id :- s/Int team :- models.team/Team db]
+  [team-id :- s/Uuid team :- models.team/Team db]
   (let [rows (db.team/update-team team-id team db)]
     (if (zero? rows)
       (throw (ex-info nil {:type :not-found :message "Team not found"}))
       (db.team/get-team team-id db))))
 
 (s/defn delete-team :- s/Int
-  [team-id :- s/Int db]
+  [team-id :- s/Uuid db]
   (let [rows (db.team/delete-team team-id db)]
     (if (zero? rows)
       (throw (ex-info nil {:type :not-found :message "Team not found"}))
       rows)))
 
 (s/defn list-teams :- [models.team/Team]
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (db.team/list-pelada-teams pelada-id db))
 
 (s/defn add-player :- responses.team/TeamPlayerResponse
-  ([team-id :- s/Int player-id :- s/Int db]
+  ([team-id :- s/Uuid player-id :- s/Uuid db]
    (add-player team-id player-id false db))
-  ([team-id :- s/Int player-id :- s/Int is-goalkeeper :- s/Bool db]
+  ([team-id :- s/Uuid player-id :- s/Uuid is-goalkeeper :- s/Bool db]
    (db.team/add-player-to-team team-id player-id is-goalkeeper db)
    {:team_id team-id :player_id player-id :is_goalkeeper is-goalkeeper}))
 
 (s/defn remove-player :- s/Int
-  [team-id :- s/Int player-id :- s/Int db]
+  [team-id :- s/Uuid player-id :- s/Uuid db]
   (db.team/remove-player-from-team team-id player-id db))

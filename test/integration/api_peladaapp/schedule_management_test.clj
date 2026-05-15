@@ -7,7 +7,7 @@
 (use-fixtures :each th/test-system-fixture)
 
 (deftest schedule-management-flow-test
-  (let [app (-> th/*test-system* :app :handler)]
+  (let [app (-> th/*test-system* :app :app-handler)]
 
     ;; Register and login
     (app (-> (mock/request :post "/auth/register") (mock/json-body {"name" "Admin" "email" "admin@test.com" "password" "pass123"})))

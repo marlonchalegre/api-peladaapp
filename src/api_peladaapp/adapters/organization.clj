@@ -29,15 +29,15 @@
   [o]
   (some-> o
           misc/unamespace
-          (select-keys [:id :name :owner_id :waha_api_url :waha_instance :waha_group_id :waha_enabled :waha_start_msg_enabled :waha_end_msg_enabled :waha_attendance_reminder_enabled :waha_vote_reminder_enabled :waha_vote_ended_msg_enabled :waha_use_all_mention])
+          (select-keys [:id :name :role :owner_id :waha_api_url :waha_instance :waha_group_id :waha_enabled :waha_start_msg_enabled :waha_end_msg_enabled :waha_attendance_reminder_enabled :waha_vote_reminder_enabled :waha_vote_ended_msg_enabled :waha_use_all_mention])
           (update-keys (comp keyword #(str/replace % "_" "-") name))
-          (update :waha-enabled #(= 1 %))
-          (update :waha-start-msg-enabled #(= 1 %))
-          (update :waha-end-msg-enabled #(= 1 %))
-          (update :waha-attendance-reminder-enabled #(= 1 %))
-          (update :waha-vote-reminder-enabled #(= 1 %))
-          (update :waha-vote-ended-msg-enabled #(= 1 %))
-          (update :waha-use-all-mention #(if (nil? %) true (= 1 %)))))
+          (update :waha-enabled #(if (boolean? %) % (= 1 %)))
+          (update :waha-start-msg-enabled #(if (boolean? %) % (= 1 %)))
+          (update :waha-end-msg-enabled #(if (boolean? %) % (= 1 %)))
+          (update :waha-attendance-reminder-enabled #(if (boolean? %) % (= 1 %)))
+          (update :waha-vote-reminder-enabled #(if (boolean? %) % (= 1 %)))
+          (update :waha-vote-ended-msg-enabled #(if (boolean? %) % (= 1 %)))
+          (update :waha-use-all-mention #(if (nil? %) true (if (boolean? %) % (= 1 %))))))
 (s/defn model->db [model :- models.organization/Organization]
   (-> model
       (select-keys [:id :name :owner-id])

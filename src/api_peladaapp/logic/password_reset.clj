@@ -3,7 +3,9 @@
    [api-peladaapp.config :as config]
    [api-peladaapp.db.password-reset :as db.password-reset]
    [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.helpers.time :as helpers.time]
    [buddy.hashers :as hashers]
+   [clojure.tools.logging :as log]
    [postal.core :as postal])
   (:import
    [java.time Instant]
@@ -40,7 +42,7 @@
                                                   "<p>This link will expire in 1 hour.</p>"
                                                   "<p>If you did not request this, please ignore this email.</p>")}]})
       (catch Exception e
-        (println "ERROR: Failed to send reset email to" email ":" (.getMessage e))))))
+        (log/error e "ERROR: Failed to send reset email to" email)))))
 
 (defn request-password-reset! [identifier db]
   (let [user (db.user/find-user-by-identifier identifier db)]
@@ -56,10 +58,10 @@
   (let [token-data (db.password-reset/find-token token db)
         now (Instant/now)]
     (if (and token-data
-             (.isAfter (Instant/parse (:expires_at token-data)) now))
+             (.isAfter (helpers.time/->instant (:expires_at token-data)) now))
       (let [user-id (:user_id token-data)
             hashed-password (hashers/encrypt new-password)]
-        (db.user/update-user user-id {:password hashed-password} db)
+        (db.user/update-password user-id hashed-password db)
         (db.password-reset/delete-user-tokens! user-id db)
         true)
       false)))

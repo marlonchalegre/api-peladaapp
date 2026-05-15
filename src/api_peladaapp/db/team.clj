@@ -1,9 +1,9 @@
 (ns api-peladaapp.db.team
   (:require
    [api-peladaapp.adapters.team :as adapter.team]
+   [api-peladaapp.helpers.sql :as hsql]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]
-   [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
 (defn- unqualify-row [row]
@@ -13,66 +13,75 @@
                  [kw v])))
         row))
 
-(defn- affected-rows-count [result]
-  (-> result vals first))
-
-(s/defn insert-team :- s/Int
-  [{:keys [pelada-id name]}
+(s/defn insert-team :- s/Uuid
+  [{:keys [pelada-id name]} :- {:pelada-id s/Uuid :name s/Str}
    db]
-  (jdbc/execute! db ["PRAGMA busy_timeout = 5000"])
-  (-> (sql/insert! db :teams {:pelada_id pelada-id :name name})
-      affected-rows-count))
+  (let [query (-> (h/insert-into :Teams)
+                  (h/values [{:pelada_id pelada-id :name name}])
+                  (h/returning :id))]
+    (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
-(s/defn get-team [id db]
-  (-> (sql/get-by-id db :teams id)
-      adapter.team/db->model))
+(s/defn get-team [id :- s/Uuid db]
+  (let [query (-> (h/select :*)
+                  (h/from :Teams)
+                  (h/where [:= :id id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        adapter.team/db->model)))
 
 (s/defn update-team :- s/Int
-  [id team db]
-  (-> (sql/update! db :teams (select-keys team [:name]) {:id id})
-      affected-rows-count))
+  [id :- s/Uuid team db]
+  (let [query (-> (h/update :Teams)
+                  (h/set (select-keys team [:name]))
+                  (h/where [:= :id id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn delete-team :- s/Int
-  [id db]
-  (-> (sql/delete! db :teams {:id id}) affected-rows-count))
+  [id :- s/Uuid db]
+  (let [query (-> (h/delete-from :Teams)
+                  (h/where [:= :id id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
-(s/defn list-pelada-teams [pelada-id db]
-  (->> (sql/find-by-keys db :teams {:pelada_id pelada-id})
-       (map adapter.team/db->model)))
+(s/defn list-pelada-teams [pelada-id :- s/Uuid db]
+  (let [query (-> (h/select :*)
+                  (h/from :Teams)
+                  (h/where [:= :pelada_id pelada-id]))]
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
+         (map adapter.team/db->model))))
 
 (s/defn validate-player-belongs-to-pelada-org :- (s/maybe s/Bool)
   "Validates if a player belongs to the same organization as the pelada of the team"
-  [team-id player-id db]
-  (let [query ["SELECT 1 FROM OrganizationPlayers op
-                  INNER JOIN Teams t ON t.id = ?
-                  INNER JOIN Peladas p ON p.id = t.pelada_id
-                  WHERE op.id = ? AND op.organization_id = p.organization_id"
-               team-id player-id]
-        result (jdbc/execute-one! db query)]
-    (some? result)))
+  [team-id :- s/Uuid player-id :- s/Uuid db]
+  (let [query (-> (h/select 1)
+                  (h/from [:OrganizationPlayers :op])
+                  (h/join [:Teams :t] [:= :t.id team-id])
+                  (h/join [:Peladas :p] [:= :p.id :t.pelada_id])
+                  (h/where [:= :op.id player-id] [:= :op.organization_id :p.organization_id]))]
+    (some? (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
 (s/defn validate-player-not-in-another-team-of-same-pelada :- (s/maybe s/Bool)
   "Validates if a player is not already in another team of the same pelada"
-  [team-id player-id db]
-  (let [query ["SELECT 1 FROM TeamPlayers tp
-                  INNER JOIN Teams t ON t.id = tp.team_id
-                  WHERE t.pelada_id = (SELECT pelada_id FROM Teams WHERE id = ?) AND tp.player_id = ?"
-               team-id player-id]
-        result (jdbc/execute-one! db query)]
-    (nil? result)))
+  [team-id :- s/Uuid player-id :- s/Uuid db]
+  (let [query (-> (h/select 1)
+                  (h/from [:TeamPlayers :tp])
+                  (h/join [:Teams :t] [:= :t.id :tp.team_id])
+                  (h/where [:and
+                            [:= :t.pelada_id (-> (h/select :pelada_id) (h/from :Teams) (h/where [:= :id team-id]))]
+                            [:= :tp.player_id player-id]]))]
+    (nil? (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
 (s/defn validate-team-not-full :- (s/maybe s/Bool)
   "Validates if the team has not reached the player limit.
    Note: Fixed goalkeepers are global and not in TeamPlayers."
-  [team-id db]
-  (let [query ["SELECT p.players_per_team as max_players, count(tp.player_id) as current_count
-                FROM Teams t
-                JOIN Peladas p ON p.id = t.pelada_id
-                LEFT JOIN TeamPlayers tp ON tp.team_id = t.id
-                WHERE t.id = ?
-                GROUP BY p.players_per_team"
-               team-id]
-        result (jdbc/execute-one! db query {:builder-fn next.jdbc.result-set/as-unqualified-lower-maps})]
+  [team-id :- s/Uuid db]
+  (let [query (-> (h/select [:p.players_per_team :max_players] [[:count :tp.player_id] :current_count])
+                  (h/from [:Teams :t])
+                  (h/join [:Peladas :p] [:= :p.id :t.pelada_id])
+                  (h/left-join [:TeamPlayers :tp] [:= :tp.team_id :t.id])
+                  (h/where [:= :t.id team-id])
+                  (h/group-by :p.players_per_team))
+        result (jdbc/execute-one! db (hsql/format query) hsql/opts)]
     (if (and (:max_players result)
              (>= (:current_count result) (:max_players result)))
       false
@@ -81,7 +90,7 @@
 (s/defn add-player-to-team :- s/Int
   ([team-id player-id db]
    (add-player-to-team team-id player-id false db))
-  ([team-id player-id is-goalkeeper db]
+  ([team-id :- s/Uuid player-id :- s/Uuid is-goalkeeper db]
    (when-not (validate-player-belongs-to-pelada-org team-id player-id db)
      (throw (ex-info "Player does not belong to the pelada's organization"
                      {:type :validation-error
@@ -100,53 +109,81 @@
                      {:type :validation-error
                       :message "Team is full"
                       :team-id team-id})))
-   (-> (sql/insert! db :teamplayers {:team_id team-id :player_id player-id :is_goalkeeper (if is-goalkeeper 1 0)})
-       affected-rows-count)))
+   (let [query (-> (h/insert-into :TeamPlayers)
+                   (h/values [{:team_id team-id :player_id player-id :is_goalkeeper (boolean is-goalkeeper)}]))]
+     (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+         hsql/affected-rows-count))))
 
 (s/defn add-team-players-batch! :- s/Any
   "Inserts multiple team players in a single batch. Skips validations (caller must ensure consistency)."
   [assignments db]
   (when (seq assignments)
-    (sql/insert-multi! db :teamplayers assignments)))
+    (let [query (-> (h/insert-into :TeamPlayers)
+                    (h/values (map (fn [a] (update a :is_goalkeeper boolean)) assignments)))]
+      (jdbc/execute! db (hsql/format query) hsql/opts))))
 
 (s/defn remove-player-from-team :- s/Int
-  [team-id player-id db]
-  (-> (sql/delete! db :teamplayers {:team_id team-id :player_id player-id})
-      affected-rows-count))
+  [team-id :- s/Uuid player-id :- s/Uuid db]
+  (let [query (-> (h/delete-from :TeamPlayers)
+                  (h/where [:and [:= :team_id team-id] [:= :player_id player-id]]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn clear-teams-players :- s/Int
-  "Removes all players from all teams of a specific pelada"
-  [pelada-id db]
-  (let [query "DELETE FROM TeamPlayers WHERE team_id IN (SELECT id FROM Teams WHERE pelada_id = ?)"
-        result (jdbc/execute! db [query pelada-id])]
-    (affected-rows-count (first result))))
+  "Removes all players from all Teams of a specific pelada"
+  [pelada-id :- s/Uuid db]
+  (let [query (-> (h/delete-from :TeamPlayers)
+                  (h/where [:in :team_id (-> (h/select :id) (h/from :Teams) (h/where [:= :pelada_id pelada-id]))]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
-(s/defn list-team-players [team-id db]
-  (->> (sql/find-by-keys db :teamplayers {:team_id team-id})
-       (map unqualify-row)
-       (map (fn [m]
-              {:team-id (:team_id m)
-               :player-id (:player_id m)
-               :is-goalkeeper (not= 0 (:is_goalkeeper m))}))))
+(s/defn list-team-players [team-id :- s/Uuid db]
+  (let [query (-> (h/select :*)
+                  (h/from :TeamPlayers)
+                  (h/where [:= :team_id team-id]))]
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
+         (map unqualify-row)
+         (map (fn [m]
+                {:team-id (:team_id m)
+                 :player-id (:player_id m)
+                 :is-goalkeeper (if (boolean? (:is_goalkeeper m)) (:is_goalkeeper m) (not= 0 (:is_goalkeeper m)))})))))
 
-(s/defn list-team-players-by-pelada [pelada-id db]
-  (->> (sql/query db ["SELECT tp.*, t.name as team_name, t.pelada_id
-                        FROM TeamPlayers tp
-                        JOIN Teams t ON tp.team_id = t.id
-                        WHERE t.pelada_id = ?" pelada-id])
-       (map unqualify-row)
-       (map (fn [m]
-              (assoc m :is_goalkeeper (not= 0 (:is_goalkeeper m)))))
-       vec))
+(s/defn list-team-players-by-pelada [pelada-id :- s/Uuid db]
+  (let [query (-> (h/select :tp.* [:t.name :team_name] :t.pelada_id)
+                  (h/from [:TeamPlayers :tp])
+                  (h/join [:Teams :t] [:= :tp.team_id :t.id])
+                  (h/where [:= :t.pelada_id pelada-id]))]
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
+         (map unqualify-row)
+         (map (fn [m]
+                (assoc m :is_goalkeeper (if (boolean? (:is_goalkeeper m)) (:is_goalkeeper m) (not= 0 (:is_goalkeeper m))))))
+         vec)))
 
-(s/defn list-team-players-with-names-by-pelada [pelada-id db]
-  (->> (sql/query db ["SELECT tp.*, t.name as team_name, u.name as player_name, u.position
-                        FROM TeamPlayers tp
-                        JOIN Teams t ON tp.team_id = t.id
-                        JOIN OrganizationPlayers op ON tp.player_id = op.id
-                        JOIN Users u ON op.user_id = u.id
-                        WHERE t.pelada_id = ?" pelada-id])
-       (map unqualify-row)
-       (map (fn [m]
-              (assoc m :is_goalkeeper (not= 0 (:is_goalkeeper m)))))
-       vec))
+(s/defn list-team-players-with-names-by-pelada [pelada-id :- s/Uuid db]
+  (let [query (-> (h/select :tp.* [:t.name :team_name] [:u.name :player_name] :u.position)
+                  (h/from [:TeamPlayers :tp])
+                  (h/join [:Teams :t] [:= :tp.team_id :t.id])
+                  (h/join [:OrganizationPlayers :op] [:= :tp.player_id :op.id])
+                  (h/join [:Users :u] [:= :u.id :op.user_id])
+                  (h/where [:= :t.pelada_id pelada-id]))]
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
+         (map unqualify-row)
+         (map (fn [m]
+                (assoc m :is_goalkeeper (if (boolean? (:is_goalkeeper m)) (:is_goalkeeper m) (not= 0 (:is_goalkeeper m))))))
+         vec)))
+
+(s/defn did-player-participate-in-pelada? :- s/Bool
+  [pelada-id :- s/Uuid player-id :- s/Uuid db]
+  (let [query (-> (h/select 1)
+                  (h/from [:TeamPlayers :tp])
+                  (h/join [:Teams :t] [:= :t.id :tp.team_id])
+                  (h/where [:= :t.pelada_id pelada-id] [:= :tp.player_id player-id]))]
+    (some? (jdbc/execute-one! db (hsql/format query) hsql/opts))))
+
+(s/defn is-goalkeeper? :- s/Bool
+  [team-id :- s/Uuid player-id :- s/Uuid db]
+  (let [query (-> (h/select :is_goalkeeper)
+                  (h/from :TeamPlayers)
+                  (h/where [:and [:= :team_id team-id] [:= :player_id player-id]]))
+        res (jdbc/execute-one! db (hsql/format query) hsql/opts)]
+    (boolean (:is_goalkeeper res))))

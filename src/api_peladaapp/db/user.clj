@@ -1,182 +1,268 @@
 (ns api-peladaapp.db.user
   (:require
    [api-peladaapp.adapters.user :as adapter.user]
+   [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.models.user :as models.user]
    [clojure.string :as str]
-   [medley.core :as medley.core]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
-   [next.jdbc.sql :as sql]
    [schema.core :as s]))
-
-(defn- affected-rows-count
-  "Get the number of affected rows from a query"
-  [result]
-  (->  result
-       vals
-       first))
 
 (s/defn find-user-by-email :- (s/maybe models.user/User)
   "Find a user by email (case-insensitive)"
   [email :- (s/maybe s/Str)
    db]
   (when email
-    (-> (sql/query db ["SELECT * FROM users WHERE LOWER(email) = LOWER(?)" email]) first adapter.user/db->model)))
-
-(s/defn find-user-by-username :- (s/maybe models.user/User)
-  "Find a user by username (case-insensitive)"
-  [username :- (s/maybe s/Str)
-   db]
-  (when username
-    (-> (sql/query db ["SELECT * FROM users WHERE LOWER(username) = LOWER(?)" username]) first adapter.user/db->model)))
+    (let [query (-> (h/select :*)
+                    (h/from :Users)
+                    (h/where [:= [:lower :email] (str/lower-case email)]))]
+      (-> (jdbc/execute! db (hsql/format query) hsql/opts)
+          first
+          adapter.user/db->model))))
 
 (s/defn find-user-by-identifier :- (s/maybe models.user/User)
   "Find a user by email or username (case-insensitive)"
   [identifier :- (s/maybe s/Str)
    db]
   (when identifier
-    (-> (sql/query db ["SELECT * FROM users WHERE LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)" identifier identifier]) first adapter.user/db->model)))
+    (let [query (-> (h/select :*)
+                    (h/from :Users)
+                    (h/where [:or [:= [:lower :email] (str/lower-case identifier)]
+                              [:= [:lower :username] (str/lower-case identifier)]]))]
+      (-> (jdbc/execute! db (hsql/format query) hsql/opts)
+          first
+          adapter.user/db->model))))
 
 (s/defn find-user-by-id :- (s/maybe models.user/User)
-  "Find a user in the database by id"
-  [id :- s/Int
+  "Find a user by id"
+  [id :- s/Uuid
    db]
-  (-> (sql/get-by-id db :users id) adapter.user/db->model))
+  (let [query (-> (h/select :*)
+                  (h/from :Users)
+                  (h/where [:= :id id]))]
+    (-> (jdbc/execute! db (hsql/format query) hsql/opts)
+        first
+        adapter.user/db->model)))
 
-(s/defn insert-user :- s/Int
+(s/defn insert-user :- s/Uuid
   "Insert a user and return its generated id"
   [{:keys [name username email password position phone]} :- models.user/NewUser
    db]
-  (-> (sql/insert! db :users (medley.core/assoc-some {} :name name :username username :email email :password password :position position :phone phone))
-      affected-rows-count
-      int))
+  (let [row (cond-> {:name name :username username :email email :password password :phone phone}
+              position (assoc :position [:cast position :player_position]))
+        query (-> (h/insert-into :Users)
+                  (h/values [row])
+                  (h/returning :id))]
+    (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
-(s/defn insert-partial-user :- s/Int
-  "Insert a user with only email and return its generated id"
-  [email :- s/Str
+(s/defn insert-partial-user :- s/Uuid
+  "Insert a user with only some fields (e.g. name or email) and return its generated id"
+  [fields :- {s/Keyword s/Any}
    db]
-  (-> (sql/insert! db :users {:email email})
-      affected-rows-count
-      int))
+  (let [query (-> (h/insert-into :Users)
+                  (h/values [fields])
+                  (h/returning :id))]
+    (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
-(s/defn insert-user-by-name :- s/Int
+(s/defn insert-guest-user :- s/Uuid
+  "Insert a user with only name (for guests)"
+  [name :- s/Str db]
+  (insert-partial-user {:name name} db))
+
+(s/defn insert-user-by-name :- s/Uuid
   "Insert a user with only name and return its generated id"
-  [name :- s/Str
-   db]
-  (-> (sql/insert! db :users {:name name})
-      affected-rows-count
-      int))
+  [name :- s/Str db]
+  (insert-partial-user {:name name} db))
 
 (s/defn update-user :- s/Int
   "Update a user in the database"
-  [id :- s/Int
+  [id :- s/Uuid
    user :- models.user/User
    db]
-  (-> (sql/update! db
-                   :users
-                   {:name (:name user)
-                    :username (:username user)
-                    :email (:email user)
-                    :password (:password user)
-                    :position (:position user)
-                    :phone (:phone user)
-                    :avatar_filename (:avatar-filename user)}
-                   {:id id})
-      affected-rows-count))
+  (let [row (cond-> {:name (:name user)
+                     :username (:username user)
+                     :email (:email user)
+                     :password (:password user)
+                     :phone (:phone user)}
+              (:position user) (assoc :position [:cast (:position user) :player_position]))
+        query (-> (h/update :Users)
+                  (h/set row)
+                  (h/where [:= :id id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
-(s/defn delete-user :- s/Int
-  "Delete a user from the database"
-  [id :- s/Int
+(s/defn update-password :- s/Int
+  "Update a user's password in the database"
+  [id :- s/Uuid
+   password :- s/Str
    db]
-  (-> (sql/delete! db :users {:id id}) affected-rows-count))
+  (let [query (-> (h/update :Users)
+                  (h/set {:password password})
+                  (h/where [:= :id id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
+
+(s/defn update-user-profile :- s/Int
+  "Update only specific fields of a user's profile"
+  [id :- s/Uuid
+   user :- s/Any
+   db]
+  (let [row (cond-> {:name (:name user)
+                     :username (:username user)
+                     :email (:email user)
+                     :phone (:phone user)
+                     :avatar_filename (:avatar-filename user)}
+              (:position user) (assoc :position [:cast (:position user) :player_position]))
+        query (-> (h/update :Users)
+                  (h/set row)
+                  (h/where [:= :id id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn get-users-by-ids :- [models.user/User]
   "Get users by a list of ids"
-  [db ids]
+  [db ids :- [s/Uuid]]
   (if (empty? ids)
     []
-    (let [placeholders (str/join "," (repeat (count ids) "?"))
-          query (str "SELECT * FROM users WHERE id IN (" placeholders ")")]
-      (->> (sql/query db (into [query] ids))
+    (let [query (-> (h/select :*)
+                    (h/from :Users)
+                    (h/where [:in :id ids]))]
+      (->> (jdbc/execute! db (hsql/format query) hsql/opts)
            (map adapter.user/db->model)))))
+
+(s/defn delete-user :- s/Int
+  "Delete a user from the database"
+  [id :- s/Uuid
+   db]
+  (let [query (-> (h/delete-from :Users)
+                  (h/where [:= :id id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn list-users :- [models.user/User]
   "List all users in the database"
   [db offset limit]
-  (->> (sql/query db ["select * from users order by id limit ? offset ?" limit offset])
-       (map adapter.user/db->model)))
+  (let [query (-> (h/select :*)
+                  (h/from :Users)
+                  (h/order-by [:id :asc])
+                  (h/limit limit)
+                  (h/offset offset))]
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
+         (map adapter.user/db->model))))
 
 (s/defn count-users :- s/Int
   "Count all users in the database"
   [db]
-  (-> (sql/query db ["select count(*) as count from users"])
-      first
-      :count))
+  (let [query (-> (h/select [[:count :*] :count])
+                  (h/from :Users))]
+    (int (:count (jdbc/execute-one! db (hsql/format query) hsql/opts)))))
 
 (s/defn search-users :- [models.user/User]
   "Search users by name, username or email with pagination"
   [db query offset limit]
-  (let [q (str "%" (str/lower-case query) "%")]
-    (->> (sql/query db ["SELECT * FROM users WHERE LOWER(name) LIKE ? OR LOWER(username) LIKE ? OR LOWER(email) LIKE ? ORDER BY name LIMIT ? OFFSET ?" q q q limit offset])
+  (let [lower-pattern (str "%" (str/lower-case query) "%")
+        hsql-query (-> (h/select :*)
+                       (h/from :Users)
+                       (h/where [:or [[:like [:lower :name] lower-pattern]]
+                                 [[:like [:lower :username] lower-pattern]]
+                                 [[:like [:lower :email] lower-pattern]]])
+                       (h/order-by :name)
+                       (h/limit limit)
+                       (h/offset offset))]
+    (->> (jdbc/execute! db (hsql/format hsql-query) hsql/opts)
          (map adapter.user/db->model))))
 
 (s/defn count-searched-users :- s/Int
   "Count users matching the search query"
   [db query]
-  (let [q (str "%" (str/lower-case query) "%")]
-    (-> (sql/query db ["SELECT count(*) as count FROM users WHERE LOWER(name) LIKE ? OR LOWER(username) LIKE ? OR LOWER(email) LIKE ?" q q q])
-        first
-        :count)))
+  (let [lower-pattern (str "%" (str/lower-case query) "%")
+        hsql-query (-> (h/select [[:count :*] :count])
+                       (h/from :Users)
+                       (h/where [:or [[:like [:lower :name] lower-pattern]]
+                                 [[:like [:lower :username] lower-pattern]]
+                                 [[:like [:lower :email] lower-pattern]]]))]
+    (int (:count (jdbc/execute-one! db (hsql/format hsql-query) hsql/opts)))))
+
+(s/defn find-user-by-username :- (s/maybe models.user/User)
+  "Find a user by username (case-insensitive)"
+  [username :- s/Str
+   db]
+  (when username
+    (let [query (-> (h/select :*)
+                    (h/from :Users)
+                    (h/where [:= [:lower :username] (str/lower-case username)]))]
+      (-> (jdbc/execute! db (hsql/format query) hsql/opts)
+          first
+          adapter.user/db->model))))
 
 (s/defn search-users-in-shared-orgs :- [models.user/User]
   "Search users that share at least one organization with the current user"
-  [db current-user-id query offset limit]
-  (let [q (str "%" (str/lower-case query) "%")]
-    (->> (sql/query db ["SELECT DISTINCT u.* FROM Users u
-                         LEFT JOIN OrganizationPlayers op ON u.id = op.user_id
-                         LEFT JOIN OrganizationAdmins oa ON u.id = oa.user_id
-                         WHERE (LOWER(u.name) LIKE ? OR LOWER(u.username) LIKE ? OR LOWER(u.email) LIKE ?)
-                         AND (
-                           op.organization_id IN (SELECT organization_id FROM OrganizationPlayers WHERE user_id = ?)
-                           OR op.organization_id IN (SELECT organization_id FROM OrganizationAdmins WHERE user_id = ?)
-                           OR oa.organization_id IN (SELECT organization_id FROM OrganizationPlayers WHERE user_id = ?)
-                           OR oa.organization_id IN (SELECT organization_id FROM OrganizationAdmins WHERE user_id = ?)
-                         )
-                         ORDER BY u.name LIMIT ? OFFSET ?" q q q current-user-id current-user-id current-user-id current-user-id limit offset])
+  [db current-user-id :- s/Uuid query offset limit]
+  (let [lower-pattern (str "%" (str/lower-case query) "%")
+        hsql-query (-> (h/select-distinct :u.*)
+                       (h/from [:Users :u])
+                       (h/left-join [:OrganizationPlayers :op] [:= :u.id :op.user_id])
+                       (h/left-join [:OrganizationAdmins :oa] [:= :u.id :oa.user_id])
+                       (h/where [:and
+                                 [:or [[:like [:lower :u.name] lower-pattern]]
+                                  [[:like [:lower :u.username] lower-pattern]]
+                                  [[:like [:lower :u.email] lower-pattern]]]
+                                 [:or
+                                  [:in :op.organization_id (-> (h/select :organization_id) (h/from :OrganizationPlayers) (h/where [:= :user_id current-user-id]))]
+                                  [:in :op.organization_id (-> (h/select :organization_id) (h/from :OrganizationAdmins) (h/where [:= :user_id current-user-id]))]
+                                  [:in :oa.organization_id (-> (h/select :organization_id) (h/from :OrganizationPlayers) (h/where [:= :user_id current-user-id]))]
+                                  [:in :oa.organization_id (-> (h/select :organization_id) (h/from :OrganizationAdmins) (h/where [:= :user_id current-user-id]))]]])
+                       (h/order-by :u.name)
+                       (h/limit limit)
+                       (h/offset offset))]
+    (->> (jdbc/execute! db (hsql/format hsql-query) hsql/opts)
          (map adapter.user/db->model))))
 
 (s/defn count-searched-users-in-shared-orgs :- s/Int
   "Count users matching the search query within shared organizations"
-  [db current-user-id query]
-  (let [q (str "%" (str/lower-case query) "%")]
-    (-> (sql/query db ["SELECT COUNT(DISTINCT u.id) as count FROM Users u
-                        LEFT JOIN OrganizationPlayers op ON u.id = op.user_id
-                        LEFT JOIN OrganizationAdmins oa ON u.id = oa.user_id
-                        WHERE (LOWER(u.name) LIKE ? OR LOWER(u.username) LIKE ? OR LOWER(u.email) LIKE ?)
-                        AND (
-                          op.organization_id IN (SELECT organization_id FROM OrganizationPlayers WHERE user_id = ?)
-                          OR op.organization_id IN (SELECT organization_id FROM OrganizationAdmins WHERE user_id = ?)
-                          OR oa.organization_id IN (SELECT organization_id FROM OrganizationPlayers WHERE user_id = ?)
-                          OR oa.organization_id IN (SELECT organization_id FROM OrganizationAdmins WHERE user_id = ?)
-                        )" q q q current-user-id current-user-id current-user-id current-user-id])
-        first
-        :count)))
+  [db current-user-id :- s/Uuid query]
+  (let [lower-pattern (str "%" (str/lower-case query) "%")
+        hsql-query (-> (h/select [[:count [:distinct :u.id]] :count])
+                       (h/from [:Users :u])
+                       (h/left-join [:OrganizationPlayers :op] [:= :u.id :op.user_id])
+                       (h/left-join [:OrganizationAdmins :oa] [:= :u.id :oa.user_id])
+                       (h/where [:and
+                                 [:or [[:like [:lower :u.name] lower-pattern]]
+                                  [[:like [:lower :u.username] lower-pattern]]
+                                  [[:like [:lower :u.email] lower-pattern]]]
+                                 [:or
+                                  [:in :op.organization_id (-> (h/select :organization_id) (h/from :OrganizationPlayers) (h/where [:= :user_id current-user-id]))]
+                                  [:in :op.organization_id (-> (h/select :organization_id) (h/from :OrganizationAdmins) (h/where [:= :user_id current-user-id]))]
+                                  [:in :oa.organization_id (-> (h/select :organization_id) (h/from :OrganizationPlayers) (h/where [:= :user_id current-user-id]))]
+                                  [:in :oa.organization_id (-> (h/select :organization_id) (h/from :OrganizationAdmins) (h/where [:= :user_id current-user-id]))]]]))]
+    (int (:count (jdbc/execute-one! db (hsql/format hsql-query) hsql/opts)))))
 
-(s/defn update-user-profile :- s/Int
-  "Update user profile (name, username, email, password, position, phone, avatar_filename only) in the database"
-  [id :- s/Int
-   user :- models.user/User
+(s/defn count-users-in-organization :- s/Int
+  "Count users in a specific organization"
+  [organization-id :- s/Uuid
    db]
-  ;; Only update allowed fields: name, username, email, password, position, phone, avatar_filename
-  (jdbc/execute! db ["PRAGMA busy_timeout = 5000"])
-  (-> (sql/update! db
-                   :users
-                   {:name (:name user)
-                    :username (:username user)
-                    :email (:email user)
-                    :password (:password user)
-                    :position (:position user)
-                    :phone (:phone user)
-                    :avatar_filename (:avatar-filename user)}
-                   {:id id})
-      affected-rows-count))
+  (let [query (-> (h/select [[:count :*] :total])
+                  (h/from :Users)
+                  (h/join [:OrganizationPlayers :op] [:= :op.user_id :Users.id])
+                  (h/where [:= :op.organization_id organization-id]))]
+    (int (:total (jdbc/execute-one! db (hsql/format query) hsql/opts)))))
 
+(s/defn list-users-in-organization :- [[s/Any]]
+  "List users in a specific organization with pagination"
+  [organization-id :- s/Uuid
+   offset :- s/Int
+   per-page :- s/Int
+   db]
+  (let [query (-> (h/select :*)
+                  (h/from :Users)
+                  (h/join [:OrganizationPlayers :op] [:= :op.user_id :Users.id])
+                  (h/where [:= :op.organization_id organization-id])
+                  (h/order-by [:id :asc])
+                  (h/limit per-page)
+                  (h/offset offset))
+        total-count-query (-> (h/select [[:count :*] :total])
+                              (h/from :Users)
+                              (h/join [:OrganizationPlayers :op] [:= :op.user_id :Users.id])
+                              (h/where [:= :op.organization_id organization-id]))]
+    [(jdbc/execute! db (hsql/format query) hsql/opts)
+     (:total (jdbc/execute-one! db (hsql/format total-count-query) hsql/opts))]))

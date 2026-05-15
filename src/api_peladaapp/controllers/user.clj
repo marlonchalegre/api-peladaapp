@@ -10,23 +10,22 @@
 (s/defn create-user :- models.user/User
   [user :- models.user/NewUser
    db]
-  (let [username (:username user)
-        email (:email user)
-        existing-user-username (when username (db.user/find-user-by-username username db))
-        existing-user-email (when email (db.user/find-user-by-email email db))]
+  (let [email (:email user)
+        existing-user-email (when email (db.user/find-user-by-email email db))
+        existing-username (when (:username user) (db.user/find-user-by-identifier (:username user) db))]
     (cond
-      ;; Username already taken
-      (and existing-user-username (:password existing-user-username))
-      (throw (ex-info "Username already exists" {:type :already-exist :message "Username already exists"}))
-
       ;; Email already taken
       (and existing-user-email (:password existing-user-email))
       (throw (ex-info "Email already exists" {:type :already-exist :message "Email already exists"}))
 
+      ;; Username already taken
+      (and existing-username (:password existing-username))
+      (throw (ex-info "Username already exists" {:type :already-exist :message "Username already exists"}))
+
       ;; User exists but has no password (partial) -> Update/Claim
       ;; We prefer matching by email for partial users if available
-      (or existing-user-username existing-user-email)
-      (let [existing-user (or existing-user-email existing-user-username)]
+      (or existing-user-email existing-username)
+      (let [existing-user (or existing-user-email existing-username)]
         (as-> user $
           (logic.user/encrypt-password $)
           (do (db.user/update-user (:id existing-user) $ db)
@@ -41,7 +40,7 @@
 
 (s/defn update-user :- models.user/User
   [user :- models.user/UserProfileUpdate
-   user-id :- s/Int
+   user-id :- s/Uuid
    db]
   (let [existing-user (-> (db.user/find-user-by-id user-id db)
                           (dissoc :id :password))]
@@ -54,7 +53,7 @@
             (db.user/find-user-by-id user-id db))))))
 
 (s/defn get-user :- models.user/User
-  [user-id :- s/Int
+  [user-id :- s/Uuid
    db]
   (let [user (db.user/find-user-by-id user-id db)]
     (if (nil? user)
@@ -63,7 +62,7 @@
         (assoc user :admin-orgs admin-orgs)))))
 
 (s/defn delete-user
-  [user-id :- s/Int
+  [user-id :- s/Uuid
    db]
   (let [user (db.user/find-user-by-id user-id db)]
     (if (nil? user)
@@ -100,7 +99,7 @@
 (s/defn update-user-profile :- models.user/User
   "Update user profile - only allows updating name, username, email, password and position. Score is protected."
   [profile-data :- models.user/UserProfileUpdate
-   user-id :- s/Int
+   user-id :- s/Uuid
    db]
   (let [existing-user (db.user/find-user-by-id user-id db)]
     (if (nil? existing-user)
@@ -124,11 +123,11 @@
 
             ;; Update with new data, only if provided
             updated-user (cond-> base-user
-                           (:name profile-data) (assoc :name (:name profile-data))
-                           (:username profile-data) (assoc :username (:username profile-data))
-                           (:email profile-data) (assoc :email (:email profile-data))
-                           (:password profile-data) (assoc :password (:password profile-data))
-                           (:position profile-data) (assoc :position (:position profile-data))
+                           (contains? profile-data :name) (assoc :name (:name profile-data))
+                           (contains? profile-data :username) (assoc :username (:username profile-data))
+                           (contains? profile-data :email) (assoc :email (:email profile-data))
+                           (contains? profile-data :password) (assoc :password (:password profile-data))
+                           (contains? profile-data :position) (assoc :position (:position profile-data))
                            (contains? profile-data :phone) (assoc :phone (:phone profile-data))
                            (contains? profile-data :avatar-filename) (assoc :avatar-filename (:avatar-filename profile-data)))
             ;; Encrypt password if it was updated

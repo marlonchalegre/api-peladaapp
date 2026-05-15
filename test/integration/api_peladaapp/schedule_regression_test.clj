@@ -7,7 +7,7 @@
 (use-fixtures :each th/test-system-fixture)
 
 (deftest schedule-regression-test
-  (let [app (-> th/*test-system* :app :handler)]
+  (let [app (-> th/*test-system* :app :app-handler)]
     ;; Setup Admin and Org
     (app (-> (mock/request :post "/auth/register") (mock/json-body {"name" "Admin" "email" "admin@test.com" "password" "pass123"})))
     (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {"email" "admin@test.com" "password" "pass123"})))

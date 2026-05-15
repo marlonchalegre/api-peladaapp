@@ -6,20 +6,6 @@
    [api-peladaapp.responses.match :as responses.match]
    [schema.core :as s]))
 
-(defn in->model [{:keys [pelada_id home_team_id away_team_id sequence status home_score away_score
-                         timer-started-at timer-accumulated-ms timer-status]}]
-  (cond-> {}
-    pelada_id (assoc :pelada-id pelada_id)
-    home_team_id (assoc :home-team-id home_team_id)
-    away_team_id (assoc :away-team-id away_team_id)
-    sequence (assoc :sequence sequence)
-    status (assoc :status status)
-    (some? home_score) (assoc :home-score home_score)
-    (some? away_score) (assoc :away-score away_score)
-    timer-started-at (assoc :timer-started-at timer-started-at)
-    (some? timer-accumulated-ms) (assoc :timer-accumulated-ms timer-accumulated-ms)
-    timer-status (assoc :timer-status timer-status)))
-
 (s/defn update-score-request->model :- (s/pred map?)
   [request :- requests.match/UpdateMatchScoreRequest]
   {:home-score (:home_score request)
@@ -28,31 +14,31 @@
 
 (s/defn create-event-request->model :- (s/pred map?)
   [request :- requests.match/CreateMatchEventRequest]
-  (cond-> {:player-id (:player_id request)
+  (cond-> {:player-id (misc/as-uuid (:player_id request))
            :event-type (:event_type request)}
     (:session_time_ms request) (assoc :session-time-ms (:session_time_ms request))
     (:match_time_ms request) (assoc :match-time-ms (:match_time_ms request))))
 
 (s/defn delete-event-request->model :- (s/pred map?)
   [request :- requests.match/DeleteMatchEventRequest]
-  {:player-id (:player_id request)
+  {:player-id (misc/as-uuid (:player_id request))
    :event-type (:event_type request)})
 
 (s/defn add-lineup-request->model :- (s/pred map?)
   [request :- requests.match/AddLineupPlayerRequest]
-  {:team-id (:team_id request)
-   :player-id (:player_id request)})
+  {:team-id (misc/as-uuid (:team_id request))
+   :player-id (misc/as-uuid (:player_id request))})
 
 (s/defn remove-lineup-request->model :- (s/pred map?)
   [request :- requests.match/RemoveLineupPlayerRequest]
-  {:team-id (:team_id request)
-   :player-id (:player_id request)})
+  {:team-id (misc/as-uuid (:team_id request))
+   :player-id (misc/as-uuid (:player_id request))})
 
 (s/defn replace-lineup-request->model :- (s/pred map?)
   [request :- requests.match/ReplaceLineupPlayerRequest]
-  {:team-id (:team_id request)
-   :out-player-id (:out_player_id request)
-   :in-player-id (:in_player_id request)})
+  {:team-id (misc/as-uuid (:team_id request))
+   :out-player-id (misc/as-uuid (:out_player_id request))
+   :in-player-id (misc/as-uuid (:in_player_id request))})
 
 (s/defn model->response :- responses.match/MatchResponse
   [{:keys [id pelada-id home-team-id away-team-id sequence status home-score away-score

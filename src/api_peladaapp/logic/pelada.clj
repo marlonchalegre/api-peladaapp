@@ -43,8 +43,8 @@
       :else (vec team-ids))))
 
 (s/defn get-voting-info :- s/Any
-  [pelada-id :- s/Int
-   player-id :- s/Int
+  [pelada-id :- s/Uuid
+   player-id :- s/Uuid
    db]
   (let [pelada (db.pelada/get-pelada pelada-id db) ;; Re-fetch pelada to ensure latest status and closed_at
         can-vote (try (logic.vote/validate-voting-eligibility pelada) true (catch Exception _ false))

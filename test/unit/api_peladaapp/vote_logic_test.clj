@@ -6,19 +6,21 @@
    [java.time Duration Instant]))
 
 (deftest test-validate-vote
-  (testing "Valid vote should pass"
-    (let [vote {:voter-id 1 :target-id 2 :stars 4}]
-      (is (= vote (vote.logic/validate-vote vote)))))
+  (let [uuid-1 (parse-uuid "00000000-0000-0000-0000-000000000001")
+        uuid-2 (parse-uuid "00000000-0000-0000-0000-000000000002")]
+    (testing "Valid vote should pass"
+      (let [vote {:voter-id uuid-1 :target-id uuid-2 :stars 4}]
+        (is (= vote (vote.logic/validate-vote vote)))))
 
-  (testing "Self vote should throw"
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Self vote not allowed"
-                          (vote.logic/validate-vote {:voter-id 1 :target-id 1 :stars 5}))))
+    (testing "Self vote should throw"
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Self vote not allowed"
+                            (vote.logic/validate-vote {:voter-id uuid-1 :target-id uuid-1 :stars 5}))))
 
-  (testing "Invalid stars should throw"
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Invalid vote stars"
-                          (vote.logic/validate-vote {:voter-id 1 :target-id 2 :stars 6})))
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Invalid vote stars"
-                          (vote.logic/validate-vote {:voter-id 1 :target-id 2 :stars 0})))))
+    (testing "Invalid stars should throw"
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Invalid vote stars"
+                            (vote.logic/validate-vote {:voter-id uuid-1 :target-id uuid-2 :stars 6})))
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Invalid vote stars"
+                            (vote.logic/validate-vote {:voter-id uuid-1 :target-id uuid-2 :stars 0}))))))
 
 (deftest test-validate-voting-eligibility
   (testing "Open pelada should throw"

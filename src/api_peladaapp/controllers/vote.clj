@@ -4,12 +4,12 @@
    [api-peladaapp.db.attendance :as db.attendance]
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.db.team :as db.team]
    [api-peladaapp.db.vote :as db.vote]
    [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.logic.vote :as vote.logic]
    [api-peladaapp.models.vote :as models.vote]
    [api-peladaapp.responses.vote :as responses.vote]
-   [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
 (s/defn cast-vote :- models.vote/Vote
@@ -24,14 +24,14 @@
 
 (s/defn batch-cast-votes :- responses.vote/BatchVoteResponse
   "Cast multiple votes at once. Replaces any existing votes by this voter."
-  [pelada-id :- s/Int voter-id :- s/Int votes :- [{:target-id s/Int :stars s/Int}] db]
+  [pelada-id :- s/Uuid voter-id :- s/Uuid votes :- [{:target-id s/Uuid :stars s/Int}] db]
   ;; Validate pelada voting eligibility
   (let [pelada (db.pelada/get-pelada pelada-id db)]
     (vote.logic/validate-voting-eligibility pelada))
 
   ;; Validate that all target players have voting enabled
   (let [attendance (db.attendance/list-attendance-by-pelada pelada-id db)
-        disabled-ids (set (map :player_id (filter #(= 0 (int (or (:voting_enabled %) 1))) attendance)))]
+        disabled-ids (set (map :player_id (filter #(= false (boolean (:voting_enabled %))) attendance)))]
     (doseq [v votes]
       (when (contains? disabled-ids (:target-id v))
         (throw (ex-info "Target player has voting disabled"
@@ -53,12 +53,12 @@
   {:votes-cast (count votes)})
 
 (s/defn list-votes :- [models.vote/Vote]
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (db.vote/list-votes-by-pelada pelada-id db))
 
 (s/defn get-voting-info :- responses.vote/VotingInfoResponse
   "Get voting eligibility info for a voter in a pelada."
-  [pelada-id :- s/Int user-id :- s/Int db]
+  [pelada-id :- s/Uuid user-id :- s/Uuid db]
   (let [pelada (db.pelada/get-pelada pelada-id db)]
     (try
       (vote.logic/validate-voting-eligibility pelada)
@@ -72,33 +72,15 @@
                           {:type :forbidden :message "User is not a player in this organization"})))
 
         ;; Verify voter participated in the pelada (was in a team)
-        (let [participation-query "SELECT 1 FROM TeamPlayers tp
-                                   JOIN Teams t ON t.id = tp.team_id
-                                   WHERE t.pelada_id = ? AND tp.player_id = ?"
-              participated (boolean (and voter-player-id
-                                         (seq (sql/query db [participation-query pelada-id voter-player-id]))))]
+        (let [participated (boolean (and voter-player-id
+                                         (db.team/did-player-participate-in-pelada? pelada-id voter-player-id db)))]
 
           (when (and (not participated) (not is-admin))
             (throw (ex-info "Player did not participate in this pelada"
                             {:type :forbidden :message "Only players who participated can vote"})))
 
           ;; Get all players who participated (were in teams) with their names and stats
-          (let [query "SELECT op.id as player_id, u.id as user_id, u.name, u.position, u.avatar_filename,
-                              COALESCE(pa.voting_enabled, 1) as voting_enabled,
-                              COALESCE(s.goals, 0) as goals, 
-                              COALESCE(s.assists, 0) as assists, 
-                              COALESCE(s.own_goals, 0) as own_goals
-                       FROM OrganizationPlayers op
-                       JOIN Users u ON u.id = op.user_id
-                       LEFT JOIN PeladaAttendance pa ON pa.player_id = op.id AND pa.pelada_id = ?
-                       LEFT JOIN PeladaPlayerStats s ON s.player_id = op.id AND s.pelada_id = ?
-                       WHERE op.id IN (
-                         SELECT player_id FROM TeamPlayers tp
-                         JOIN Teams t ON t.id = tp.team_id
-                         WHERE t.pelada_id = ?
-                       )
-                       AND op.id != ?"
-                eligible-players-raw (sql/query db [query pelada-id pelada-id pelada-id (or voter-player-id -1)])
+          (let [eligible-players-raw (db.vote/list-eligible-players-for-voting pelada-id voter-player-id db)
                 eligible-players (mapv (fn [p]
                                          (let [up (misc/unamespace p)]
                                            {:player-id (:player_id up)
@@ -106,7 +88,8 @@
                                             :name (:name up)
                                             :avatar-filename (:avatar_filename up)
                                             :position (:position up)
-                                            :voting-enabled (= 1 (:voting_enabled up))
+                                            :voting-enabled (let [v (:voting_enabled up)]
+                                                              (if (boolean? v) v true))
                                             :goals (int (or (:goals up) 0))
                                             :assists (int (or (:assists up) 0))
                                             :own-goals (int (or (:own_goals up) 0))}))
@@ -128,18 +111,10 @@
            :message (or (:message data) (.getMessage e))})))))
 
 (s/defn get-voting-status
-  [pelada-id :- s/Int db]
+  [pelada-id :- s/Uuid db]
   (let [votes (db.vote/list-votes-by-pelada pelada-id db)
         ;; Get all participants (potential voters)
-        participants-query "SELECT op.id as player_id, u.id as user_id, u.name, u.position, u.avatar_filename
-                            FROM OrganizationPlayers op
-                            JOIN Users u ON u.id = op.user_id
-                            WHERE op.id IN (
-                              SELECT player_id FROM TeamPlayers tp
-                              JOIN Teams t ON t.id = tp.team_id
-                              WHERE t.pelada_id = ?
-                            )"
-        participants-raw (sql/query db [participants-query pelada-id])
+        participants-raw (db.vote/list-pelada-participants pelada-id db)
         participants (mapv (fn [p]
                              (let [up (misc/unamespace p)]
                                {:player-id (:player_id up)
@@ -153,7 +128,7 @@
                             {:player-id (:player-id p)
                              :user-id (:user-id p)
                              :name (:name p)
-                             :avatar-filename (:avatar-filename p)
+                             :avatar-filename (:avatar_filename p)
                              :has-voted (boolean (voted-ids (:player-id p)))})
                           participants)]
     {:voters voter-status
@@ -161,7 +136,7 @@
      :total-voted (count voted-ids)}))
 
 (s/defn get-voting-results :- responses.vote/VotingResultsResponse
-  [pelada-id :- s/Int user-id :- s/Int db]
+  [pelada-id :- s/Uuid user-id :- s/Uuid db]
   (let [pelada (db.pelada/get-pelada pelada-id db)]
     (when (vote.logic/voting-open? pelada)
       (throw (ex-info "Voting still in progress"
@@ -172,11 +147,8 @@
           is-admin (db.admin/is-user-admin-of-organization? user-id org-id db)
           voter-player (db.player/get-org-player-by-user-id user-id org-id db)
           voter-player-id (:id voter-player)
-          participation-query "SELECT 1 FROM TeamPlayers tp
-                               JOIN Teams t ON t.id = tp.team_id
-                               WHERE t.pelada_id = ? AND tp.player_id = ?"
           participated (boolean (and voter-player-id
-                                     (seq (sql/query db [participation-query pelada-id voter-player-id]))))]
+                                     (db.team/did-player-participate-in-pelada? pelada-id voter-player-id db)))]
 
       (when (and participated
                  (not is-admin)
@@ -188,19 +160,7 @@
       (let [status (get-voting-status pelada-id db)
             votes (db.vote/list-votes-by-pelada pelada-id db)
             ;; Get stats for all players
-            stats-query "SELECT op.id as player_id, u.id as user_id, u.name, u.position, u.avatar_filename,
-                              COALESCE(s.goals, 0) as goals, 
-                              COALESCE(s.assists, 0) as assists, 
-                              COALESCE(s.own_goals, 0) as own_goals
-                       FROM OrganizationPlayers op
-                       JOIN Users u ON u.id = op.user_id
-                       LEFT JOIN PeladaPlayerStats s ON s.player_id = op.id AND s.pelada_id = ?
-                       WHERE op.id IN (
-                         SELECT player_id FROM TeamPlayers tp
-                         JOIN Teams t ON t.id = tp.team_id
-                         WHERE t.pelada_id = ?
-                       )"
-            participants-raw (sql/query db [stats-query pelada-id pelada-id])
+            participants-raw (db.vote/list-pelada-participants pelada-id db)
             participants (mapv (fn [p]
                                  (let [up (misc/unamespace p)]
                                    {:player-id (:player_id up)

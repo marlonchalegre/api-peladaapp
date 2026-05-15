@@ -3,17 +3,24 @@ All notable changes to this project will be documented in this file. This change
 
 ## [Unreleased]
 ### Added
+- **Migração para PostgreSQL**
+  - O banco de dados principal foi migrado de SQLite para PostgreSQL.
+  - Adicionado suporte a HoneySQL para consultas dinâmicas.
+  - Nova estrutura de migrations compatível com PostgreSQL.
 - **Recurso de Sair da Organização**
   - Jogadores agora podem voluntariamente sair de uma organização.
   - Salvaguarda para impedir que o último administrador saia da organização.
   - Endpoint `POST /api/organizations/:id/leave`.
   - Novos testes de integração para o fluxo de saída.
-- **Suporte a Turso/LibSQL**
-  - Adicionado driver `io.github.conagyurig/libsql-jdbc` para compatibilidade com bancos de dados na nuvem Turso.
-  - Configuração dinâmica via variável de ambiente `TURSO_DATABASE_URL`.
 - **Testes End-to-End (E2E)**
   - Suite de testes completa usando Playwright.
   - Scripts `npm run test:e2e` e `npm run test` com suporte a execução de testes específicos e gravação de vídeo.
+
+### Removed
+- **Suporte a Turso/LibSQL e SQLite**
+  - Removido driver LibSQL e SQLite.
+  - Remoção de lógica de backup SQLite e replicação Litestream.
+  - Removidas todas as referências a Turso, LibSQL e SQLite do código-fonte e configurações.
 
 ### Changed
 - **Otimização de Segurança e Performance (Dashboard)**
@@ -120,7 +127,7 @@ All notable changes to this project will be documented in this file. This change
 - Autentica??o JWT com Buddy
 - CRUD de usu?rios e organiza??es
 - Sistema b?sico de peladas e times
-- Banco de dados SQLite com migrations
+- Banco de dados com migrations
 - Testes unit?rios e de integra??o
 - Dockeriza??o da aplica??o
 

@@ -6,21 +6,19 @@
    [api-peladaapp.db.reminder :as db.reminder]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.db.vote :as db.vote]
+   [api-peladaapp.helpers.misc :as misc]
+   [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.logic.scheduler :as scheduler]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]))
 
 (use-fixtures :once th/test-system-fixture)
 
-(defn- sqlite-date [instant]
-  (let [formatter (-> (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd HH:mm:ss")
-                      (.withZone (java.time.ZoneId/of "UTC")))]
-    (.format formatter instant)))
-
 (deftest test-scheduler-updates-grades-without-waha
-  (let [db-file (:db-file th/*test-system*)
-        db (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
+  (let [db-val (-> th/*test-system* :database :database)
+        db (if (fn? db-val) (db-val) db-val)]
     (testing "execute-tasks! updates grades and inserts reminders even if WAHA is disabled"
       ;; 1. Setup organization with WAHA notifications explicitly disabled
       (let [org-id (db.organization/insert-organization {:name "Org WAHA Disabled" :owner-id nil} db)
@@ -38,13 +36,17 @@
             target-player-id (db.player/insert-player {:organization-id org-id :user-id target-user-id :grade 5.0} db)
 
             ;; 3. Create a Pelada closed 25h ago
-            now (java.time.Instant/now)
-            old-date (sqlite-date (.minus now (java.time.Duration/ofHours 25)))
+            now (java.time.OffsetDateTime/now)
+            old-date (.minus now (java.time.Duration/ofHours 25))
             pelada-id (db.pelada/insert-pelada {:organization-id org-id :status "closed"} db)]
-        (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ? WHERE id = ?" old-date pelada-id])
 
-        (jdbc/execute! db ["INSERT INTO peladaattendance (pelada_id, player_id, status, voting_enabled) VALUES (?, ?, 'confirmed', 1)" pelada-id target-player-id])
-        (jdbc/execute! db ["INSERT INTO peladaattendance (pelada_id, player_id, status, voting_enabled) VALUES (?, ?, 'confirmed', 1)" pelada-id voter-player-id])
+        (jdbc/execute! db (hsql/format (-> (h/update :Peladas)
+                                           (h/set {:status [:cast "closed" :pelada_status] :closed_at [[:cast old-date :timestamp]]})
+                                           (h/where [:= :id (misc/as-uuid pelada-id)]))))
+
+        (jdbc/execute! db (hsql/format (-> (h/insert-into :Attendance)
+                                           (h/values [{:pelada_id (misc/as-uuid pelada-id) :player_id (misc/as-uuid target-player-id) :status [:cast "confirmed" :attendance_status] :voting_enabled true}
+                                                      {:pelada_id (misc/as-uuid pelada-id) :player_id (misc/as-uuid voter-player-id) :status [:cast "confirmed" :attendance_status] :voting_enabled true}]))))
 
     ;; 4. Add a vote for the target player (e.g., 1 star to drastically change grade)
         (db.vote/insert-vote {:pelada-id pelada-id :voter-id voter-player-id :target-id target-player-id :stars 1} db)
@@ -67,16 +69,18 @@
             "PeladaReminder 'vote_ended' should have been inserted even with WAHA disabled")))))
 
 (deftest test-scheduler-vote-reminder-bounds
-  (let [db-file (:db-file th/*test-system*)
-        db (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
+  (let [db-val (-> th/*test-system* :database :database)
+        db (if (fn? db-val) (db-val) db-val)]
     (testing "list-peladas-for-vote-reminders only returns peladas within the 1-hour windows"
       (let [org-id (db.organization/insert-organization {:name "Org Bounds Test" :owner-id nil} db)
-            now (java.time.Instant/now)
+            now (java.time.OffsetDateTime/now)
             ;; Helper to create pelada at specific time
             create-pelada (fn [duration]
-                            (let [d (sqlite-date (.minus now duration))
+                            (let [d (.minus now duration)
                                   p-id (db.pelada/insert-pelada {:organization-id org-id :status "closed"} db)]
-                              (jdbc/execute! db ["UPDATE Peladas SET status = 'closed', closed_at = ? WHERE id = ?" d p-id])
+                              (jdbc/execute! db (hsql/format (-> (h/update :Peladas)
+                                                                 (h/set {:status [:cast "closed" :pelada_status] :closed_at [[:cast d :timestamp]]})
+                                                                 (h/where [:= :id (misc/as-uuid p-id)]))))
                               p-id))
             ;; Inside windows
             p-30m-in (create-pelada (java.time.Duration/ofMinutes 45))
@@ -93,6 +97,6 @@
             by-type (group-by :type my-reminders)
             ids-by-type (fn [t] (set (map #(-> % :pelada :id) (get by-type t))))]
 
-        (is (= #{p-30m-in} (ids-by-type :30m)) "Only 45m pelada should be in 30m window")
-        (is (= #{p-12h-in} (ids-by-type :12h)) "Only 12.5h pelada should be in 12h window")
-        (is (= #{p-23h-in} (ids-by-type :23h)) "Only 23.5h pelada should be in 23h window")))))
+        (is (= #{p-30m-in} (ids-by-type :vote_30m)) "Only 45m pelada should be in 30m window")
+        (is (= #{p-12h-in} (ids-by-type :vote_12h)) "Only 12.5h pelada should be in 12h window")
+        (is (= #{p-23h-in} (ids-by-type :vote_23h)) "Only 23.5h pelada should be in 23h window")))))

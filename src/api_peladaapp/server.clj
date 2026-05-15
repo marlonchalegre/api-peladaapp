@@ -5,6 +5,7 @@
    [buddy.auth.accessrules   :refer [wrap-access-rules]]
    [buddy.auth.middleware    :refer [wrap-authorization]]
    [clojure.string           :as str]
+   [clojure.tools.logging    :as log]
    [next.jdbc                :as jdbc]
    [ring.middleware.cookies  :refer [wrap-cookies]]
    [ring.middleware.json     :refer [wrap-json-body wrap-json-response]]
@@ -38,18 +39,22 @@
 ;; In dev (lein-ring), we don't start the Component system, so we must
 ;; initialize the database and inject it into every request ourselves.
 (def ^:private db-spec
-  (let [turso-url (System/getenv "TURSO_DATABASE_URL")
-        turso-token (System/getenv "TURSO_AUTH_TOKEN")]
-    (if (and turso-url turso-token)
-      (do
-        (Class/forName "com.dbeaver.jdbc.driver.libsql.LibSqlDriver")
-        {:jdbcUrl (str "jdbc:dbeaver:libsql:https://"
-                       (str/replace turso-url #"^libsql://" ""))
-         :user ""
-         :password turso-token})
-      {:dbtype "sqlite"
-       :dbname (or (System/getenv "DB_NAME") "peladaapp.db")
-       :connectionInitSql "PRAGMA busy_timeout = 5000;"})))
+  (let [database-url (System/getenv "DATABASE_URL")]
+    (if database-url
+      (let [^java.net.URI uri (try (java.net.URI. database-url) (catch Exception _ nil))
+            user-info (when uri (.getUserInfo uri))
+            [user pass] (when user-info (clojure.string/split user-info #":" 2))
+            host (when uri (.getHost uri))
+            port (when uri (.getPort uri))
+            ^String path (when uri (.getPath uri))
+            db (when path (let [p (if (.startsWith path "/") (subs path 1) path)] p))]
+        {:dbtype "postgresql"
+         :dbname (or db "peladaapp")
+         :host host
+         :port (when (and port (pos? port)) port)
+         :user user
+         :password pass})
+      (throw (Exception. "DATABASE_URL is required for dev database initialization. PostgreSQL is now mandatory.")))))
 
 (defonce ^:private datasource
   (jdbc/get-datasource db-spec))
@@ -67,11 +72,10 @@
     (try
       (let [response (handler request)]
         (when (= 500 (:status response))
-          (println "[SERVER 500]" (:uri request) (:body response)))
+          (log/error "[SERVER 500]" (:uri request) (:body response)))
         response)
       (catch Throwable e
-        (println "[FATAL ERROR]" (:uri request) (.getMessage e))
-        (.printStackTrace e)
+        (log/error e "[FATAL ERROR]" (:uri request))
         (throw e)))))
 
 (def app (as-> #'routes/app-handler $

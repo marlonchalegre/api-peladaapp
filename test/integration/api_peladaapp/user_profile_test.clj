@@ -4,7 +4,6 @@
    [clojure.data.json :as json]
    [clojure.string :as str]
    [clojure.test :refer [deftest is use-fixtures]]
-   [next.jdbc :as jdbc]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
@@ -18,9 +17,9 @@
       :else nil)))
 
 (deftest get-user-profile-success
-  (let [app (-> th/*test-system* :app :handler)
-        db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+  (let [app (-> th/*test-system* :app :app-handler)
+        ds (api-peladaapp.test-helpers/get-test-datasource)
+
         token (th/register-and-login! app {:name "Profile User" :email "profile@example.com" :password "pass"})
         user-id (th/user-id-by-email ds "profile@example.com")
         resp (app (-> (mock/request :get (str "/api/user/" user-id))
@@ -31,16 +30,16 @@
     (is (= "profile@example.com" (:email body)))))
 
 (deftest get-user-profile-unauthorized
-  (let [app (-> th/*test-system* :app :handler)
+  (let [app (-> th/*test-system* :app :app-handler)
         token (th/register-and-login! app {:name "Any" :email "any@any.com" :password "any"})
         resp (app (-> (mock/request :get "/api/user/9999")
                       (mock/cookie "authToken" token)))]
     (is (= 403 (:status resp)))))
 
 (deftest update-user-profile-success
-  (let [app (-> th/*test-system* :app :handler)
-        db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+  (let [app (-> th/*test-system* :app :app-handler)
+        ds (api-peladaapp.test-helpers/get-test-datasource)
+
         token (th/register-and-login! app {:name "Old Name" :email "old@example.com" :password "pass"})
         user-id (th/user-id-by-email ds "old@example.com")
         resp (app (-> (mock/request :put (str "/api/user/" user-id "/profile"))
@@ -52,9 +51,9 @@
     (is (= "Midfielder" (:position body)))))
 
 (deftest delete-user-success
-  (let [app (-> th/*test-system* :app :handler)
-        db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+  (let [app (-> th/*test-system* :app :app-handler)
+        ds (api-peladaapp.test-helpers/get-test-datasource)
+
         token (th/register-and-login! app {:name "Delete Me" :email "delete@example.com" :password "pass"})
         user-id (th/user-id-by-email ds "delete@example.com")
         resp (app (-> (mock/request :delete (str "/api/user/" user-id))
@@ -63,9 +62,9 @@
     (is (nil? (th/user-id-by-email ds "delete@example.com")))))
 
 (deftest update-user-profile-duplicate-email
-  (let [app (-> th/*test-system* :app :handler)
-        db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+  (let [app (-> th/*test-system* :app :app-handler)
+        ds (api-peladaapp.test-helpers/get-test-datasource)
+
         ;; Register first user
         _ (th/register-and-login! app {:name "User 1" :username "user1" :email "user1@example.com" :password "pass"})
         ;; Register second user

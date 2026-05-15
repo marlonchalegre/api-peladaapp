@@ -1,72 +1,94 @@
 (ns api-peladaapp.db.match
   (:require
    [api-peladaapp.adapters.match :as adapter.match]
+   [api-peladaapp.helpers.sql :as hsql]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
-   [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
-(defn- affected-rows-count [result]
-  (-> result vals first))
-
-(s/defn insert-match :- s/Int
-  [{:keys [pelada-id home-team-id away-team-id sequence status home-score away-score]}
+(s/defn insert-match :- s/Uuid
+  [{:keys [pelada-id home-team-id away-team-id sequence status home-score away-score]} :- {:pelada-id s/Uuid
+                                                                                           :home-team-id s/Uuid
+                                                                                           :away-team-id s/Uuid
+                                                                                           :sequence s/Int
+                                                                                           :status s/Str
+                                                                                           (s/optional-key :home-score) (s/maybe s/Int)
+                                                                                           (s/optional-key :away-score) (s/maybe s/Int)}
    db]
-  (-> (sql/insert! db :matches {:pelada_id pelada-id
-                                :home_team_id home-team-id
-                                :away_team_id away-team-id
-                                :sequence sequence
-                                :status status
-                                :home_score home-score
-                                :away_score away-score})
-      affected-rows-count))
+  (let [row {:pelada_id pelada-id
+             :home_team_id home-team-id
+             :away_team_id away-team-id
+             :sequence sequence
+             :status [:cast status :match_status]
+             :home_score home-score
+             :away_score away-score}
+        query (-> (h/insert-into :Matches)
+                  (h/values [row])
+                  (h/returning :id))]
+    (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
 (s/defn list-matches-by-pelada :- [s/Any]
-  [pelada-id db]
-  (->> (sql/find-by-keys db :matches {:pelada_id pelada-id})
-       (sort-by :matches/sequence)
-       (map adapter.match/db->model)))
+  [pelada-id :- s/Uuid db]
+  (let [query (-> (h/select :*)
+                  (h/from :Matches)
+                  (h/where [:= :pelada_id pelada-id])
+                  (h/order-by :sequence))]
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
+         (map adapter.match/db->model))))
 
-(s/defn get-match [id db]
-  (-> (sql/get-by-id db :matches id)
-      adapter.match/db->model))
+(s/defn get-match [id :- s/Uuid db]
+  (let [query (-> (h/select :*)
+                  (h/from :Matches)
+                  (h/where [:= :id id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        adapter.match/db->model)))
 
 (s/defn update-match :- s/Int
-  [id {:keys [home-score away-score status timer-started-at timer-accumulated-ms timer-status]} db]
-  (-> (sql/update! db :matches (cond-> {}
-                                 (some? home-score) (assoc :home_score home-score)
-                                 (some? away-score) (assoc :away_score away-score)
-                                 status (assoc :status status)
-                                 timer-started-at (assoc :timer_started_at timer-started-at)
-                                 (some? timer-accumulated-ms) (assoc :timer_accumulated_ms timer-accumulated-ms)
-                                 timer-status (assoc :timer_status timer-status))
-                   {:id id})
-      affected-rows-count))
+  [id :- s/Uuid {:keys [home-score away-score status timer-started-at timer-accumulated-ms timer-status]} db]
+  (let [db-row (cond-> {}
+                 (some? home-score) (assoc :home_score home-score)
+                 (some? away-score) (assoc :away_score away-score)
+                 status (assoc :status [:cast status :match_status])
+                 timer-started-at (assoc :timer_started_at [[:cast timer-started-at :timestamp]])
+                 (some? timer-accumulated-ms) (assoc :timer_accumulated_ms timer-accumulated-ms)
+                 timer-status (assoc :timer_status [:cast timer-status :timer_status]))]
+    (if (empty? db-row)
+      1
+      (let [query (-> (h/update :Matches)
+                      (h/set db-row)
+                      (h/where [:= :id id]))]
+        (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+            hsql/affected-rows-count)))))
 
 (s/defn update-score :- s/Int
-  [id data db]
+  [id :- s/Uuid data db]
   (update-match id data db))
 
 (s/defn update-sequence :- s/Int
-  [id sequence db]
-  (-> (sql/update! db :matches {:sequence sequence} {:id id})
-      affected-rows-count))
+  [id :- s/Uuid sequence :- s/Int db]
+  (let [query (-> (h/update :Matches)
+                  (h/set {:sequence sequence})
+                  (h/where [:= :id id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
 (s/defn finish-all-by-pelada
   "Finish all matches for a pelada. Matches not yet finished are closed.
    It also ensures timers are stopped and accumulated time is calculated for running matches."
-  [pelada-id :- s/Int db]
-  (let [now (str (java.time.Instant/now))]
-    (jdbc/execute! db
-                   ["UPDATE matches
-                     SET
-                       timer_accumulated_ms = CASE
-                         WHEN timer_status = 'running' THEN COALESCE(timer_accumulated_ms, 0) + (unixepoch(?) * 1000 - unixepoch(timer_started_at) * 1000)
-                         ELSE COALESCE(timer_accumulated_ms, 0)
-                       END,
-                       timer_status = 'paused',
-                       timer_started_at = NULL,
-                       status = 'finished',
-                       home_score = COALESCE(home_score, 0),
-                       away_score = COALESCE(away_score, 0)
-                     WHERE pelada_id = ? AND status != 'finished'"
-                    now pelada-id])))
+  [pelada-id :- s/Uuid db]
+  (let [;; Note: Postgres handles interval arithmetic better with native types.
+        ;; Using :raw for EXTRACT to ensure "FROM" keyword is used instead of comma.
+        query (-> (h/update :Matches)
+                  (h/set {:timer_accumulated_ms
+                          [:case
+                           [:= :timer_status [:cast "running" :timer_status]]
+                           [:+ [:coalesce :timer_accumulated_ms 0]
+                            [:* [:raw "EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - \"timer_started_at\"))"] 1000]]
+                           :else [:coalesce :timer_accumulated_ms 0]]
+                          :timer_status [:cast "paused" :timer_status]
+                          :timer_started_at nil
+                          :status [:cast "finished" :match_status]
+                          :home_score [:coalesce :home_score 0]
+                          :away_score [:coalesce :away_score 0]})
+                  (h/where [:= :pelada_id pelada-id] [:!= :status [:cast "finished" :match_status]]))]
+    (jdbc/execute! db (hsql/format query))))

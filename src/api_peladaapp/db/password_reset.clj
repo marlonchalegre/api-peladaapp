@@ -1,24 +1,35 @@
 (ns api-peladaapp.db.password-reset
   (:require
    [api-peladaapp.helpers.misc :as misc]
+   [api-peladaapp.helpers.sql :as hsql]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
-   [next.jdbc.sql :as sql]))
+   [schema.core :as s]))
 
-(defn create-token! [user-id token expires-at db]
-  (sql/insert! db :password_reset_tokens
-               {:user_id user-id
-                :token token
-                :expires_at expires-at}))
+(s/defn create-token! [user-id :- s/Uuid token :- s/Str expires-at db]
+  (let [query (-> (h/insert-into :password_reset_tokens)
+                  (h/values [{:user_id user-id
+                              :token token
+                              :expires_at [:cast expires-at :timestamptz]}]))]
+    (jdbc/execute-one! db (hsql/format query))))
 
-(defn find-token [token db]
-  (some-> (sql/get-by-id db :password_reset_tokens token :token {})
-          misc/unamespace))
+(s/defn find-token [token :- s/Str db]
+  (let [query (-> (h/select :*)
+                  (h/from :password_reset_tokens)
+                  (h/where [:= :token token]))]
+    (some-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+            misc/unamespace)))
 
-(defn delete-token! [token db]
-  (sql/delete! db :password_reset_tokens {:token token}))
+(s/defn delete-token! [token :- s/Str db]
+  (let [query (-> (h/delete-from :password_reset_tokens)
+                  (h/where [:= :token token]))]
+    (jdbc/execute-one! db (hsql/format query))))
 
-(defn delete-user-tokens! [user-id db]
-  (sql/delete! db :password_reset_tokens {:user_id user-id}))
+(s/defn delete-user-tokens! [user-id :- s/Uuid db]
+  (let [query (-> (h/delete-from :password_reset_tokens)
+                  (h/where [:= :user_id user-id]))]
+    (jdbc/execute-one! db (hsql/format query))))
 
-(defn delete-expired-tokens! [now db]
-  (jdbc/execute! db ["DELETE FROM password_reset_tokens WHERE expires_at < ?" now]))
+(s/defn delete-expired-tokens! [now db]
+  (let [query (-> (h/delete-from :password_reset_tokens) (h/where [:< :expires_at now]))]
+    (jdbc/execute! db (hsql/format query))))

@@ -2,16 +2,14 @@
   (:require
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
-   [next.jdbc :as jdbc]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 
 (deftest test-prevent-removing-last-admin
   (testing "Should prevent removing the last admin of an organization"
-    (let [app (-> th/*test-system* :app :handler)
-          db-file (:db-file th/*test-system*)
-          ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+    (let [app (-> th/*test-system* :app :app-handler)
+          ds (api-peladaapp.test-helpers/get-test-datasource)
 
           ;; Register and login
           token (th/register-and-login! app {:name "Admin User" :email "admin@test.com" :password "pass123"})

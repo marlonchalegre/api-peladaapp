@@ -12,7 +12,7 @@
     user))
 
 (s/defn build-token :- s/Str
-  [{:keys [id email phone admin-orgs avatar-filename]} :- (assoc models.user/User :admin-orgs [s/Int])
+  [{:keys [id email phone admin-orgs avatar-filename]} :- (assoc models.user/User :admin-orgs [s/Uuid])
    secret :- s/Str]
   (-> {:id id
        :email email

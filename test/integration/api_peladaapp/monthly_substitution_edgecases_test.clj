@@ -1,9 +1,9 @@
 (ns integration.api-peladaapp.monthly-substitution-edgecases-test
   (:require
    [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is use-fixtures]]
-   [next.jdbc :as jdbc]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
@@ -12,9 +12,9 @@
   (th/decode-body resp))
 
 (deftest substitution-error-cases
-  (let [app (-> th/*test-system* :app :handler)
-        db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
         token (th/register-and-login! app {:name "Admin" :email "admin@ex.com" :password "p"})
         p2-token (th/register-and-login! app {:name "Player 2" :email "p2@ex.com" :password "p"})
         p3-token (th/register-and-login! app {:name "Player 3" :email "p3@ex.com" :password "p"})
@@ -28,7 +28,7 @@
         org-resp (app (-> (mock/request :post "/api/organizations")
                           (mock/json-body {:name "Sub Club"})
                           auth))
-        org-id (:id (decode-body org-resp))]
+        org-id (misc/as-uuid (:id (decode-body org-resp)))]
 
     (is (= 201 (:status org-resp)))
 
@@ -50,12 +50,12 @@
 
     ;; Fetch organization players and ids
     (let [players (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/players")) auth)))
-          admin-player (first (filter #(= (:user_id %) admin-id) players))
-          admin-player-id (:id admin-player)
-          p2-player (first (filter #(= (:user_id %) p2-id) players))
-          p2-player-id (:id p2-player)
-          p3-player (first (filter #(= (:user_id %) p3-id) players))
-          p3-player-id (:id p3-player)]
+          admin-player (first (filter #(= (misc/as-uuid (:user_id %)) admin-id) players))
+          admin-player-id (misc/as-uuid (:id admin-player))
+          p2-player (first (filter #(= (misc/as-uuid (:user_id %)) p2-id) players))
+          p2-player-id (misc/as-uuid (:id p2-player))
+          p3-player (first (filter #(= (misc/as-uuid (:user_id %)) p3-id) players))
+          p3-player-id (misc/as-uuid (:id p3-player))]
 
       ;; 1) Cannot create substitution if permanent is not mensalista
       ;; Force admin to non-mensalista and verify API rejects
@@ -97,7 +97,7 @@
 
       ;; 4) Ending an already ended substitution should return bad request
       (let [subs (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/substitutions")) auth)))
-            sub-id (:id (first subs))
+            sub-id (misc/as-uuid (:id (first subs)))
             end-resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/substitutions/" sub-id "/end"))
                               (mock/json-body {:end_date "2026-06-06"})
                               auth))]

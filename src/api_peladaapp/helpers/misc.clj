@@ -15,3 +15,12 @@
         (assoc new-k (get m old-k))
         (dissoc old-k))
     m))
+
+(defn as-uuid
+  "Safely convert a string to a UUID. If it's already a UUID, return it.
+   Returns nil if input is nil or invalid."
+  [x]
+  (cond
+    (instance? java.util.UUID x) x
+    (string? x) (parse-uuid x)
+    :else nil))

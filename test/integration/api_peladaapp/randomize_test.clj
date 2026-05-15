@@ -1,205 +1,336 @@
 (ns api-peladaapp.randomize-test
   (:require
+   [api-peladaapp.helpers.misc :as misc]
+   [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.logic.randomize :as logic.randomize]
    [api-peladaapp.test-helpers :as th]
    [clojure.set]
    [clojure.test :refer [deftest is testing use-fixtures]]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]
-   [next.jdbc.sql :as sql]))
+   [next.jdbc.result-set :as rs]))
 
 (use-fixtures :each th/test-system-fixture)
 
 (deftest randomize-teams-logic-test
-  (let [db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})]
-    ;; Setup Data
-    (jdbc/execute! ds ["INSERT INTO Organizations (name) VALUES ('Org')"])
-    (jdbc/execute! ds ["INSERT INTO Peladas (organization_id, scheduled_at) VALUES (1, '2023-01-01')"])
-    (jdbc/execute! ds ["INSERT INTO Teams (pelada_id, name) VALUES (1, 'T1')"])
-    (jdbc/execute! ds ["INSERT INTO Teams (pelada_id, name) VALUES (1, 'T2')"])
-
-    ;; Create Players
-    (dotimes [i 6]
-      (jdbc/execute! ds ["INSERT INTO Users (name, email, password) VALUES (?, ?, 'pw')" (str "U" i) (str "u" i "@e.com")])
-      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (user_id, organization_id) VALUES (?, 1)" (inc i)]))
-
+  (let [ds (th/get-test-datasource)]
     (testing "Distributes players to fill teams"
-      (let [player-ids [1 2 3 4 5 6]
-            pelada-id 1
-            players-per-team 3
-            org-player-ids (set (map :organizationplayers/id (sql/query ds ["SELECT id FROM OrganizationPlayers"])))]
-
-        (logic.randomize/randomize-teams! pelada-id player-ids players-per-team ds)
-
-        (let [t1-players (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 1"])
-              t2-players (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 2"])]
+      (let [org-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Organizations)
+                                                               (h/values [{:name "Org"}])
+                                                               (h/returning :id)))
+                                           {:builder-fn rs/as-unqualified-lower-maps}))
+            pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas)
+                                                                  (h/values [{:organization_id (misc/as-uuid org-id)
+                                                                              :scheduled_at [:raw "CURRENT_TIMESTAMP"]}])
+                                                                  (h/returning :id)))
+                                              {:builder-fn rs/as-unqualified-lower-maps}))
+            t1-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams)
+                                                              (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "T1"}])
+                                                              (h/returning :id)))
+                                          {:builder-fn rs/as-unqualified-lower-maps}))
+            t2-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams)
+                                                              (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "T2"}])
+                                                              (h/returning :id)))
+                                          {:builder-fn rs/as-unqualified-lower-maps}))
+            org-player-ids (doall (for [i (range 6)]
+                                    (let [email (str "u" i "@e.com")
+                                          user-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users)
+                                                                                              (h/values [{:name (str "U" i)
+                                                                                                          :email email
+                                                                                                          :password "pw"}])
+                                                                                              (h/returning :id)))
+                                                                          {:builder-fn rs/as-unqualified-lower-maps}))]
+                                      (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
+                                                                                  (h/values [{:user_id (misc/as-uuid user-id)
+                                                                                              :organization_id (misc/as-uuid org-id)
+                                                                                              :member_type [:cast "diarista" :member_type]}])
+                                                                                  (h/returning :id)))
+                                                              {:builder-fn rs/as-unqualified-lower-maps})))))]
+        (logic.randomize/randomize-teams! pelada-id org-player-ids 3 ds)
+        (let [t1-players (jdbc/execute! ds (hsql/format (-> (h/select :player_id)
+                                                            (h/from :TeamPlayers)
+                                                            (h/where [:= :team_id (misc/as-uuid t1-id)])))
+                                        {:builder-fn rs/as-unqualified-lower-maps})
+              t2-players (jdbc/execute! ds (hsql/format (-> (h/select :player_id)
+                                                            (h/from :TeamPlayers)
+                                                            (h/where [:= :team_id (misc/as-uuid t2-id)])))
+                                        {:builder-fn rs/as-unqualified-lower-maps})]
           (is (= 3 (count t1-players)))
           (is (= 3 (count t2-players)))
-          ;; Ensure all players are assigned
-          (let [assigned-ids (set (map :teamplayers/player_id (concat t1-players t2-players)))]
-            (is (= org-player-ids assigned-ids))))))
+          (is (= (set (map misc/as-uuid org-player-ids)) (set (map (comp misc/as-uuid :player_id) (concat t1-players t2-players))))))))
 
     (testing "Balances teams by position and score"
-      (jdbc/execute! ds ["DELETE FROM TeamPlayers"])
-      (jdbc/execute! ds ["DELETE FROM OrganizationPlayers"])
-      (jdbc/execute! ds ["DELETE FROM Users"])
-      (jdbc/execute! ds ["DELETE FROM Teams"])
-      (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (1, 1, 'TA')"])
-      (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (2, 1, 'TB')"])
+      (jdbc/execute! ds (hsql/format (h/delete-from :TeamPlayers)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :OrganizationPlayers)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :Users)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :Teams)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :Peladas)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :Organizations)))
 
-      ;; Setup specific scenario
-      ;; P1: GK, score 10
-      (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (1, 'GK', 'gk@e.com', 'p', 'Goalkeeper')"])
-      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (1, 1, 1, 10.0)"])
-      ;; P4: Defender, score 7
-      (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (4, 'Def', 'def@e.com', 'p', 'Defender')"])
-      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (4, 4, 1, 7.0)"])
-      ;; P3: Striker, score 8
-      (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (3, 'Str1', 's1@e.com', 'p', 'Striker')"])
-      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (3, 3, 1, 8.0)"])
-      ;; P2: Striker, score 5
-      (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (2, 'Str2', 's2@e.com', 'p', 'Striker')"])
-      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (2, 2, 1, 5.0)"])
-
-      (let [player-ids [1 2 3 4]
-            pelada-id 1
-            players-per-team 2]
-        (logic.randomize/randomize-teams! pelada-id player-ids players-per-team ds)
-
-        (let [t1-players (->> (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 1"])
-                              (map :TeamPlayers/player_id) set)
-              t2-players (->> (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 2"])
-                              (map :TeamPlayers/player_id) set)]
-          ;; Verify positions are split (one GK and one Def in different teams)
-          (let [gk-team-id (if (contains? t1-players 1) 1 2)
-                def-team-id (if (contains? t1-players 4) 1 2)]
+      (let [org-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Organizations)
+                                                               (h/values [{:name "Org"}])
+                                                               (h/returning :id)))
+                                           {:builder-fn rs/as-unqualified-lower-maps}))
+            pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas)
+                                                                  (h/values [{:organization_id (misc/as-uuid org-id)
+                                                                              :scheduled_at [:raw "CURRENT_TIMESTAMP"]}])
+                                                                  (h/returning :id)))
+                                              {:builder-fn rs/as-unqualified-lower-maps}))
+            ta-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams)
+                                                              (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "TA"}])
+                                                              (h/returning :id)))
+                                          {:builder-fn rs/as-unqualified-lower-maps}))
+            tb-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams)
+                                                              (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "TB"}])
+                                                              (h/returning :id)))
+                                          {:builder-fn rs/as-unqualified-lower-maps}))
+            ;; P1: GK, score 10
+            u1-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users)
+                                                              (h/values [{:name "GK" :email "gk@e.com" :password "p" :position [:cast "Goalkeeper" :player_position]}])
+                                                              (h/returning :id)))
+                                          {:builder-fn rs/as-unqualified-lower-maps}))
+            p1-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
+                                                              (h/values [{:user_id (misc/as-uuid u1-id) :organization_id (misc/as-uuid org-id) :grade 10.0 :member_type [:cast "diarista" :member_type]}])
+                                                              (h/returning :id)))
+                                          {:builder-fn rs/as-unqualified-lower-maps}))
+            ;; P4: Defender, score 7
+            u4-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users)
+                                                              (h/values [{:name "Def" :email "def@e.com" :password "p" :position [:cast "Defender" :player_position]}])
+                                                              (h/returning :id)))
+                                          {:builder-fn rs/as-unqualified-lower-maps}))
+            p4-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
+                                                              (h/values [{:user_id (misc/as-uuid u4-id) :organization_id (misc/as-uuid org-id) :grade 7.0 :member_type [:cast "diarista" :member_type]}])
+                                                              (h/returning :id)))
+                                          {:builder-fn rs/as-unqualified-lower-maps}))
+            ;; P3: Striker, score 8
+            u3-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users)
+                                                              (h/values [{:name "Str1" :email "s1@e.com" :password "p" :position [:cast "Striker" :player_position]}])
+                                                              (h/returning :id)))
+                                          {:builder-fn rs/as-unqualified-lower-maps}))
+            p3-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
+                                                              (h/values [{:user_id (misc/as-uuid u3-id) :organization_id (misc/as-uuid org-id) :grade 8.0 :member_type [:cast "diarista" :member_type]}])
+                                                              (h/returning :id)))
+                                          {:builder-fn rs/as-unqualified-lower-maps}))
+            ;; P2: Striker, score 5
+            u2-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users)
+                                                              (h/values [{:name "Str2" :email "s2@e.com" :password "p" :position [:cast "Striker" :player_position]}])
+                                                              (h/returning :id)))
+                                          {:builder-fn rs/as-unqualified-lower-maps}))
+            p2-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
+                                                              (h/values [{:user_id (misc/as-uuid u2-id) :organization_id (misc/as-uuid org-id) :grade 5.0 :member_type [:cast "diarista" :member_type]}])
+                                                              (h/returning :id)))
+                                          {:builder-fn rs/as-unqualified-lower-maps}))]
+        (logic.randomize/randomize-teams! pelada-id [p1-id p2-id p3-id p4-id] 2 ds)
+        (let [t1-players (->> (jdbc/execute! ds (hsql/format (-> (h/select :player_id)
+                                                                 (h/from :TeamPlayers)
+                                                                 (h/where [:= :team_id (misc/as-uuid ta-id)])))
+                                             {:builder-fn rs/as-unqualified-lower-maps})
+                              (map (comp misc/as-uuid :player_id)) set)
+              t2-players (->> (jdbc/execute! ds (hsql/format (-> (h/select :player_id)
+                                                                 (h/from :TeamPlayers)
+                                                                 (h/where [:= :team_id (misc/as-uuid tb-id)])))
+                                             {:builder-fn rs/as-unqualified-lower-maps})
+                              (map (comp misc/as-uuid :player_id)) set)]
+          (let [gk-team-id (if (contains? t1-players (misc/as-uuid p1-id)) ta-id tb-id)
+                def-team-id (if (contains? t1-players (misc/as-uuid p4-id)) ta-id tb-id)]
             (is (not= gk-team-id def-team-id) "GK and Defender should be in different teams"))
-
-        ;; Verify each team has one striker
-          (let [t1-strikers (clojure.set/intersection t1-players #{2 3})
-                t2-strikers (clojure.set/intersection t2-players #{2 3})]
+          (let [t1-strikers (clojure.set/intersection t1-players #{(misc/as-uuid p2-id) (misc/as-uuid p3-id)})
+                t2-strikers (clojure.set/intersection t2-players #{(misc/as-uuid p2-id) (misc/as-uuid p3-id)})]
             (is (= 1 (count t1-strikers)))
             (is (= 1 (count t2-strikers))))
-
-        ;; Verify balance is reasonable (difference <= 6 for this small set)
-          (let [t1-score (->> (jdbc/execute! ds ["SELECT op.grade FROM TeamPlayers tp JOIN OrganizationPlayers op ON tp.player_id = op.id WHERE tp.team_id = 1"]
+          (let [t1-score (->> (jdbc/execute! ds (hsql/format (-> (h/select :op.grade)
+                                                                 (h/from [:TeamPlayers :tp])
+                                                                 (h/join [:OrganizationPlayers :op] [:= :tp.player_id :op.id])
+                                                                 (h/where [:= :tp.team_id (misc/as-uuid ta-id)])))
                                              {:builder-fn rs/as-unqualified-lower-maps})
                               (map :grade) (reduce + 0))
-                t2-score (->> (jdbc/execute! ds ["SELECT op.grade FROM TeamPlayers tp JOIN OrganizationPlayers op ON tp.player_id = op.id WHERE tp.team_id = 2"]
+                t2-score (->> (jdbc/execute! ds (hsql/format (-> (h/select :op.grade)
+                                                                 (h/from [:TeamPlayers :tp])
+                                                                 (h/join [:OrganizationPlayers :op] [:= :tp.player_id :op.id])
+                                                                 (h/where [:= :tp.team_id (misc/as-uuid tb-id)])))
                                              {:builder-fn rs/as-unqualified-lower-maps})
                               (map :grade) (reduce + 0))]
-            (is (<= (abs (- t1-score t2-score)) 6.0) (str "Score difference should be reasonable, got " t1-score " vs " t2-score))))))
+            (is (<= (abs (- t1-score t2-score)) 6.0))))))
+
     (testing "Respects player limit with many players"
-      (jdbc/execute! ds ["DELETE FROM TeamPlayers"])
-      (jdbc/execute! ds ["DELETE FROM OrganizationPlayers"])
-      (jdbc/execute! ds ["DELETE FROM Users"])
-      (jdbc/execute! ds ["DELETE FROM Teams"])
-      ;; Create 4 teams
-      (dotimes [i 4]
-        (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (?, 1, ?)" (inc i) (str "T" i)]))
-
-      ;; Create 20 players
-      (dotimes [i 20]
-        (let [id (inc i)]
-          (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (?, ?, ?, 'p', 'Midfielder')" id (str "P" i) (str "p" i "@e.com")])
-          (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (?, ?, 1, 5.0)" id id])))
-
-      (let [player-ids (range 1 21)
-            pelada-id 1
-            players-per-team 6]
-        (logic.randomize/randomize-teams! pelada-id player-ids players-per-team ds)
-
-        (let [team-counts (map :c (sql/query ds ["SELECT count(*) as c FROM TeamPlayers GROUP BY team_id"]))]
-          (is (every? #(<= % 6) team-counts))
-          (is (= 20 (reduce + team-counts))))))
+      (jdbc/execute! ds (hsql/format (h/delete-from :TeamPlayers)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :OrganizationPlayers)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :Users)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :Teams)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :Peladas)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :Organizations)))
+      (let [org-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Organizations)
+                                                               (h/values [{:name "Org"}])
+                                                               (h/returning :id)))
+                                           {:builder-fn rs/as-unqualified-lower-maps}))
+            pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas)
+                                                                  (h/values [{:organization_id (misc/as-uuid org-id)
+                                                                              :scheduled_at [:raw "CURRENT_TIMESTAMP"]}])
+                                                                  (h/returning :id)))
+                                              {:builder-fn rs/as-unqualified-lower-maps}))]
+        (doall (for [i (range 4)]
+                 (jdbc/execute! ds (hsql/format (-> (h/insert-into :Teams)
+                                                    (h/values [{:pelada_id (misc/as-uuid pelada-id) :name (str "T" i)}]))))))
+        (let [player-ids (doall (for [i (range 20)]
+                                  (let [user-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users)
+                                                                                            (h/values [{:name (str "P" i)
+                                                                                                        :email (str "p" i "@e.com")
+                                                                                                        :password "p"
+                                                                                                        :position [:cast "Midfielder" :player_position]}])
+                                                                                            (h/returning :id)))
+                                                                        {:builder-fn rs/as-unqualified-lower-maps}))]
+                                    (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
+                                                                                (h/values [{:user_id (misc/as-uuid user-id)
+                                                                                            :organization_id (misc/as-uuid org-id)
+                                                                                            :grade 5.0
+                                                                                            :member_type [:cast "diarista" :member_type]}])
+                                                                                (h/returning :id)))
+                                                            {:builder-fn rs/as-unqualified-lower-maps})))))]
+          (logic.randomize/randomize-teams! pelada-id player-ids 6 ds)
+          (let [team-counts (jdbc/execute! ds (hsql/format (-> (h/select [[:count :*] :c])
+                                                               (h/from :TeamPlayers)
+                                                               (h/group-by :team_id)))
+                                           {:builder-fn rs/as-unqualified-lower-maps})]
+            (is (every? #(<= (:c %) 6) team-counts))
+            (is (= 20 (reduce + (map :c team-counts))))))))
 
     (testing "Respects existing players in teams"
-      (jdbc/execute! ds ["DELETE FROM TeamPlayers"])
-      (jdbc/execute! ds ["DELETE FROM OrganizationPlayers"])
-      (jdbc/execute! ds ["DELETE FROM Users"])
-      (jdbc/execute! ds ["DELETE FROM Teams"])
-
-      (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (1, 1, 'T1')"])
-      (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (2, 1, 'T2')"])
-
-      ;; Create 4 players
-      (dotimes [i 4]
-        (let [id (inc i)]
-          (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (?, ?, ?, 'p', 'Midfielder')" id (str "P" i) (str "p" i "@e.com")])
-          (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (?, ?, 1, 5.0)" id id])))
-
-      ;; Pre-fill Team 1 with Player 1
-      (jdbc/execute! ds ["INSERT INTO TeamPlayers (team_id, player_id) VALUES (1, 1)"])
-
-      ;; Randomize ALL players [1, 2, 3, 4] to reshuffle
-      (let [player-ids [1 2 3 4]
-            pelada-id 1
-            players-per-team 2]
-        (logic.randomize/randomize-teams! pelada-id player-ids players-per-team ds)
-
-        (let [t1-count (:c (first (sql/query ds ["SELECT count(*) as c FROM TeamPlayers WHERE team_id = 1"])))
-              t2-count (:c (first (sql/query ds ["SELECT count(*) as c FROM TeamPlayers WHERE team_id = 2"])))]
-          ;; Total 4 players. T1 had 1 but it was cleared and re-randomized.
-          ;; Both teams should be full now.
+      (jdbc/execute! ds (hsql/format (h/delete-from :TeamPlayers)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :OrganizationPlayers)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :Users)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :Teams)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :Peladas)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :Organizations)))
+      (let [org-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Organizations)
+                                                               (h/values [{:name "Org"}])
+                                                               (h/returning :id)))
+                                           {:builder-fn rs/as-unqualified-lower-maps}))
+            pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas)
+                                                                  (h/values [{:organization_id (misc/as-uuid org-id)
+                                                                              :scheduled_at [:raw "CURRENT_TIMESTAMP"]}])
+                                                                  (h/returning :id)))
+                                              {:builder-fn rs/as-unqualified-lower-maps}))
+            t1-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams)
+                                                              (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "T1"}])
+                                                              (h/returning :id)))
+                                          {:builder-fn rs/as-unqualified-lower-maps}))
+            t2-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams)
+                                                              (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "T2"}])
+                                                              (h/returning :id)))
+                                          {:builder-fn rs/as-unqualified-lower-maps}))
+            player-ids (doall (for [i (range 4)]
+                                (let [user-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users)
+                                                                                          (h/values [{:name (str "P" i)
+                                                                                                      :email (str "p" i "@e.com")
+                                                                                                      :password "p"
+                                                                                                      :position [:cast "Midfielder" :player_position]}])
+                                                                                          (h/returning :id)))
+                                                                      {:builder-fn rs/as-unqualified-lower-maps}))]
+                                  (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
+                                                                              (h/values [{:user_id (misc/as-uuid user-id)
+                                                                                          :organization_id (misc/as-uuid org-id)
+                                                                                          :grade 5.0
+                                                                                          :member_type [:cast "diarista" :member_type]}])
+                                                                              (h/returning :id)))
+                                                          {:builder-fn rs/as-unqualified-lower-maps})))))]
+        (jdbc/execute! ds (hsql/format (-> (h/insert-into :TeamPlayers)
+                                           (h/values [{:team_id (misc/as-uuid t1-id) :player_id (misc/as-uuid (first player-ids))}]))))
+        (logic.randomize/randomize-teams! pelada-id player-ids 2 ds)
+        (let [t1-count (:c (jdbc/execute-one! ds (hsql/format (-> (h/select [[:count :*] :c])
+                                                                  (h/from :TeamPlayers)
+                                                                  (h/where [:= :team_id (misc/as-uuid t1-id)])))
+                                              {:builder-fn rs/as-unqualified-lower-maps}))
+              t2-count (:c (jdbc/execute-one! ds (hsql/format (-> (h/select [[:count :*] :c])
+                                                                  (h/from :TeamPlayers)
+                                                                  (h/where [:= :team_id (misc/as-uuid t2-id)])))
+                                              {:builder-fn rs/as-unqualified-lower-maps}))]
           (is (= 2 t1-count))
           (is (= 2 t2-count)))))
 
     (testing "Spreads positions across teams (no clumping)"
-      (jdbc/execute! ds ["DELETE FROM TeamPlayers"])
-      (jdbc/execute! ds ["DELETE FROM OrganizationPlayers"])
-      (jdbc/execute! ds ["DELETE FROM Users"])
-      (jdbc/execute! ds ["DELETE FROM Teams"])
+      (jdbc/execute! ds (hsql/format (h/delete-from :TeamPlayers)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :OrganizationPlayers)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :Users)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :Teams)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :Peladas)))
+      (jdbc/execute! ds (hsql/format (h/delete-from :Organizations)))
+      (let [org-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Organizations)
+                                                               (h/values [{:name "Org"}])
+                                                               (h/returning :id)))
+                                           {:builder-fn rs/as-unqualified-lower-maps}))
+            pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas)
+                                                                  (h/values [{:organization_id (misc/as-uuid org-id)
+                                                                              :scheduled_at [:raw "CURRENT_TIMESTAMP"]}])
+                                                                  (h/returning :id)))
+                                              {:builder-fn rs/as-unqualified-lower-maps}))
+            t1-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams)
+                                                              (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "T1"}])
+                                                              (h/returning :id)))
+                                          {:builder-fn rs/as-unqualified-lower-maps}))
+            t2-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams)
+                                                              (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "T2"}])
+                                                              (h/returning :id)))
+                                          {:builder-fn rs/as-unqualified-lower-maps}))
+            gk-ids (doall (for [i (range 1 3)]
+                            (let [user-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users)
+                                                                                      (h/values [{:name (str "GK" i)
+                                                                                                  :email (str "gk" i "@e.com")
+                                                                                                  :password "p"
+                                                                                                  :position [:cast "Goalkeeper" :player_position]}])
+                                                                                      (h/returning :id)))
+                                                                  {:builder-fn rs/as-unqualified-lower-maps}))]
+                              (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
+                                                                          (h/values [{:user_id (misc/as-uuid user-id)
+                                                                                      :organization_id (misc/as-uuid org-id)
+                                                                                      :grade 10.0
+                                                                                      :member_type [:cast "diarista" :member_type]}])
+                                                                          (h/returning :id)))
+                                                      {:builder-fn rs/as-unqualified-lower-maps})))))
+            df-ids (doall (for [i (range 1 3)]
+                            (let [user-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users)
+                                                                                      (h/values [{:name (str "DF" i)
+                                                                                                  :email (str "df" i "@e.com")
+                                                                                                  :password "p"
+                                                                                                  :position [:cast "Defender" :player_position]}])
+                                                                                      (h/returning :id)))
+                                                                  {:builder-fn rs/as-unqualified-lower-maps}))]
+                              (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
+                                                                          (h/values [{:user_id (misc/as-uuid user-id)
+                                                                                      :organization_id (misc/as-uuid org-id)
+                                                                                      :grade 5.0
+                                                                                      :member_type [:cast "diarista" :member_type]}])
+                                                                          (h/returning :id)))
+                                                      {:builder-fn rs/as-unqualified-lower-maps})))))
+            player-ids (concat gk-ids df-ids)]
+        (logic.randomize/randomize-teams! pelada-id player-ids 2 ds)
+        (let [t1-players (set (map (comp misc/as-uuid :player_id) (jdbc/execute! ds (hsql/format (-> (h/select :player_id)
+                                                                                                     (h/from :TeamPlayers)
+                                                                                                     (h/where [:= :team_id (misc/as-uuid t1-id)])))
+                                                                                 {:builder-fn rs/as-unqualified-lower-maps})))
+              t2-players (set (map (comp misc/as-uuid :player_id) (jdbc/execute! ds (hsql/format (-> (h/select :player_id)
+                                                                                                     (h/from :TeamPlayers)
+                                                                                                     (h/where [:= :team_id (misc/as-uuid t2-id)])))
+                                                                                 {:builder-fn rs/as-unqualified-lower-maps})))]
+          (is (= 1 (count (clojure.set/intersection t1-players (set (map misc/as-uuid gk-ids))))))
+          (is (= 1 (count (clojure.set/intersection t2-players (set (map misc/as-uuid gk-ids))))))))
 
-      (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (1, 1, 'T1')"])
-      (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (2, 1, 'T2')"])
+      (testing "Handles empty player list gracefully"
+        (let [org-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Organizations) (h/values [{:name "O"}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
+              pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas) (h/values [{:organization_id (misc/as-uuid org-id)}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))]
+          (is (nil? (logic.randomize/randomize-teams! pelada-id [] 6 ds)))))
 
-      ;; 2 Goalkeepers, 2 Defenders
-      (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (1, 'GK1', 'gk1@e.com', 'p', 'Goalkeeper')"])
-      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (1, 1, 1, 10.0)"])
-      (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (2, 'GK2', 'gk2@e.com', 'p', 'Goalkeeper')"])
-      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (2, 2, 1, 10.0)"])
-
-      (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (3, 'DF1', 'df1@e.com', 'p', 'Defender')"])
-      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (3, 3, 1, 5.0)"])
-      (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (4, 'DF2', 'df2@e.com', 'p', 'Defender')"])
-      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (4, 4, 1, 5.0)"])
-
-      (let [player-ids [1 2 3 4]
-            pelada-id 1
-            players-per-team 2]
-        (logic.randomize/randomize-teams! pelada-id player-ids players-per-team ds)
-
-        ;; Each team MUST have 1 GK and 1 DF.
-        ;; If they clumped, one team would have 2 GKs.
-        (let [t1-players (set (map :TeamPlayers/player_id (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 1"])))
-              t2-players (set (map :TeamPlayers/player_id (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 2"])))]
-
-          ;; Verify T1 has exactly one of the GKs
-          (is (= 1 (count (clojure.set/intersection t1-players #{1 2}))))
-          ;; Verify T2 has exactly one of the GKs
-          (is (= 1 (count (clojure.set/intersection t2-players #{1 2})))))))
-
-    (testing "Handles empty player list gracefully"
-      (let [player-ids []
-            pelada-id 1
-            players-per-team 6]
-        ;; Should not throw and do nothing
-        (is (nil? (logic.randomize/randomize-teams! pelada-id player-ids players-per-team ds)))))
-
-    (testing "Handles players with no position"
-      (jdbc/execute! ds ["DELETE FROM TeamPlayers"])
-      (jdbc/execute! ds ["DELETE FROM OrganizationPlayers"])
-      (jdbc/execute! ds ["DELETE FROM Users"])
-      (jdbc/execute! ds ["DELETE FROM Teams"])
-      (jdbc/execute! ds ["INSERT INTO Teams (id, pelada_id, name) VALUES (1, 1, 'T1')"])
-
-      (jdbc/execute! ds ["INSERT INTO Users (id, name, email, password, position) VALUES (1, 'NoPos', 'np@e.com', 'p', NULL)"])
-      (jdbc/execute! ds ["INSERT INTO OrganizationPlayers (id, user_id, organization_id, grade) VALUES (1, 1, 1, 5.0)"])
-
-      (let [player-ids [1]
-            pelada-id 1
-            players-per-team 2]
-        (logic.randomize/randomize-teams! pelada-id player-ids players-per-team ds)
-        (let [t1-players (sql/query ds ["SELECT player_id FROM TeamPlayers WHERE team_id = 1"])]
-          (is (= 1 (count t1-players))))))))
+      (testing "Handles players with no position"
+        (jdbc/execute! ds (hsql/format (h/delete-from :TeamPlayers)))
+        (jdbc/execute! ds (hsql/format (h/delete-from :OrganizationPlayers)))
+        (jdbc/execute! ds (hsql/format (h/delete-from :Users)))
+        (jdbc/execute! ds (hsql/format (h/delete-from :Teams)))
+        (jdbc/execute! ds (hsql/format (h/delete-from :Peladas)))
+        (jdbc/execute! ds (hsql/format (h/delete-from :Organizations)))
+        (let [org-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Organizations) (h/values [{:name "O"}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
+              pelada-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Peladas) (h/values [{:organization_id (misc/as-uuid org-id)}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
+              t1-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Teams) (h/values [{:pelada_id (misc/as-uuid pelada-id) :name "T1"}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
+              user-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :Users) (h/values [{:name "NP" :email "n@p.c" :password "p" :position nil}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))
+              player-id (:id (jdbc/execute-one! ds (hsql/format (-> (h/insert-into :OrganizationPlayers) (h/values [{:user_id (misc/as-uuid user-id) :organization_id (misc/as-uuid org-id) :grade 5.0 :member_type [:cast "diarista" :member_type]}]) (h/returning :id))) {:builder-fn rs/as-unqualified-lower-maps}))]
+          (logic.randomize/randomize-teams! pelada-id [player-id] 2 ds)
+          (let [t1-players (jdbc/execute! ds (hsql/format (-> (h/select :player_id) (h/from :TeamPlayers) (h/where [:= :team_id (misc/as-uuid t1-id)]))) {:builder-fn rs/as-unqualified-lower-maps})]
+            (is (= 1 (count t1-players)))))))))

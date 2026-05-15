@@ -4,6 +4,7 @@
    [api-peladaapp.controllers.pelada :as controller.pelada]
    [api-peladaapp.controllers.team :as controller.team]
    [api-peladaapp.helpers.exception :as exception]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.responses :refer [created deleted]]
    [api-peladaapp.logic.authorization :as auth]))
 
@@ -28,7 +29,7 @@
 
 (defn delete [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)
              org-id (get-org-id-from-team id db)]
          (auth/require-organization-admin! user-id org-id db)
@@ -37,8 +38,8 @@
 
 (defn add-player [request]
   (try (let [db (:database request)
-             team-id (Integer/parseInt (str (get-in request [:params :id])))
-             player-id (Integer/parseInt (str (get-in request [:body :player_id])))
+             team-id (misc/as-uuid (get-in request [:params :id]))
+             player-id (misc/as-uuid (get-in request [:body :player_id]))
              is-goalkeeper (get-in request [:body :is_goalkeeper] false)
              user-id (auth/get-user-id-from-request request)
              org-id (get-org-id-from-team team-id db)]
@@ -48,8 +49,8 @@
 
 (defn remove-player [request]
   (try (let [db (:database request)
-             team-id (Integer/parseInt (str (get-in request [:params :id])))
-             player-id (Integer/parseInt (str (get-in request [:body :player_id])))
+             team-id (misc/as-uuid (get-in request [:params :id]))
+             player-id (misc/as-uuid (get-in request [:body :player_id]))
              user-id (auth/get-user-id-from-request request)
              org-id (get-org-id-from-team team-id db)]
          (auth/require-organization-admin! user-id org-id db)

@@ -1,22 +1,15 @@
 (ns api-peladaapp.logic.score
   (:require
-   [clojure.string :as str]
-   [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]))
+   [api-peladaapp.db.player :as db.player]))
 
 (defn get-normalized-scores
   "Fetches grades for a list of player IDs.
    Returns a map of {player-id grade}.
-   Uses the stored grade from OrganizationPlayers, defaulting to 5.0."
+   Uses the stored grade from \"OrganizationPlayers\", defaulting to 5.0."
   [player-ids db]
   (if (empty? player-ids)
     {}
-    (let [placeholders (str/join "," (repeat (count player-ids) "?"))
-          query (into [(str "SELECT id, grade
-                             FROM OrganizationPlayers
-                             WHERE id IN (" placeholders ")")]
-                      player-ids)
-          db-results (jdbc/execute! db query {:builder-fn rs/as-unqualified-lower-maps})
+    (let [db-results (db.player/get-players-grades player-ids db)
           scores-map (reduce (fn [acc {:keys [id grade]}]
                                (let [final-score (double (or grade 5.0))]
                                  (assoc acc id final-score)))

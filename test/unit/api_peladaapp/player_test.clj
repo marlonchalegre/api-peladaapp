@@ -7,13 +7,17 @@
 
 (deftest update-player-test
   (let [db (fn [] nil)
-        mock-player {:id 1 :organization-id 10 :user-id 2 :grade 5.0}
-        updated-player {:id 1 :organization-id 10 :user-id 2 :grade 7.5}]
+        player-id (parse-uuid "00000000-0000-0000-0000-000000000001")
+        org-id (parse-uuid "00000000-0000-0000-0000-000000000010")
+        user-id (parse-uuid "00000000-0000-0000-0000-000000000002")
+        admin-id (parse-uuid "00000000-0000-0000-0000-000000000099")
+        mock-player {:id player-id :organization-id org-id :user-id user-id :grade 5.0}
+        updated-player {:id player-id :organization-id org-id :user-id user-id :grade 7.5}]
 
     (testing "Successfully updates player score if user is org admin"
       (let [get-calls (atom 0)]
         (with-redefs [db.player/get-player (fn [id _]
-                                             (if (= id 1)
+                                             (if (= id player-id)
                                                (if (= @get-calls 0)
                                                  (do (swap! get-calls inc) mock-player)
                                                  updated-player)
@@ -21,19 +25,19 @@
                       db.player/update-player (fn [_ _ _] 1)
                       auth/require-organization-admin! (fn [_ _ _] true)]
           (let [request {:database db
-                         :params {:id "1"}
+                         :params {:id player-id}
                          :body {:grade 7.5}
-                         :identity {:id 99 :is-admin? false}}
+                         :identity {:id admin-id :is-admin? false}}
                 response (handler.player/update-player-score request)]
             (is (= 200 (:status response)))
             (is (= 7.5 (:grade (:body response))))))))
 
     (testing "Successfully updates member_type if user is org admin"
       (let [get-calls (atom 0)
-            mock-diarista {:id 1 :organization-id 10 :user-id 2 :member-type "diarista"}
-            updated-mensalista {:id 1 :organization-id 10 :user-id 2 :member-type "mensalista"}]
+            mock-diarista {:id player-id :organization-id org-id :user-id user-id :member-type "diarista"}
+            updated-mensalista {:id player-id :organization-id org-id :user-id user-id :member-type "mensalista"}]
         (with-redefs [db.player/get-player (fn [id _]
-                                             (if (= id 1)
+                                             (if (= id player-id)
                                                (if (= @get-calls 0)
                                                  (do (swap! get-calls inc) mock-diarista)
                                                  updated-mensalista)
@@ -43,29 +47,29 @@
                                                 1)
                       auth/require-organization-admin! (fn [_ _ _] true)]
           (let [request {:database db
-                         :params {:id "1"}
+                         :params {:id player-id}
                          :body {:member_type "mensalista"}
-                         :identity {:id 99 :is-admin? false}}
+                         :identity {:id admin-id :is-admin? false}}
                 response (handler.player/update-player-score request)]
             (is (= 200 (:status response)))
             (is (= "mensalista" (:member_type (:body response))))))))
 
     (testing "Fails with 403 if user is not org admin"
-      (with-redefs [db.player/get-player (fn [id _] (if (= id 1) mock-player nil))
+      (with-redefs [db.player/get-player (fn [id _] (if (= id player-id) mock-player nil))
                     auth/require-organization-admin! (fn [_ _ _]
                                                        (throw (ex-info "Forbidden" {:type :forbidden})))]
         (let [request {:database db
-                       :params {:id "1"}
+                       :params {:id player-id}
                        :body {:grade 7.5}
-                       :identity {:id 99 :is-admin? false}}
+                       :identity {:id admin-id :is-admin? false}}
               response (handler.player/update-player-score request)]
           (is (= 403 (:status response))))))
 
     (testing "Fails with 404 if player not found"
       (with-redefs [db.player/get-player (fn [_ _] nil)]
         (let [request {:database db
-                       :params {:id "999"}
+                       :params {:id (parse-uuid "00000000-0000-0000-0000-000000000999")}
                        :body {:grade 7.5}
-                       :identity {:id 99 :is-admin? false}}
+                       :identity {:id admin-id :is-admin? false}}
               response (handler.player/update-player-score request)]
           (is (= 404 (:status response))))))))

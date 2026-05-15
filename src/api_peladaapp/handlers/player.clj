@@ -3,6 +3,7 @@
    [api-peladaapp.adapters.player :as adapter.player]
    [api-peladaapp.controllers.player :as controller.player]
    [api-peladaapp.helpers.exception :as exception]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.responses :refer [created deleted ok]]
    [api-peladaapp.logic.authorization :as auth]))
 
@@ -20,7 +21,7 @@
 
 (defn update-player-score [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              body (:body request)
              player-update (adapter.player/update-request->model body)
              user-id (auth/get-user-id-from-request request)
@@ -32,7 +33,7 @@
 
 (defn delete [request]
   (try (let [db (:database request)
-             id (Integer/parseInt (str (get-in request [:params :id])))
+             id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)
              player (controller.player/get-player id db)
              org-id (:organization-id player)]
@@ -42,7 +43,7 @@
 
 (defn list-by-org [request]
   (try (let [db (:database request)
-             org-id (Integer/parseInt (str (get-in request [:params :organization_id])))
+             org-id (misc/as-uuid (get-in request [:params :organization_id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-member! user-id org-id db)
          (ok (map adapter.player/model->response (controller.player/list-players org-id db))))

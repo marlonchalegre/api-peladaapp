@@ -10,11 +10,11 @@
     (db.admin/get-organization-admin id db)))
 
 (s/defn get-organization-admin :- models.admin/OrganizationAdmin
-  [id :- s/Int db]
+  [id :- s/Uuid db]
   (db.admin/get-organization-admin id db))
 
 (s/defn remove-organization-admin :- s/Int
-  [id :- s/Int db]
+  [id :- s/Uuid db]
   (let [admin (db.admin/get-organization-admin id db)]
     (if admin
       (let [admins (db.admin/list-admins-by-organization (:organization-id admin) db)]
@@ -25,7 +25,7 @@
       0)))
 
 (s/defn remove-organization-admin-by-org-and-user :- s/Int
-  [organization_id :- s/Int user_id :- s/Int db]
+  [organization_id :- s/Uuid user_id :- s/Uuid db]
   (let [admins (db.admin/list-admins-by-organization organization_id db)]
     (if (<= (count admins) 1)
       (throw (ex-info "Cannot remove the last administrator from the organization."
@@ -33,13 +33,13 @@
       (db.admin/delete-organization-admin-by-org-and-user organization_id user_id db))))
 
 (s/defn list-organization-admins :- [models.admin/OrganizationAdmin]
-  [organization_id :- s/Int db]
+  [organization_id :- s/Uuid db]
   (db.admin/list-admins-by-organization organization_id db))
 
 (s/defn list-user-admin-organizations :- [models.admin/OrganizationAdmin]
-  [user_id :- s/Int db]
+  [user_id :- s/Uuid db]
   (db.admin/list-organizations-by-admin user_id db))
 
 (s/defn is-user-admin-of-organization? :- s/Bool
-  [user_id :- s/Int organization_id :- s/Int db]
+  [user_id :- s/Uuid organization_id :- s/Uuid db]
   (db.admin/is-user-admin-of-organization? user_id organization_id db))

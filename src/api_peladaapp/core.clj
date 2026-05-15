@@ -3,53 +3,70 @@
   (:require
    [api-peladaapp.components :as core.components]
    [clojure.string :as str]
+   [clojure.tools.logging :as log]
    [com.stuartsierra.component :as component]
-   [migratus.core :as migratus]))
+   [migratus.core :as migratus]
+   [next.jdbc]))
+
+(defn- add-schema-to-url [jdbc-url schema]
+  (if (or (str/blank? schema) (= "public" schema))
+    jdbc-url
+    (let [separator (if (str/includes? jdbc-url "?") "&" "?")]
+      (if (str/includes? jdbc-url "currentSchema=")
+        jdbc-url ;; Already has it
+        (str jdbc-url separator "currentSchema=" schema)))))
 
 (defn -main
   [& _args]
-  (println "[SYSTEM] Backend process starting...")
-  (let [turso-url (System/getenv "TURSO_DATABASE_URL")
-        turso-token (System/getenv "TURSO_AUTH_TOKEN")
-        db-name (or (System/getenv "DB_NAME") "peladaapp.db")
-        ;; Build the same spec as in components.clj
-        db-spec (if (and turso-url turso-token)
-                  (do
-                    (Class/forName "com.dbeaver.jdbc.driver.libsql.LibSqlDriver")
-                    {:jdbcUrl (str "jdbc:dbeaver:libsql:https://"
-                                   (str/replace turso-url #"^libsql://" ""))
-                     :user ""
-                     :password turso-token})
-                  {:dbtype "sqlite" :dbname db-name})
+  (log/info "[SYSTEM] Backend process starting...")
+  (let [;; Build the same spec as in components.clj
+        database-url (System/getenv "DATABASE_URL")
+        schema (or (System/getenv "DB_SCHEMA") "public")
+        ;; Build a db-spec usable by Migratus: prefer Postgres
+        base-db-spec (if database-url
+                       (let [^java.net.URI uri (try (java.net.URI. database-url) (catch Exception _ nil))
+                             user-info (when uri (.getUserInfo uri))
+                             [user pass] (when user-info (clojure.string/split user-info #":" 2))
+                             host (when uri (.getHost uri))
+                             port (when uri (.getPort uri))
+                             ^String path (when uri (.getPath uri))
+                             db (when path (let [p (if (.startsWith path "/") (subs path 1) path)] p))
+                             base-url (if (str/starts-with? database-url "postgres://")
+                                        (str "jdbc:postgresql://" host ":" (if (and port (pos? port)) port 5432) "/" (or db "peladaapp") "?user=" user "&password=" pass)
+                                        database-url)
+                             jdbc-url (add-schema-to-url base-url schema)]
+                         {:connection-uri jdbc-url})
+                       (throw (Exception. "DATABASE_URL is required for migrations. PostgreSQL is now mandatory.")))
+
         skip-migrations (= "true" (System/getenv "SKIP_MIGRATIONS"))
-        options {:db-spec db-spec
+        options {:db-spec base-db-spec
                  :skip-migrations skip-migrations}
+
         migratus-config {:store :database
                          :migration-dir "migrations"
-                         :db db-spec}
-        ;; Check if we are using Turso
-        is-turso (and turso-url turso-token)]
-    (if (and (not skip-migrations) (not is-turso))
+                         :db base-db-spec}]
+    (if (not skip-migrations)
       (do
-        (println (str "[MIGRATION] Starting migration process for " (:dbname db-spec) " ..."))
+        (log/info (str "[MIGRATION] Starting migration process for (schema: " schema ") ..."))
         (try
-          (migratus/migrate migratus-config)
-          (println "[MIGRATION] Finished migration process.")
-          (catch Exception e
-            (println "[MIGRATION] ERROR during migration:")
-            (.printStackTrace e)
-            (System/exit 1))))
-      (if is-turso
-        (println "[MIGRATION] Skipping automated Migratus migrations for Turso (Cloud DB). Please run migrations manually or via CI.")
-        (println "[MIGRATION] Migrations skipped via environment variable.")))
+          ;; Ensure the schema exists before migrating if it's not public
+          (when (not= "public" schema)
+            (let [ds (next.jdbc/get-datasource base-db-spec)]
+              (next.jdbc/execute! ds [(str "CREATE SCHEMA IF NOT EXISTS " schema)])))
 
-    (println "[SYSTEM] Initializing components...")
+          (migratus/migrate (assoc migratus-config :schema schema))
+          (log/info "[MIGRATION] Finished migration process.")
+          (catch Exception e
+            (log/error e "[MIGRATION] ERROR during migration:")
+            (System/exit 1))))
+      (log/info "[MIGRATION] Migrations skipped via environment variable."))
+
+    (log/info "[SYSTEM] Initializing components...")
     (try
       (let [system (core.components/system options)]
-        (println "[SYSTEM] Starting system map...")
+        (log/info "[SYSTEM] Starting system map...")
         (component/start system)
-        (println "[SYSTEM] All components started and running."))
+        (log/info "[SYSTEM] All components started and running."))
       (catch Exception e
-        (println "[SYSTEM] ERROR during component startup:")
-        (.printStackTrace e)
+        (log/error e "[SYSTEM] ERROR during component startup:")
         (System/exit 1)))))

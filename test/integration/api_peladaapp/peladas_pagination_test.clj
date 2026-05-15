@@ -1,17 +1,19 @@
 (ns api-peladaapp.peladas-pagination-test
   (:require
+   [api-peladaapp.helpers.misc :as misc]
+   [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is use-fixtures]]
+   [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
-   [next.jdbc.sql :as sql]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
 
 (deftest peladas-pagination-test
-  (let [app (-> th/*test-system* :app :handler)
-        db-file (:db-file th/*test-system*)
-        ds (jdbc/get-datasource {:dbtype "sqlite" :dbname db-file})
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
         token (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass"})
         auth (th/auth-cookie token)
 
@@ -23,7 +25,10 @@
 
       ;; Create 25 peladas directly in DB to be faster
     (dotimes [i 25]
-      (sql/insert! ds :Peladas {:organization_id org-id :scheduled_at (str "2025-01-" (inc i)) :num_teams 2}))
+      (jdbc/execute! ds (hsql/format (-> (h/insert-into :Peladas)
+                                         (h/values [{:organization_id (misc/as-uuid org-id)
+                                                     :scheduled_at [[:cast (format "2025-01-%02d 00:00:00" (inc i)) :timestamp]]
+                                                     :num_teams 2}])))))
 
       ;; Test first page (default 20 items)
     (let [resp (app (-> (mock/request :get (str "/api/organizations/" org-id "/peladas"))

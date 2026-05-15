@@ -35,8 +35,8 @@
   (when payload
     (let [p (misc/unamespace payload)]
       (medley.core/assoc-some {}
-                              :id (:id p)
-                              :organization-id (:organization_id p)
+                              :id (misc/as-uuid (:id p))
+                              :organization-id (misc/as-uuid (:organization_id p))
                               :mensalista-price (:mensalista_price p)
                               :diarista-price (:diarista_price p)
                               :monthly-fine-amount (:monthly_fine_amount p)
@@ -87,17 +87,22 @@
                             :category (:category model)
                             :description (:description model)
                             :status (or (:status model) "paid")
-                            :payment_date (:payment-date model)
+                            :payment_date (when-let [pd (:payment-date model)]
+                                            (cond
+                                              (string? pd) (java.sql.Date/valueOf pd)
+                                              (instance? java.time.LocalDate pd) (java.sql.Date/valueOf pd)
+                                              (instance? java.util.Date pd) (java.sql.Date. (.getTime pd))
+                                              :else pd))
                             :created_by (:created-by model))))
 
 (defn payload->transaction [payload]
   (when payload
     (let [p (misc/unamespace payload)]
       (medley.core/assoc-some {}
-                              :id (:id p)
-                              :organization-id (:organization_id p)
-                              :player-id (:player_id p)
-                              :pelada-id (:pelada_id p)
+                              :id (misc/as-uuid (:id p))
+                              :organization-id (misc/as-uuid (:organization_id p))
+                              :player-id (misc/as-uuid (:player_id p))
+                              :pelada-id (misc/as-uuid (:pelada_id p))
                               :amount (:amount p)
                               :fine-amount (:fine_amount p)
                               :type (:type p)
@@ -105,7 +110,7 @@
                               :description (:description p)
                               :status (:status p)
                               :payment-date (:payment_date p)
-                              :created-by (:created_by p)))))
+                              :created-by (misc/as-uuid (:created_by p))))))
 
 (defn model->transaction-response [model]
   (when model
@@ -159,20 +164,20 @@
                             :transaction_id (:transaction-id model)
                             :fine_transaction_id (:fine-transaction-id model)
                             :paid (if (contains? model :paid)
-                                    (if (:paid model) 1 0)
+                                    (boolean (:paid model))
                                     nil))))
 
 (defn payload->monthly-payment [payload]
   (when payload
     (let [p (misc/unamespace payload)]
       (medley.core/assoc-some {}
-                              :id (:id p)
-                              :organization-id (:organization_id p)
-                              :player-id (:player_id p)
+                              :id (misc/as-uuid (:id p))
+                              :organization-id (misc/as-uuid (:organization_id p))
+                              :player-id (misc/as-uuid (:player_id p))
                               :year (:year p)
                               :month (:month p)
-                              :transaction-id (:transaction_id p)
-                              :fine-transaction-id (:fine_transaction_id p)
+                              :transaction-id (misc/as-uuid (:transaction_id p))
+                              :fine-transaction-id (misc/as-uuid (:fine_transaction_id p))
                               :paid (:paid p)))))
 
 (defn model->monthly-payment-response [model]

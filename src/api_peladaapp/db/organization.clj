@@ -1,186 +1,203 @@
 (ns api-peladaapp.db.organization
   (:require
    [api-peladaapp.adapters.organization :as adapter.organization]
-   [api-peladaapp.helpers.misc :as misc]
-   [clojure.string :as str]
+   [api-peladaapp.helpers.sql :as hsql]
+   [honey.sql.helpers :as h]
+   [medley.core :as medley.core]
    [next.jdbc :as jdbc]
-   [next.jdbc.result-set :as rs]
-   [next.jdbc.sql :as sql]
    [schema.core :as s]))
 
-(defn- affected-rows-count [result]
-  (-> result vals first))
-
-(s/defn insert-organization :- s/Int
-  [org db]
-  (let [row (adapter.organization/model->db org)]
-    (-> (sql/insert! db :organizations row)
-        affected-rows-count
-        int)))
-
-(s/defn get-organization [id db]
-  (let [query "SELECT o.*, 
-                      wc.api_url as waha_api_url, wc.instance as waha_instance, wc.group_id as waha_group_id,
-                      wc.enabled as waha_enabled, wc.start_msg_enabled as waha_start_msg_enabled,
-                      wc.end_msg_enabled as waha_end_msg_enabled, wc.attendance_reminder_enabled as waha_attendance_reminder_enabled,
-                      wc.vote_reminder_enabled as waha_vote_reminder_enabled, wc.vote_ended_msg_enabled as waha_vote_ended_msg_enabled,
-                      wc.use_all_mention as waha_use_all_mention
-               FROM Organizations o
-               LEFT JOIN OrganizationWahaConfigs wc ON o.id = wc.organization_id
-               WHERE o.id = ?"
-        result (sql/query db [query id])]
-    (some-> result first adapter.organization/db->model)))
+(s/defn insert-organization :- s/Uuid
+  [{:keys [name owner-id]} :- {:name s/Str :owner-id (s/maybe s/Uuid)}
+   db]
+  (let [query (-> (h/insert-into :Organizations)
+                  (h/values [{:name name :owner_id owner-id}])
+                  (h/returning :id))]
+    (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
 (s/defn update-organization :- s/Int
-  [id org db]
+  [id :- s/Uuid
+   organization
+   db]
   (jdbc/with-transaction [tx db]
-    (let [org-row (select-keys org [:name])
-          waha-row (-> org
-                       (select-keys [:waha-api-url :waha-instance :waha-group-id :waha-enabled :waha-start-msg-enabled :waha-end-msg-enabled :waha-attendance-reminder-enabled :waha-vote-reminder-enabled :waha-vote-ended-msg-enabled :waha-use-all-mention])
-                       (update-keys (comp keyword #(str/replace % "waha-" "") name))
-                       (update-keys (comp keyword #(str/replace % "-" "_") name)))]
-      (when (seq org-row)
-        (sql/update! tx :organizations org-row {:id id}))
+    (let [org-row (medley.core/assoc-some {}
+                                          :name (:name organization)
+                                          :owner_id (:owner-id organization))
+          _ (when (seq org-row)
+              (jdbc/execute! tx (hsql/format (-> (h/update :Organizations)
+                                                 (h/set org-row)
+                                                 (h/where [:= :id id])))))
+          waha-row (medley.core/assoc-some {}
+                                           :api_url (:waha-api-url organization)
+                                           :instance (:waha-instance organization)
+                                           :group_id (:waha-group-id organization)
+                                           :enabled (:waha-enabled organization)
+                                           :start_msg_enabled (:waha-start-msg-enabled organization)
+                                           :end_msg_enabled (:waha-end-msg-enabled organization)
+                                           :attendance_reminder_enabled (:waha-attendance-reminder-enabled organization)
+                                           :vote_reminder_enabled (:waha-vote-reminder-enabled organization)
+                                           :vote_ended_msg_enabled (:waha-vote-ended-msg-enabled organization)
+                                           :use_all_mention (:waha-use-all-mention organization))]
       (when (seq waha-row)
-        (let [waha-row (assoc waha-row :organization_id id)
-              exists? (first (sql/query tx ["SELECT 1 FROM OrganizationWahaConfigs WHERE organization_id = ?" id]))]
+        (let [exists? (jdbc/execute-one! tx (hsql/format (-> (h/select 1)
+                                                             (h/from :OrganizationWahaConfigs)
+                                                             (h/where [:= :organization_id id]))))]
           (if exists?
-            (sql/update! tx :organizationwahaconfigs waha-row {:organization_id id})
-            (sql/insert! tx :organizationwahaconfigs waha-row))))
+            (jdbc/execute! tx (hsql/format (-> (h/update :OrganizationWahaConfigs)
+                                               (h/set waha-row)
+                                               (h/where [:= :organization_id id]))))
+            (jdbc/execute! tx (hsql/format (-> (h/insert-into :OrganizationWahaConfigs)
+                                               (h/values [(assoc waha-row :organization_id id)])))))))
       1)))
 
 (s/defn delete-organization :- s/Int
-  [id db]
-  (-> (sql/delete! db :organizations {:id id}) affected-rows-count))
+  [id :- s/Uuid
+   db]
+  (let [query (-> (h/delete-from :Organizations)
+                  (h/where [:= :id id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
 
-(s/defn list-organizations [db limit offset]
-  (->> (sql/query db ["select * from organizations order by id limit ? offset ?" limit offset])
-       (map adapter.organization/db->model)))
+(s/defn get-organization :- s/Any
+  [id :- s/Uuid
+   db]
+  (let [query (-> (h/select :o.*
+                            [:owc.api_url :waha_api_url]
+                            [:owc.instance :waha_instance]
+                            [:owc.group_id :waha_group_id]
+                            [:owc.enabled :waha_enabled]
+                            [:owc.start_msg_enabled :waha_start_msg_enabled]
+                            [:owc.end_msg_enabled :waha_end_msg_enabled]
+                            [:owc.attendance_reminder_enabled :waha_attendance_reminder_enabled]
+                            [:owc.vote_reminder_enabled :waha_vote_reminder_enabled]
+                            [:owc.vote_ended_msg_enabled :waha_vote_ended_msg_enabled]
+                            [:owc.use_all_mention :waha_use_all_mention])
+                  (h/from [:Organizations :o])
+                  (h/left-join [:OrganizationWahaConfigs :owc] [:= :owc.organization_id :o.id])
+                  (h/where [:= :o.id id]))]
+    (some-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+            adapter.organization/db->model)))
 
-(s/defn list-all-organizations [db]
-  (let [query "SELECT o.*, 
-                      wc.api_url as waha_api_url, wc.instance as waha_instance, wc.group_id as waha_group_id,
-                      wc.enabled as waha_enabled, wc.start_msg_enabled as waha_start_msg_enabled,
-                      wc.end_msg_enabled as waha_end_msg_enabled, wc.attendance_reminder_enabled as waha_attendance_reminder_enabled,
-                      wc.vote_reminder_enabled as waha_vote_reminder_enabled, wc.vote_ended_msg_enabled as waha_vote_ended_msg_enabled,
-                      wc.use_all_mention as waha_use_all_mention
-               FROM Organizations o
-               LEFT JOIN OrganizationWahaConfigs wc ON o.id = wc.organization_id"]
-    (->> (sql/query db [query])
-         (map adapter.organization/db->model))))
-
-(s/defn list-by-user [user-id db]
-  (->> (sql/query db ["SELECT o.id, o.name, 'admin' as role
-                       FROM Organizations o
-                       JOIN OrganizationAdmins oa ON o.id = oa.organization_id
-                       WHERE oa.user_id = ?
-                       UNION
-                       SELECT o.id, o.name, 'player' as role
-                       FROM Organizations o
-                       JOIN OrganizationPlayers op ON o.id = op.organization_id
-                       WHERE op.user_id = ?
-                       AND NOT EXISTS (SELECT 1 FROM OrganizationAdmins oa WHERE oa.organization_id = o.id AND oa.user_id = ?)"
-                      user-id user-id user-id])
-       (map misc/unamespace)))
+(s/defn list-organizations :- [s/Any]
+  ([db] (list-organizations db 1000 0))
+  ([db limit offset]
+   (let [query (-> (h/select :o.*
+                             [:owc.api_url :waha_api_url]
+                             [:owc.instance :waha_instance]
+                             [:owc.group_id :waha_group_id]
+                             [:owc.enabled :waha_enabled]
+                             [:owc.start_msg_enabled :waha_start_msg_enabled]
+                             [:owc.end_msg_enabled :waha_end_msg_enabled]
+                             [:owc.attendance_reminder_enabled :waha_attendance_reminder_enabled]
+                             [:owc.vote_reminder_enabled :waha_vote_reminder_enabled]
+                             [:owc.vote_ended_msg_enabled :waha_vote_ended_msg_enabled]
+                             [:owc.use_all_mention :waha_use_all_mention])
+                   (h/from [:Organizations :o])
+                   (h/left-join [:OrganizationWahaConfigs :owc] [:= :owc.organization_id :o.id])
+                   (h/order-by [:o.id :desc])
+                   (h/limit limit)
+                   (h/offset offset))]
+     (->> (jdbc/execute! db (hsql/format query) hsql/opts)
+          (map adapter.organization/db->model)))))
 
 (s/defn count-organizations :- s/Int
   [db]
-  (-> (sql/query db ["select count(*) as count from organizations"]) first :count))
+  (let [query (-> (h/select [[:count :*] :count])
+                  (h/from :Organizations))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        :count
+        int)))
+
+(s/defn list-by-user :- [s/Any]
+  [user-id :- s/Uuid
+   db]
+  (let [id-uuid [:cast user-id :uuid]
+        query (-> (h/select :o.id :o.name [[:raw "COALESCE(oa_role.role, op_role.role)"] :role] [[:raw "COALESCE(oa_role.priority, op_role.priority)"] :priority])
+                  (h/from [:Organizations :o])
+                  (h/left-join [(-> (h/select :organization_id [[:raw "'admin'"] :role] [1 :priority])
+                                    (h/from :OrganizationAdmins)
+                                    (h/where [:= :user_id id-uuid])) :oa_role]
+                               [:= :oa_role.organization_id :o.id])
+                  (h/left-join [(-> (h/select :organization_id [[:raw "'player'"] :role] [2 :priority])
+                                    (h/from :OrganizationPlayers)
+                                    (h/where [:= :user_id id-uuid])) :op_role]
+                               [:= :op_role.organization_id :o.id])
+                  (h/where [:or [:!= :oa_role.role nil] [:!= :op_role.role nil]])
+                  (h/order-by :o.name :priority))]
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
+         (group-by :id)
+         (map (fn [[_ orgs]] (first orgs)))
+         (map adapter.organization/db->model))))
 
 (s/defn get-statistics
-  [id :- s/Int
+  [id :- s/Uuid
    year :- s/Int
    db]
-  (let [where-year (if (pos? year) " AND strftime('%Y', p.scheduled_at) = ?" "")
-        base-params (if (pos? year) [id (str year)] [id])
-        manual-stats-params (if (pos? year) [id year] [id])
-        params (into [] (concat
-                         base-params ;; RawParticipation 1
-                         base-params ;; RawParticipation 2
-                         base-params ;; PlayerEvents (MatchEvents part)
-                         manual-stats-params ;; PlayerEvents (goals part)
-                         manual-stats-params ;; PlayerEvents (assists part)
-                         manual-stats-params ;; PlayerEvents (own_goals part)
-                         manual-stats-params ;; AllPlayers (ManualStats part)
-                         base-params ;; PlayerRatings
-                         ))
-        sql (str "
-WITH RawParticipation AS (
-    SELECT ml.player_id, m.pelada_id
-    FROM MatchLineups ml
-    JOIN Matches m ON ml.match_id = m.id
-    JOIN Peladas p ON m.pelada_id = p.id
-    WHERE p.organization_id = ? " where-year "
-
-    UNION
-
-    SELECT tp.player_id, m.pelada_id
-    FROM TeamPlayers tp
-    JOIN Teams t ON tp.team_id = t.id
-    JOIN Matches m ON (m.home_team_id = t.id OR m.away_team_id = t.id)
-    JOIN Peladas p ON m.pelada_id = p.id
-    WHERE p.organization_id = ? " where-year "
-      AND NOT EXISTS (SELECT 1 FROM MatchLineups sub_ml WHERE sub_ml.match_id = m.id)
-),
-PlayerParticipation AS (
-    SELECT player_id, COUNT(DISTINCT pelada_id) as peladas_count
-    FROM RawParticipation
-    GROUP BY player_id
-),
-PlayerEvents AS (
-    SELECT me.player_id, me.event_type, COUNT(*) as event_count
-    FROM MatchEvents me
-    JOIN Matches m ON me.match_id = m.id
-    JOIN Peladas p ON m.pelada_id = p.id
-    WHERE p.organization_id = ? " where-year "
-    GROUP BY me.player_id, me.event_type
-
-    UNION ALL
-
-    SELECT ms.player_id, 'goal' as event_type, ms.goals as event_count
-    FROM ManualStats ms
-    WHERE ms.organization_id = ? " (if (pos? year) " AND ms.year = ?" "") " AND ms.goals > 0
-
-    UNION ALL
-
-    SELECT ms.player_id, 'assist' as event_type, ms.assists as event_count
-    FROM ManualStats ms
-    WHERE ms.organization_id = ? " (if (pos? year) " AND ms.year = ?" "") " AND ms.assists > 0
-
-    UNION ALL
-
-    SELECT ms.player_id, 'own_goal' as event_type, ms.own_goals as event_count
-    FROM ManualStats ms
-    WHERE ms.organization_id = ? " (if (pos? year) " AND ms.year = ?" "") " AND ms.own_goals > 0
-),
-AllPlayers AS (
-    SELECT player_id FROM PlayerParticipation
-    UNION
-    SELECT player_id FROM ManualStats WHERE organization_id = ? " (if (pos? year) " AND year = ?" "") "
-),
-PlayerRatings AS (
-    SELECT v.target_id as player_id, AVG(v.stars) as avg_rating
-    FROM Votes v
-    JOIN Peladas p ON v.pelada_id = p.id
-    WHERE p.organization_id = ? " where-year "
-    GROUP BY v.target_id
-)
-SELECT 
-    ap.player_id, 
-    u.id as user_id,
-    u.name as player_name, 
-    u.position as player_position,
-    u.avatar_filename,
-    COALESCE(pp.peladas_count, 0) as peladas_count,
-    COALESCE(pr.avg_rating, 0.0) as avg_rating,
-    pe.event_type,
-    SUM(pe.event_count) as count
-FROM AllPlayers ap
-JOIN OrganizationPlayers op ON ap.player_id = op.id
-JOIN Users u ON op.user_id = u.id
-LEFT JOIN PlayerParticipation pp ON ap.player_id = pp.player_id
-LEFT JOIN PlayerEvents pe ON ap.player_id = pe.player_id
-LEFT JOIN PlayerRatings pr ON ap.player_id = pr.player_id
-GROUP BY ap.player_id, u.id, u.name, u.position, u.avatar_filename, pp.peladas_count, pr.avg_rating, pe.event_type
-")]
-    (sql/query db (into [sql] params) {:builder-fn rs/as-unqualified-lower-maps})))
+  (let [id-uuid [:cast id :uuid]
+        where-year (if (pos? year) [[:= [:to_char :p.scheduled_at "YYYY"] (str year)]] [])
+        raw-participation (h/union
+                           (-> (h/select :ml.player_id :m.pelada_id)
+                               (h/from [:MatchLineups :ml])
+                               (h/join [:Matches :m] [:= :ml.match_id :m.id])
+                               (h/join [:Peladas :p] [:= :m.pelada_id :p.id])
+                               (h/where (into [:and [:= :p.organization_id id-uuid]] where-year)))
+                           (-> (h/select :tp.player_id :m.pelada_id)
+                               (h/from [:TeamPlayers :tp])
+                               (h/join [:Teams :t] [:= :tp.team_id :t.id])
+                               (h/join [:Matches :m] [:or [:= :m.home_team_id :t.id] [:= :m.away_team_id :t.id]])
+                               (h/join [:Peladas :p] [:= :m.pelada_id :p.id])
+                               (h/where (into [:and [:= :p.organization_id id-uuid] [:not-exists (-> (h/select 1)
+                                                                                                     (h/from [:MatchLineups :sub_ml])
+                                                                                                     (h/where [:= :sub_ml.match_id :m.id]))]] where-year))))
+        player-participation (-> (h/select :player_id [[:count [:distinct :pelada_id]] :peladas_count])
+                                 (h/from :RawParticipation)
+                                 (h/group-by :player_id))
+        player-events (h/union-all
+                       (-> (h/select :me.player_id :me.event_type [[:count :*] :event_count])
+                           (h/from [:MatchEvents :me])
+                           (h/join [:Matches :m] [:= :me.match_id :m.id])
+                           (h/join [:Peladas :p] [:= :m.pelada_id :p.id])
+                           (h/where (into [:and [:= :p.organization_id id-uuid]] where-year))
+                           (h/group-by :me.player_id :me.event_type))
+                       (-> (h/select :ms.player_id [[:raw "'goal'"] :event_type] [:ms.goals :event_count])
+                           (h/from [:ManualStats :ms])
+                           (h/where (cond-> [:and [:= :ms.organization_id id-uuid] [:> :ms.goals 0]]
+                                      (pos? year) (conj [:= :ms.year year]))))
+                       (-> (h/select :ms.player_id [[:raw "'assist'"] :event_type] [:ms.assists :event_count])
+                           (h/from [:ManualStats :ms])
+                           (h/where (cond-> [:and [:= :ms.organization_id id-uuid] [:> :ms.assists 0]]
+                                      (pos? year) (conj [:= :ms.year year]))))
+                       (-> (h/select :ms.player_id [[:raw "'own_goal'"] :event_type] [:ms.own_goals :event_count])
+                           (h/from [:ManualStats :ms])
+                           (h/where (cond-> [:and [:= :ms.organization_id id-uuid] [:> :ms.own_goals 0]]
+                                      (pos? year) (conj [:= :ms.year year])))))
+        all-players (h/union
+                     (-> (h/select :player_id) (h/from :PlayerParticipation))
+                     (-> (h/select :player_id) (h/from :ManualStats) (h/where (cond-> [:and [:= :organization_id id-uuid]] (pos? year) (conj [:= :year year])))))
+        player-ratings (-> (h/select [:v.target_id :player_id] [[:avg :v.stars] :avg_rating])
+                           (h/from [:Votes :v])
+                           (h/join [:Peladas :p] [:= :v.pelada_id :p.id])
+                           (h/where (into [:and [:= :p.organization_id id-uuid]] where-year))
+                           (h/group-by :v.target_id))
+        final-query (-> (h/with [:RawParticipation raw-participation]
+                                [:PlayerParticipation player-participation]
+                                [:PlayerEvents player-events]
+                                [:AllPlayers all-players]
+                                [:PlayerRatings player-ratings])
+                        (h/select :ap.player_id
+                                  [:u.id :user_id]
+                                  [:u.name :player_name]
+                                  [:u.position :player_position]
+                                  :u.avatar_filename
+                                  [[:coalesce :pp.peladas_count 0] :peladas_count]
+                                  [[:coalesce :pr.avg_rating 0.0] :avg_rating]
+                                  :pe.event_type
+                                  [[:sum :pe.event_count] :count])
+                        (h/from [:AllPlayers :ap])
+                        (h/join [:OrganizationPlayers :op] [:= :ap.player_id :op.id])
+                        (h/join [:Users :u] [:= :op.user_id :u.id])
+                        (h/left-join [:PlayerParticipation :pp] [:= :ap.player_id :pp.player_id])
+                        (h/left-join [:PlayerEvents :pe] [:= :ap.player_id :pe.player_id])
+                        (h/left-join [:PlayerRatings :pr] [:= :ap.player_id :pr.player_id])
+                        (h/group-by :ap.player_id :u.id :u.name :u.position :u.avatar_filename :pp.peladas_count :pr.avg_rating :pe.event_type))]
+    (jdbc/execute! db (hsql/format final-query) hsql/opts)))
