@@ -33,25 +33,29 @@
             schema (or (System/getenv "DB_SCHEMA") "public")
 
             final-db-spec (cond
-                            (:jdbcUrl db-spec)
-                            (let [url (add-schema-to-url (:jdbcUrl db-spec) schema)]
-                              (log/info (str "Using explicit jdbcUrl from db-spec: " (redact-jdbc-url url)))
+                            (or (:jdbcUrl db-spec) (:dbtype db-spec))
+                            (do
                               (try (Class/forName "org.postgresql.Driver") (catch Exception _))
-                              (assoc db-spec :jdbcUrl url :connectionTestQuery "SELECT 1" :maximumPoolSize 10))
+                              (assoc db-spec :connectionTestQuery "SELECT 1" :maximumPoolSize 10))
 
                           ;; Postgres via DATABASE_URL
                             database-url
-                            (let [base-url (if (str/starts-with? database-url "postgres://")
-                                             (let [[_ user pass host port db] (re-matches #"^postgres://([^:]+):(.+)@([^@:]+)(?::(\d+))?/(.+)$" database-url)]
-                                               (if host
-                                                 (str "jdbc:postgresql://" host ":" (if port port 5432) "/" db "?user=" user "&password=" pass)
-                                                 database-url))
-                                             database-url)
-                                  jdbc-url (add-schema-to-url base-url schema)]
-                              (log/info (str "Using DATABASE_URL with schema '" schema "': " (redact-jdbc-url jdbc-url)))
-                              (try (Class/forName "org.postgresql.Driver") (catch Exception _))
-                              {:jdbcUrl jdbc-url
-                               :connectionTestQuery "SELECT 1"})
+                            (if (str/starts-with? database-url "postgres://")
+                              (let [[_ user pass host port db] (re-matches #"^postgres://([^:]+):(.+)@([^@:]+)(?::(\d+))?/(.+)$" database-url)]
+                                (if host
+                                  (let [jdbc-url (add-schema-to-url (str "jdbc:postgresql://" host ":" (if port port 5432) "/" db) schema)]
+                                    (log/info (str "Using DATABASE_URL with schema '" schema "'"))
+                                    (try (Class/forName "org.postgresql.Driver") (catch Exception _))
+                                    {:jdbcUrl jdbc-url
+                                     :user user
+                                     :password pass
+                                     :connectionTestQuery "SELECT 1"})
+                                  (throw (Exception. "Invalid DATABASE_URL format"))))
+                              (let [jdbc-url (add-schema-to-url database-url schema)]
+                                (log/info (str "Using DATABASE_URL with schema '" schema "': " (redact-jdbc-url jdbc-url)))
+                                (try (Class/forName "org.postgresql.Driver") (catch Exception _))
+                                {:jdbcUrl jdbc-url
+                                 :connectionTestQuery "SELECT 1"}))
 
                           ;; Fallback
                             :else

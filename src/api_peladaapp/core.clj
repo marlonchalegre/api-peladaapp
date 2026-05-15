@@ -24,14 +24,18 @@
         schema (or (System/getenv "DB_SCHEMA") "public")
         ;; Build a db-spec usable by Migratus: prefer Postgres
         base-db-spec (if database-url
-                       (let [base-url (if (str/starts-with? database-url "postgres://")
-                                        (let [[_ user pass host port db] (re-matches #"^postgres://([^:]+):(.+)@([^@:]+)(?::(\d+))?/(.+)$" database-url)]
-                                          (if host
-                                            (str "jdbc:postgresql://" host ":" (if port port 5432) "/" db "?user=" user "&password=" pass)
-                                            database-url))
-                                        database-url)
-                             jdbc-url (add-schema-to-url base-url schema)]
-                         {:connection-uri jdbc-url})
+                       (if (str/starts-with? database-url "postgres://")
+                         (let [[_ user pass host port db] (re-matches #"^postgres://([^:]+):(.+)@([^@:]+)(?::(\d+))?/(.+)$" database-url)]
+                           (if host
+                             {:dbtype "postgresql"
+                              :dbname db
+                              :host host
+                              :port (if port (Integer/parseInt port) 5432)
+                              :user user
+                              :password pass
+                              :currentSchema schema}
+                             (throw (Exception. "Invalid DATABASE_URL format"))))
+                         {:connection-uri (add-schema-to-url database-url schema)})
                        (throw (Exception. "DATABASE_URL is required for migrations. PostgreSQL is now mandatory.")))
 
         skip-migrations (= "true" (System/getenv "SKIP_MIGRATIONS"))
