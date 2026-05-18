@@ -21,7 +21,7 @@ RUN --mount=type=cache,target=/root/.m2 \
     mv target/uberjar/*-standalone.jar /app/app.jar
 
 # --- Runtime image: lean JRE
-FROM eclipse-temurin:23-jre-noble
+FROM --platform=$TARGETPLATFORM eclipse-temurin:23-jre-noble
 WORKDIR /app
 
 # Combine apt operations to reduce layers
