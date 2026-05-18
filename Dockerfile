@@ -21,7 +21,7 @@ RUN --mount=type=cache,target=/root/.m2 \
     mv target/uberjar/*-standalone.jar /app/app.jar
 
 # --- Runtime image: lean JRE
-FROM --platform=$TARGETPLATFORM eclipse-temurin:23-jre-noble
+FROM eclipse-temurin:23-jre-noble
 WORKDIR /app
 
 # Combine apt operations to reduce layers
@@ -39,3 +39,4 @@ EXPOSE 8080
 ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0 -XX:+ExitOnOutOfMemoryError"
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
+
