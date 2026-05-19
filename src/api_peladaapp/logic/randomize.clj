@@ -8,15 +8,19 @@
 (def position-priority
   {"Goalkeeper" 0
    "Defender" 1
-   "Midfielder" 2
-   "Striker" 3
-   nil 4
-   "" 4})
+   "Midfielder" 1
+   "Striker" 1
+   nil 1
+   "" 1})
 
 (defn- sort-players-for-balance
   [players num-teams]
-  (let [sorted (sort-by (juxt #(get position-priority (:position %) 4)
-                              (comp - #(or (:grade %) 0)))
+  ;; 1. Prioritize Goalkeepers to ensure they are picked to play first.
+  ;; 2. Then prioritize by Grade (descending) to get the best field players.
+  ;; 3. Finally by position as a tie-breaker.
+  (let [sorted (sort-by (juxt #(get position-priority (:position %) 1)
+                              (comp - #(or (:grade %) 0))
+                              #(or (:position %) ""))
                         players)]
     (if (pos? num-teams)
       (->> sorted
@@ -64,8 +68,29 @@
             updated-states (mapv #(if (= (:id %) (:id best-team)) updated-team %) team-states)]
         [(:id best-team) updated-states]))))
 
+(defn- calculate-imbalance
+  "Calculates the score variance (imbalance) between teams."
+  [team-states]
+  (let [scores (map :current-score team-states)
+        avg (if (seq scores) (/ (double (reduce + scores)) (count scores)) 0)]
+    (reduce + (map #(Math/abs (- % avg)) scores))))
+
+(defn- generate-assignment-candidate
+  [sorted-players initial-team-states]
+  (loop [remaining sorted-players
+         states initial-team-states
+         acc []]
+    (if-let [player (first remaining)]
+      (let [[team-id new-states] (assign-player-to-best-team player states)]
+        (if team-id
+          (recur (rest remaining) new-states (conj acc {:team_id team-id :player_id (:id player) :is_goalkeeper false :final-states new-states}))
+          (recur (rest remaining) states acc)))
+      {:assignments (map #(dissoc % :final-states) acc)
+       :imbalance (calculate-imbalance (:final-states (last acc)))})))
+
 (defn randomize-teams!
-  "Randomly assigns provided players to empty slots in the pelada's teams, balancing by position and score."
+  "Randomly assigns provided players to empty slots in the pelada's teams, balancing by position and score.
+   Uses a Best-of-N approach to minimize score imbalance."
   [pelada-id player-ids players-per-team db]
   (when (and players-per-team (pos? players-per-team) (seq player-ids))
     (jdbc/with-transaction [tx db]
@@ -76,7 +101,6 @@
             global-gk-ids (set (filter some? [home-gk-id away-gk-id]))]
 
         ;; Clear existing assignments to allow full reshuffle.
-        ;; Note: In global fixed GK mode, these players are NOT in any team.
         (db.team/clear-teams-players pelada-id tx)
 
         (let [;; Filter out players who are global fixed goalkeepers
@@ -88,21 +112,24 @@
               teams (db.team/list-pelada-teams pelada-id tx)
               num-teams (count teams)
 
-              ;; Sort players: Position first, then Grade, with bucket shuffle for variety
-              sorted-players (sort-players-for-balance (shuffle players-details) num-teams)
-
               ;; Initial team states
               initial-team-states (get-team-states teams players-per-team org-id tx)
 
-              ;; Distribute remaining players and collect assignments for batch insert
-              assignments (loop [remaining sorted-players
-                                 states initial-team-states
-                                 acc []]
-                            (if-let [player (first remaining)]
-                              (let [[team-id new-states] (assign-player-to-best-team player states)]
-                                (if team-id
-                                  (recur (rest remaining) new-states (conj acc {:team_id team-id :player_id (:id player) :is_goalkeeper false}))
-                                  (recur (rest remaining) states acc)))
-                              acc))]
-          (when (seq assignments)
-            (db.team/add-team-players-batch! assignments tx)))))))
+              ;; Run multiple trials and pick one randomly among those with the lowest imbalance
+              candidates (repeatedly 100 (fn []
+                                           (let [jittered (map #(update % :grade + (* 0.1 (- (rand) 0.5))) players-details)
+                                                 sorted (sort-players-for-balance (shuffle jittered) num-teams)]
+                                             (generate-assignment-candidate sorted initial-team-states))))
+              sorted-candidates (->> candidates
+                                     (group-by :assignments)
+                                     vals
+                                     (map first)
+                                     (sort-by :imbalance))
+              min-imb (:imbalance (first sorted-candidates))
+              ;; Pick randomly from unique candidates that are "good enough" (within 0.5 of min)
+              best-pool (->> sorted-candidates
+                             (filter #(<= (:imbalance %) (+ min-imb 0.5)))
+                             (take 10))
+              best-candidate (rand-nth best-pool)]
+          (when (seq (:assignments best-candidate))
+            (db.team/add-team-players-batch! (:assignments best-candidate) tx)))))))

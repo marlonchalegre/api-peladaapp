@@ -8,9 +8,7 @@ pom.xml
 pom.xml.asc
 *.jar
 *.class
-.lein-*
-leiningen.log
-/.lein-*
+.lein*
 /.nrepl-port
 /.prepl-port
 /.cpcache
@@ -59,3 +57,4 @@ tmp/
 uploads/
 peladaapp.db*
 .lein-failures
+/scratch/
