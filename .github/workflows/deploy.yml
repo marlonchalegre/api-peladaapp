@@ -118,17 +118,13 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - name: Set up Kubernetes context
-        run: |
-          mkdir -p ~/.kube
-          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
-          chmod 600 ~/.kube/config
-
       - name: Deploy to Kubernetes
         env:
           IMAGE_TAG: ghcr.io/${{ github.repository }}:latest
-          KUBECONFIG: ~/.kube/config
         continue-on-error: true
         run: |
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > /tmp/kubeconfig
+          chmod 600 /tmp/kubeconfig
+          export KUBECONFIG=/tmp/kubeconfig
           kubectl set image deployment/backend backend=$IMAGE_TAG -n peladaapp
           kubectl rollout status deployment/backend -n peladaapp --timeout=90s
