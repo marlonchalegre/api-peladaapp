@@ -108,3 +108,15 @@ jobs:
           sbom: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Deploy to Kubernetes
+        if: github.ref == 'refs/heads/main'
+        uses: tale/kubectl-action@v1
+        with:
+          base64-kube-config: ${{ secrets.KUBECONFIG }}
+        env:
+          IMAGE_TAG: ghcr.io/${{ github.repository }}:latest
+        continue-on-error: true
+        run: |
+          kubectl set image deployment/backend backend=$IMAGE_TAG -n peladaapp
+          kubectl rollout status deployment/backend -n peladaapp --timeout=90s
