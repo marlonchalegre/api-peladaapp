@@ -160,6 +160,7 @@
     (or (= remote-addr "127.0.0.1")
         (= remote-addr "localhost")
         (= remote-addr "0:0:0:0:0:0:0:1")
+        (str/starts-with? remote-addr "10.")
         (str/starts-with? remote-addr "172.")
         (str/starts-with? remote-addr "192.168."))))
 
