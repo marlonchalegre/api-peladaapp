@@ -119,14 +119,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Kubernetes context
-        uses: azure/k8s-set-context@v3
-        with:
-          method: kubeconfig
-          kubeconfig: ${{ secrets.KUBECONFIG }}
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBECONFIG }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
 
       - name: Deploy to Kubernetes
         env:
           IMAGE_TAG: ghcr.io/${{ github.repository }}:latest
+          KUBECONFIG: ~/.kube/config
         continue-on-error: true
         run: |
           kubectl set image deployment/backend backend=$IMAGE_TAG -n peladaapp
