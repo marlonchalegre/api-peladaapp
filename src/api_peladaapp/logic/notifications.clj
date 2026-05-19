@@ -182,9 +182,13 @@
     (str title "Confira os destaques no link abaixo:\n" link)))
 
 (defn- format-mention [player]
-  (if (:phone player)
-    (str "@" (:player-name player))
-    (:player-name player)))
+  (let [name (:player-name player)
+        words (str/split (or name "") #"\s+")
+        short-name (str/join " " (take 2 words))
+        jid (some-> (:phone player) waha/normalize-phone)]
+    (if jid
+      (str short-name " (@" (str/replace jid "@c.us" "") ")")
+      short-name)))
 
 (defn generate-attendance-reminder [pending-players]
   (let [title "⏰ *Lembrete de Presença!* ⏰\n\nAinda temos jogadores com presença pendente para a próxima pelada:\n\n"
@@ -221,14 +225,16 @@
                           :vote-reminder (generate-vote-reminder (:pelada-id data) (:pending-voters data)))
                 mentions (case type
                            :attendance-reminder (->> (:pending-players data)
-                                                     (keep #(some-> (:phone %) waha/normalize-phone)))
+                                                     (keep #(some-> (:phone %) waha/normalize-phone))
+                                                     vec)
                            :vote-reminder (->> (:pending-voters data)
-                                               (keep #(some-> (:phone %) waha/normalize-phone)))
+                                               (keep #(some-> (:phone %) waha/normalize-phone))
+                                               vec)
                            nil)
                 use-all? (:waha-use-all-mention org)
                 final-mentions (if (and (contains? #{:attendance-reminder :vote-reminder} type)
                                         use-all?)
-                                 (conj (vec mentions) "all")
+                                 (conj mentions "all")
                                  mentions)
                 final-message (if (and (contains? #{:attendance-reminder :vote-reminder} type)
                                        use-all?)

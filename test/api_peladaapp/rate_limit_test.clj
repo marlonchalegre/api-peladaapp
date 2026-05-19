@@ -31,7 +31,7 @@
       (testing "should reset lock when duration passed"
         ;; Manually set last-attempt to 20 minutes ago
         (swap! handlers.auth/login-attempts assoc email {:count 5 :last-attempt (- (System/currentTimeMillis) (* 20 60 1000))})
-        
+
         ;; Should now work again (401 is expected if credentials are wrong, not 429)
         (let [response (handler (-> (mock/request :post "/auth/login")
                                     (mock/json-body {:email email :password password})))]

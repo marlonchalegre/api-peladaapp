@@ -41,7 +41,7 @@
 
             ;; Check message text
             (is (re-find #"⏰ \*Lembrete de Presença! @all\*" message))
-            (is (re-find #"• @User 1" message))))))))
+            (is (re-find #"• User 1 \(@5511911111111\)" message))))))))
 
 (deftest send-notification-disabled-all-test
   (let [db-val (-> th/*test-system* :database :database)
