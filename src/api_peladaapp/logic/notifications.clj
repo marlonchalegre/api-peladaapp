@@ -240,4 +240,7 @@
                                        use-all?)
                                 (str/replace message #"!\*" "! @all*")
                                 message)]
-            (waha/send-message org final-message final-mentions)))))))
+            (waha/send-message org final-message final-mentions)
+            (when (= type :start)
+              (let [team-names (map :name (:teams data))]
+                (waha/send-poll org "Quem será o campeão?" team-names false)))))))))

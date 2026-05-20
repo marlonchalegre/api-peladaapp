@@ -57,6 +57,38 @@
          (log/error e "Failed to send WAHA message")
          {:error (.getMessage e)})))))
 
+(defn send-poll
+  "Sends a poll via WAHA API.
+   config: {:waha-api-url ... :waha-instance ... :waha-group-id ...}
+   question: the poll question
+   options: list of strings
+   multiple-answers?: boolean (default false)"
+  ([config question options] (send-poll config question options false))
+  ([{:keys [waha-api-url waha-instance waha-group-id]} question options multiple-answers?]
+   (let [url (str waha-api-url "/api/sendPoll")
+         default-waha-url (System/getenv "WAHA_API_URL")
+         api-key (config/get-key :waha-api-key)
+         is-trusted? (or (str/blank? waha-api-url)
+                         (= waha-api-url default-waha-url)
+                         (str/starts-with? waha-api-url "http://backend:")
+                         (str/starts-with? waha-api-url "http://waha:"))
+         payload {:session waha-instance
+                  :chatId waha-group-id
+                  :poll {:name question
+                         :options options
+                         :multipleAnswers (boolean multiple-answers?)}}
+         body (json/write-str payload)]
+     (try
+       (log/info "Sending WAHA poll to" waha-group-id "via" waha-instance ":" question)
+       (http/post url
+                  {:body body
+                   :content-type :json
+                   :accept :json
+                   :headers (when (and api-key is-trusted?) {"X-Api-Key" api-key})})
+       (catch Exception e
+         (log/error e "Failed to send WAHA poll")
+         {:error (.getMessage e)})))))
+
 (defn healthcheck
   "Checks if WAHA service is up by calling server version endpoint."
   []
