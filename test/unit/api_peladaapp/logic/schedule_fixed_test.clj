@@ -37,3 +37,17 @@
                      (set [(:home (nth matches 1)) (:away (nth matches 1))])
                      (set [(:home (nth matches 2)) (:away (nth matches 2))])])]
         (is (= (set [(set [1 2]) (set [3 5]) (set [4 6])]) r1))))))
+
+(deftest schedule-uuid-preservation-test
+  (testing "preserves the order of UUIDs passed from caller without sorting them by UUID string/value"
+    (let [u1 (java.util.UUID/fromString "dddddddd-dddd-dddd-dddd-dddddddddddd")
+          u2 (java.util.UUID/fromString "cccccccc-cccc-cccc-cccc-cccccccccccc")
+          u3 (java.util.UUID/fromString "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+          u4 (java.util.UUID/fromString "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+          teams [u1 u2 u3 u4]
+          matches (vec (schedule/schedule-matches-with-limit teams 5))]
+      (is (= 10 (count matches)))
+      ;; Check R1: T1 vs T2, T3 vs T4 (based on original order [u1 u2 u3 u4])
+      (is (= (set [u1 u2]) (set [(:home (nth matches 0)) (:away (nth matches 0))])))
+      (is (= (set [u3 u4]) (set [(:home (nth matches 1)) (:away (nth matches 1))]))))))
+

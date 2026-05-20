@@ -46,7 +46,8 @@
 (s/defn list-pelada-teams [pelada-id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :Teams)
-                  (h/where [:= :pelada_id pelada-id]))]
+                  (h/where [:= :pelada_id pelada-id])
+                  (h/order-by :name))]
     (->> (jdbc/execute! db (hsql/format query) hsql/opts)
          (map adapter.team/db->model))))
 

@@ -17,6 +17,7 @@
    [api-peladaapp.db.team :as db.team]
    [api-peladaapp.db.transaction :as db.transaction]
    [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.notifications :as notifications]
@@ -97,9 +98,10 @@
   [pelada-id :- s/Uuid db]
   (let [plans (db.schedule/list-match-plans-by-pelada pelada-id db)]
     (map (fn [p]
-           {:home (:home_team_id p)
-            :away (:away_team_id p)
-            :sequence (:sequence p)})
+           (let [row (misc/unamespace p)]
+             {:home (:home_team_id row)
+              :away (:away_team_id row)
+              :sequence (:sequence row)}))
          plans)))
 
 (s/defn create-pelada :- models.pelada/Pelada

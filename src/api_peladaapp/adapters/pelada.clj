@@ -1,6 +1,7 @@
 (ns api-peladaapp.adapters.pelada
   (:require
    [api-peladaapp.adapters.finance :as adapter.finance]
+   [api-peladaapp.adapters.team :as adapter.team]
    [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.vote :as logic.vote]
@@ -115,9 +116,8 @@
                            :has_schedule_plan (:has-schedule-plan data))]
     {:pelada pelada-resp
      :teams (map (fn [team]
-                   (-> team
-                       (misc/unamespace)
-                       (assoc :players (map player->response (:players team)))))
+                   (assoc (adapter.team/model->response team)
+                          :players (map player->response (:players team))))
                  (:teams data))
      :available_players (map player->response (:available-players data))
      :scores (:scores data)

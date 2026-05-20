@@ -77,7 +77,7 @@
 
 (defn berger-schedule [team-ids matches-per-team]
   (let [n (count team-ids)
-        ids (vec (sort team-ids))
+        ids (vec team-ids)
 
         ;; Manual tables from PDF and User requests
         rounds (cond
