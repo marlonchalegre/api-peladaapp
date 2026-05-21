@@ -11,11 +11,14 @@
                   :organization_id (parse-uuid "00000000-0000-0000-0000-000000000002")
                   :amount 50.0
                   :payment_date payment-date
-                  :created_at created-at}
+                  :created_at created-at
+                  :pelada_date created-at}
           model (adapter.finance/db->transaction db-row)
           response (adapter.finance/model->transaction-response model)]
       ;; The model should keep the java.sql.Date
       (is (= payment-date (:payment-date model)))
+      (is (= created-at (:pelada-date model)))
       ;; The response should have the string representation
       (is (= "2026-05-21" (:payment_date response)))
+      (is (= (str created-at) (:pelada_date response)))
       (is (string? (:payment_date response))))))

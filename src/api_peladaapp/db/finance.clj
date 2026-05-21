@@ -78,11 +78,12 @@
 
 (s/defn list-transactions
   [org-id :- s/Uuid limit offset db]
-  (let [query (-> (h/select :t.* [:u.name :player_name] [:uc.name :creator_name])
+  (let [query (-> (h/select :t.* [:u.name :player_name] [:uc.name :creator_name] [:p.scheduled_at :pelada_date])
                   (h/from [:Transactions :t])
                   (h/left-join [:OrganizationPlayers :op] [:= :t.player_id :op.id])
                   (h/left-join [:Users :u] [:= :op.user_id :u.id])
                   (h/left-join [:Users :uc] [:= :t.created_by :uc.id])
+                  (h/left-join [:Peladas :p] [:= :t.pelada_id :p.id])
                   (h/where [:= :t.organization_id org-id])
                   (h/order-by [:t.payment_date :desc] [:t.created_at :desc])
                   (h/limit limit)

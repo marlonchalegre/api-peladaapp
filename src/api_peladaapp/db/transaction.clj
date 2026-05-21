@@ -8,10 +8,11 @@
 
 (s/defn list-transactions-by-pelada
   [pelada-id :- s/Uuid db]
-  (let [query (-> (h/select :t.* [:u.name :player_name])
+  (let [query (-> (h/select :t.* [:u.name :player_name] [:p.scheduled_at :pelada_date])
                   (h/from [:Transactions :t])
                   (h/left-join [:OrganizationPlayers :op] [:= :t.player_id :op.id])
                   (h/left-join [:Users :u] [:= :op.user_id :u.id])
+                  (h/left-join [:Peladas :p] [:= :t.pelada_id :p.id])
                   (h/where [:= :t.pelada_id pelada-id])
                   (h/order-by [:t.created_at :desc]))
         result (jdbc/execute! db (hsql/format query) hsql/opts)]

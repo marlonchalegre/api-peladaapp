@@ -73,7 +73,9 @@
                               :payment-date (:payment_date row)
                               :created-by (:created_by row)
                               :creator-name (:creator_name row)
-                              :created-at (:created_at row)))))
+                              :created-at (:created_at row)
+                              :pelada-date (:pelada_date row)))))
+
 
 (defn transaction->db [model]
   (when model
@@ -127,9 +129,11 @@
                             :description (:description model)
                             :status (:status model)
                             :payment_date (some-> (:payment-date model) str)
-                            :created_by (:created-by model)
-                            :creator_name (:creator-name model)
-                            :created_at (:created-at model))))
+                            :created-by (:created-by model)
+                            :creator-name (:creator-name model)
+                            :created_at (:created-at model)
+                            :pelada_date (some-> (:pelada-date model) str))))
+
 
 ;; --- Monthly Payments ---
 
