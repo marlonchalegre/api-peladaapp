@@ -5,6 +5,7 @@
    [api-peladaapp.requests.organization :as requests.organization]
    [api-peladaapp.responses.organization :as responses.organization]
    [clojure.string :as str]
+   [medley.core :as medley.core]
    [schema.core :as s]))
 
 (s/defn create-request->model :- models.organization/Organization
@@ -54,3 +55,38 @@
    :token (:token result)
    :is_new_user (:is-new-user result)
    :organization_id (:organization-id result)})
+
+   ;; --- Monthly Player Substitutions ---
+
+(defn db->substitution [row]
+  (when row
+    (let [row (misc/unamespace row)]
+      (medley.core/assoc-some {}
+                              :id (:id row)
+                              :organization-id (:organization_id row)
+                              :permanent-player-id (:permanent_player_id row)
+                              :permanent-player-name (:permanent_player_name row)
+                              :temporary-player-id (:temporary_player_id row)
+                              :temporary-player-name (:temporary_player_name row)
+                              :start-date (some-> (:start_date row) str)
+                              :end-date (some-> (:end_date row) str)
+                              :active (if (contains? row :active)
+                                        (if (number? (:active row))
+                                          (not (zero? (:active row)))
+                                          (boolean (:active row)))
+                                        nil)
+                              :created-at (:created_at row)))))
+
+(defn model->substitution-response [model]
+  (when model
+    (medley.core/assoc-some {}
+                            :id (:id model)
+                            :organization_id (:organization-id model)
+                            :permanent_player_id (:permanent-player-id model)
+                            :permanent_player_name (:permanent-player-name model)
+                            :temporary_player_id (:temporary-player-id model)
+                            :temporary_player_name (:temporary-player-name model)
+                            :start_date (:start-date model)
+                            :end_date (:end-date model)
+                            :active (:active model)
+                            :created_at (:created-at model))))

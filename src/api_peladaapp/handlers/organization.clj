@@ -178,7 +178,10 @@
              org-id (misc/as-uuid (get-in request [:params :organization_id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-member! user-id org-id db)
-         (ok (db.monthly-sub/list-substitutions-by-org org-id db)))
+         (let [subs (db.monthly-sub/list-substitutions-by-org org-id db)]
+           (ok (map (comp adapter.organization/model->substitution-response
+                          adapter.organization/db->substitution)
+                    subs))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn create-substitution [request]

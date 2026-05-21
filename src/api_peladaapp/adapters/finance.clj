@@ -126,7 +126,7 @@
                             :category (:category model)
                             :description (:description model)
                             :status (:status model)
-                            :payment_date (:payment-date model)
+                            :payment_date (some-> (:payment-date model) str)
                             :created_by (:created-by model)
                             :creator_name (:creator-name model)
                             :created_at (:created-at model))))

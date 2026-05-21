@@ -26,3 +26,18 @@
           model (adapter.organization/db->model db-row)]
       (is (true? (:waha-enabled model)))
       (is (false? (:waha-start-msg-enabled model))))))
+
+(deftest substitution-adapter-test
+  (testing "db->substitution and model->substitution-response with java.sql.Date"
+    (let [start-date (java.sql.Date/valueOf "2026-05-01")
+          db-row {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                  :organization_id (parse-uuid "00000000-0000-0000-0000-000000000002")
+                  :permanent_player_id (parse-uuid "00000000-0000-0000-0000-000000000003")
+                  :temporary_player_id (parse-uuid "00000000-0000-0000-0000-000000000004")
+                  :start_date start-date
+                  :active 1}
+          model (adapter.organization/db->substitution db-row)
+          response (adapter.organization/model->substitution-response model)]
+      (is (= "2026-05-01" (:start-date model))) ;; db->substitution already converts to str
+      (is (= "2026-05-01" (:start_date response)))
+      (is (true? (:active model))))))
