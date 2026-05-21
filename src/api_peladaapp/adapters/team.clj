@@ -33,3 +33,9 @@
                             :id (:id row)
                             :pelada-id (:pelada_id row)
                             :name (:name row))))
+
+(s/defn team-player->response :- responses.team/TeamPlayerResponse
+  [model :- models.team/TeamPlayer]
+  {:team_id (:team-id model)
+   :player_id (:player-id model)
+   :is_goalkeeper (boolean (:is-goalkeeper model))})

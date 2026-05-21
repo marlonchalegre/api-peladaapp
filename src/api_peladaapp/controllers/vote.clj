@@ -9,7 +9,6 @@
    [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.logic.vote :as vote.logic]
    [api-peladaapp.models.vote :as models.vote]
-   [api-peladaapp.responses.vote :as responses.vote]
    [schema.core :as s]))
 
 (s/defn cast-vote :- models.vote/Vote
@@ -22,7 +21,7 @@
   (let [id (db.vote/insert-vote vote db)]
     (db.vote/get-vote id db)))
 
-(s/defn batch-cast-votes :- responses.vote/BatchVoteResponse
+(s/defn batch-cast-votes :- models.vote/BatchVote
   "Cast multiple votes at once. Replaces any existing votes by this voter."
   [pelada-id :- s/Uuid voter-id :- s/Uuid votes :- [{:target-id s/Uuid :stars s/Int}] db]
   ;; Validate pelada voting eligibility
@@ -56,7 +55,7 @@
   [pelada-id :- s/Uuid db]
   (db.vote/list-votes-by-pelada pelada-id db))
 
-(s/defn get-voting-info :- responses.vote/VotingInfoResponse
+(s/defn get-voting-info :- models.vote/VotingInfo
   "Get voting eligibility info for a voter in a pelada."
   [pelada-id :- s/Uuid user-id :- s/Uuid db]
   (let [pelada (db.pelada/get-pelada pelada-id db)]
@@ -110,7 +109,7 @@
            :eligible-players []
            :message (or (:message data) (.getMessage e))})))))
 
-(s/defn get-voting-status
+(s/defn get-voting-status :- models.vote/VotingStatus
   [pelada-id :- s/Uuid db]
   (let [votes (db.vote/list-votes-by-pelada pelada-id db)
         ;; Get all participants (potential voters)
@@ -135,7 +134,7 @@
      :total-eligible (count participants)
      :total-voted (count voted-ids)}))
 
-(s/defn get-voting-results :- responses.vote/VotingResultsResponse
+(s/defn get-voting-results :- models.vote/VotingResults
   [pelada-id :- s/Uuid user-id :- s/Uuid db]
   (let [pelada (db.pelada/get-pelada pelada-id db)]
     (when (vote.logic/voting-open? pelada)

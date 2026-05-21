@@ -1,6 +1,9 @@
 (ns api-peladaapp.adapters.pelada
   (:require
+   [api-peladaapp.adapters.attendance :as adapter.attendance]
    [api-peladaapp.adapters.finance :as adapter.finance]
+   [api-peladaapp.adapters.match :as adapter.match]
+   [api-peladaapp.adapters.player :as adapter.player]
    [api-peladaapp.adapters.team :as adapter.team]
    [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.time :as helpers.time]
@@ -60,6 +63,9 @@
          :timer_started_at (:timer-started-at model)
          :timer_accumulated_ms (:timer-accumulated-ms model)
          :timer_status (:timer-status model)))))
+
+(defn begin-model->response [model]
+  {:matches_created (:matches-created model)})
 
 (s/defn db->model :- models.pelada/Pelada
   [pelada]
@@ -134,3 +140,46 @@
                      :votes_cast (:votes-cast v)})
      :users_map (into {} (map (fn [[k v]] [k (user->response v)]) (:users-map data)))
      :org_players_map (into {} (map (fn [[k v]] [k (player->response v)]) (:org-players-map data)))}))
+
+(defn dashboard->response [data]
+  (let [pelada (:pelada data)
+        is-admin (:is-admin data)
+        matches (:matches data)
+        teams (:teams data)
+        users (:users data)
+        organization-players (:organization-players data)
+        match-events (:match-events data)
+        player-stats (:player-stats data)
+        team-players (:team-players data)
+        match-lineups (:match-lineups data)
+        transactions (:transactions data)
+        attendance (:attendance data)
+
+        ;; Transform team-players into a map
+        team-players-map (into {} (map (fn [[tid tps]]
+                                         [tid (map (fn [tp]
+                                                     {:team_id (:team_id tp)
+                                                      :player_id (:player_id tp)
+                                                      :is_goalkeeper (:is_goalkeeper tp)})
+                                                   tps)])
+                                       (group-by :team_id team-players)))
+        ;; Transform match-lineups into a map of match-id -> team-id -> players
+        match-lineups-map (reduce (fn [acc {:keys [match_id team_id] :as lineup}]
+                                    (assoc-in acc [match_id team_id] (conj (get-in acc [match_id team_id] []) lineup)))
+                                  {}
+                                  match-lineups)
+        matches-resp (map adapter.match/model->response matches)
+        teams-resp (map adapter.team/model->response teams)
+        attendance-resp (map adapter.attendance/db->response attendance)
+        users-resp (map user->response users)]
+    {:pelada (assoc (model->response pelada) :is_admin is-admin)
+     :matches matches-resp
+     :teams teams-resp
+     :users users-resp
+     :organization_players (map adapter.player/model->response organization-players)
+     :match_events (map adapter.match/event->response match-events)
+     :player_stats (when player-stats (map adapter.match/stats->response player-stats))
+     :team_players_map team-players-map
+     :match_lineups_map match-lineups-map
+     :pelada_transactions (map adapter.finance/model->transaction-response transactions)
+     :attendance attendance-resp}))

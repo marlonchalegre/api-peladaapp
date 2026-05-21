@@ -3,7 +3,6 @@
    [api-peladaapp.adapters.match :as adapter.match]
    [api-peladaapp.controllers.match :as match-controller]
    [api-peladaapp.controllers.pelada :as pelada-controller]
-   [api-peladaapp.db.match :as db.match]
    [api-peladaapp.helpers.exception :as exception]
    [api-peladaapp.helpers.responses :refer [ok updated]]
    [api-peladaapp.logic.authorization :as auth]
@@ -14,7 +13,7 @@
              id (parse-uuid (clojure.core/str (get-in request [:params :id])))
              body (:body request)
              user-id (auth/get-user-id-from-request request)
-             match (db.match/get-match id db)
+             match (match-controller/get-match id db)
              pelada (pelada-controller/get-pelada (:pelada-id match) db)
              org-id (:organization-id pelada)]
          ;; Only admins can update scores and finish matches
@@ -29,7 +28,7 @@
   (try (let [db (:database request)
              id (parse-uuid (clojure.core/str (get-in request [:params :id])))
              user-id (auth/get-user-id-from-request request)
-             match (db.match/get-match id db)
+             match (match-controller/get-match id db)
              pelada (pelada-controller/get-pelada (:pelada-id match) db)
              org-id (:organization-id pelada)]
          (auth/require-organization-admin! user-id org-id db)
@@ -42,7 +41,7 @@
   (try (let [db (:database request)
              id (parse-uuid (clojure.core/str (get-in request [:params :id])))
              user-id (auth/get-user-id-from-request request)
-             match (db.match/get-match id db)
+             match (match-controller/get-match id db)
              pelada (pelada-controller/get-pelada (:pelada-id match) db)
              org-id (:organization-id pelada)]
          (auth/require-organization-admin! user-id org-id db)
@@ -55,7 +54,7 @@
   (try (let [db (:database request)
              id (parse-uuid (clojure.core/str (get-in request [:params :id])))
              user-id (auth/get-user-id-from-request request)
-             match (db.match/get-match id db)
+             match (match-controller/get-match id db)
              pelada (pelada-controller/get-pelada (:pelada-id match) db)
              org-id (:organization-id pelada)]
          (auth/require-organization-admin! user-id org-id db)
@@ -69,7 +68,7 @@
              id (parse-uuid (clojure.core/str (get-in request [:params :id])))
              body (:body request)
              user-id (auth/get-user-id-from-request request)
-             match (db.match/get-match id db)
+             match (match-controller/get-match id db)
              pelada (pelada-controller/get-pelada (:pelada-id match) db)
              org-id (:organization-id pelada)]
          ;; Only admins can create events
@@ -86,7 +85,7 @@
           id (parse-uuid (clojure.core/str (get-in request [:params :id])))
           body (:body request)
           user-id (auth/get-user-id-from-request request)
-          match (db.match/get-match id db)
+          match (match-controller/get-match id db)
           pelada (pelada-controller/get-pelada (:pelada-id match) db)
           org-id (:organization-id pelada)]
       ;; Only admins can perform this action
@@ -103,7 +102,7 @@
           id (parse-uuid (clojure.core/str (get-in request [:params :id])))
           body (:body request)
           user-id (auth/get-user-id-from-request request)
-          match (db.match/get-match id db)
+          match (match-controller/get-match id db)
           pelada (pelada-controller/get-pelada (:pelada-id match) db)
           org-id (:organization-id pelada)]
       ;; Only admins can modify lineups
@@ -118,7 +117,7 @@
           id (parse-uuid (clojure.core/str (get-in request [:params :id])))
           body (:body request)
           user-id (auth/get-user-id-from-request request)
-          match (db.match/get-match id db)
+          match (match-controller/get-match id db)
           pelada (pelada-controller/get-pelada (:pelada-id match) db)
           org-id (:organization-id pelada)]
       ;; Only admins can modify lineups

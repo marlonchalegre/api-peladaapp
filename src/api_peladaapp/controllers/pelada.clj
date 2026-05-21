@@ -1,11 +1,5 @@
 (ns api-peladaapp.controllers.pelada
   (:require
-   [api-peladaapp.adapters.attendance :as adapter.attendance]
-   [api-peladaapp.adapters.finance :as adapter.finance]
-   [api-peladaapp.adapters.match :as adapter.match]
-   [api-peladaapp.adapters.pelada :as adapter.pelada]
-   [api-peladaapp.adapters.player :as adapter.player]
-   [api-peladaapp.adapters.team :as adapter.team]
    [api-peladaapp.db.admin :as db.admin]
    [api-peladaapp.db.attendance :as db.attendance]
    [api-peladaapp.db.match :as db.match]
@@ -23,7 +17,6 @@
    [api-peladaapp.logic.notifications :as notifications]
    [api-peladaapp.logic.pelada :as pelada.logic]
    [api-peladaapp.models.pelada :as models.pelada]
-   [api-peladaapp.responses.pelada :as responses.pelada]
    [clojure.tools.logging :as log]
    [next.jdbc :as jdbc]
    [schema.core :as s]))
@@ -178,7 +171,7 @@
         total-count (db.pelada/count-peladas-by-user user-id db)]
     (pagination/with-pagination-headers peladas total-count page per-page)))
 
-(s/defn begin-pelada :- responses.pelada/PeladaBeginResponse
+(s/defn begin-pelada :- {:matches-created s/Int}
   "Generate matches for a pelada, transition it to running, and seed lineups."
   [pelada-id :- s/Uuid db & [opts]]
   (let [result (try
@@ -196,7 +189,7 @@
                      (persist-match-plan! pelada-id match-plan tx)
                      (db.pelada/update-pelada pelada-id {:status "running"} tx)
                      (seed-lineups-from-teams! pelada-id tx)
-                     {:pelada pelada :matches_created (count match-plan)}))
+                     {:pelada pelada :matches-created (count match-plan)}))
                  (catch Exception e
                    (log/error e "CRITICAL ERROR in begin-pelada transaction:")
                    (throw e)))]
@@ -210,7 +203,7 @@
           (notifications/send-notification! (:organization-id pelada) :start {:teams teams :team-players team-players} db))
         (catch Exception e (log/error e "Error sending start notification:"))))
 
-    {:matches_created (:matches_created result)}))
+    {:matches-created (:matches-created result)}))
 
 (s/defn start-pelada-timer :- models.pelada/Pelada
   [pelada-id :- s/Uuid db]
@@ -274,7 +267,7 @@
         (catch Exception e (log/error e "Error sending close/reminder notification:"))))
     pelada))
 
-(s/defn get-pelada-dashboard-data :- responses.pelada/PeladaDashboardResponse
+(s/defn get-pelada-dashboard-data
   [pelada-id :- s/Uuid
    user-id :- s/Uuid
    db]
@@ -297,36 +290,19 @@
                                                (map :user-id organization-players)
                                                (map :user-id match-events)
                                                (map :created-by transactions))))
-        users (map adapter.pelada/user->response
-                   (db.user/get-users-by-ids db (vec referenced-user-ids)))
-
-        ;; Transform team-players into a map
-        team-players-map (into {} (map (fn [[tid tps]]
-                                         [tid (map (fn [tp]
-                                                     {:team_id (:team_id tp)
-                                                      :player_id (:player_id tp)
-                                                      :is_goalkeeper (:is_goalkeeper tp)})
-                                                   tps)])
-                                       (group-by :team_id team-players)))
-        ;; Transform match-lineups into a map of match-id -> team-id -> players
-        match-lineups-map (reduce (fn [acc {:keys [match_id team_id] :as lineup}]
-                                    (assoc-in acc [match_id team_id] (conj (get-in acc [match_id team_id] []) lineup)))
-                                  {}
-                                  match-lineups)
-        matches-resp (map adapter.match/model->response matches)
-        teams-resp (map adapter.team/model->response teams)
-        attendance-resp (map adapter.attendance/db->response attendance)]
-    {:pelada (assoc (adapter.pelada/model->response pelada) :is_admin is-admin)
-     :matches matches-resp
-     :teams teams-resp
+        users (db.user/get-users-by-ids db (vec referenced-user-ids))]
+    {:pelada pelada
+     :is-admin is-admin
+     :matches matches
+     :teams teams
      :users users
-     :organization_players (map adapter.player/model->response organization-players)
-     :match_events (map adapter.match/event->response match-events)
-     :player_stats (when player-stats (map adapter.match/stats->response player-stats))
-     :team_players_map team-players-map
-     :match_lineups_map match-lineups-map
-     :pelada_transactions (map adapter.finance/model->transaction-response transactions)
-     :attendance attendance-resp}))
+     :organization-players organization-players
+     :match-events match-events
+     :player-stats player-stats
+     :team-players team-players
+     :match-lineups match-lineups
+     :transactions transactions
+     :attendance attendance}))
 
 (s/defn get-pelada-full-details-controller
   [pelada-id :- s/Uuid

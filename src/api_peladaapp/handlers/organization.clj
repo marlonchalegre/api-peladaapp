@@ -4,17 +4,13 @@
    [api-peladaapp.adapters.invitation :as adapter.invitation]
    [api-peladaapp.adapters.organization :as adapter.organization]
    [api-peladaapp.controllers.organization :as controller.organization]
-   [api-peladaapp.db.admin :as db.admin]
-   [api-peladaapp.db.monthly-substitution :as db.monthly-sub]
-   [api-peladaapp.db.player :as db.player]
-   [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.controllers.user :as controller.user]
    [api-peladaapp.helpers.exception :as exception]
    [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.responses :refer [bad-request created deleted ok]]
    [api-peladaapp.logic.authorization :as auth]
    [api-peladaapp.logic.monthly-substitution :as logic.monthly-sub]
-   [clojure.string :as str]
-   [next.jdbc :as jdbc]))
+   [clojure.string :as str]))
 
 (defn create [request]
   (try (let [db (:database request)
@@ -31,19 +27,8 @@
              org-id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-member! user-id org-id db)
-         (let [is-admin? (db.admin/is-user-admin-of-organization? user-id org-id db)
-               admin-count (db.admin/count-admins-by-organization org-id db)
-               player (db.player/get-org-player-by-user-id user-id org-id db)]
-           (when (and is-admin? (<= admin-count 1))
-             (throw (ex-info "Cannot leave organization: you are the last administrator."
-                             {:type :bad-request
-                              :message "Cannot leave organization: you are the last administrator."})))
-           (jdbc/with-transaction [tx db]
-             (when is-admin?
-               (db.admin/delete-organization-admin-by-org-and-user org-id user-id tx))
-             (when player
-               (db.player/delete-player (:id player) tx)))
-           (deleted)))
+         (controller.organization/leave-organization org-id user-id db)
+         (deleted))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn get-by-id [request]
@@ -80,7 +65,7 @@
   (try (let [db (:database request)
              target-user-id (misc/as-uuid (get-in request [:params :user_id]))]
          (auth/require-self-or-admin! request target-user-id)
-         (ok (controller.organization/list-user-organizations target-user-id db)))
+         (ok (map adapter.organization/model->response (controller.organization/list-user-organizations target-user-id db))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn get-statistics [request]
@@ -133,7 +118,7 @@
 (defn list-pending-invitations [request]
   (try (let [db (:database request)
              user-id (auth/get-user-id-from-request request)
-             user (db.user/find-user-by-id user-id db)]
+             user (controller.user/get-user user-id db)]
          (ok (map adapter.invitation/model->response
                   (controller.organization/list-pending-invitations-for-user (:email user) (:username user) db))))
        (catch Exception e (exception/api-exception-handler e))))
@@ -178,7 +163,7 @@
              org-id (misc/as-uuid (get-in request [:params :organization_id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-member! user-id org-id db)
-         (let [subs (db.monthly-sub/list-substitutions-by-org org-id db)]
+         (let [subs (controller.organization/list-monthly-substitutions org-id db)]
            (ok (map (comp adapter.organization/model->substitution-response
                           adapter.organization/db->substitution)
                     subs))))

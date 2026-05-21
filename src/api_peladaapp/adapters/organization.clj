@@ -23,7 +23,7 @@
 (s/defn model->response :- responses.organization/OrganizationResponse
   [model :- models.organization/Organization]
   (-> model
-      (select-keys [:id :name :owner-id :waha-api-url :waha-instance :waha-group-id :waha-enabled :waha-start-msg-enabled :waha-end-msg-enabled :waha-attendance-reminder-enabled :waha-vote-reminder-enabled :waha-vote-ended-msg-enabled :waha-use-all-mention])
+      (select-keys [:id :name :owner-id :role :waha-api-url :waha-instance :waha-group-id :waha-enabled :waha-start-msg-enabled :waha-end-msg-enabled :waha-attendance-reminder-enabled :waha-vote-reminder-enabled :waha-vote-ended-msg-enabled :waha-use-all-mention])
       (update-keys (comp keyword #(str/replace % "-" "_") name))))
 
 (s/defn db->model :- models.organization/Organization

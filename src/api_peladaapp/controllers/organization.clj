@@ -1,6 +1,7 @@
 (ns api-peladaapp.controllers.organization
   (:require
    [api-peladaapp.db.admin :as db.admin]
+   [api-peladaapp.db.monthly-substitution :as db.monthly-sub]
    [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.db.organization-invitation :as db.invitation]
    [api-peladaapp.db.player :as db.player]
@@ -240,3 +241,24 @@
                               acc))
                           base
                           player-rows)))))))
+
+(s/defn leave-organization
+  [org-id :- s/Uuid
+   user-id :- s/Uuid
+   db]
+  (let [is-admin? (db.admin/is-user-admin-of-organization? user-id org-id db)
+        admin-count (db.admin/count-admins-by-organization org-id db)
+        player (db.player/get-org-player-by-user-id user-id org-id db)]
+    (when (and is-admin? (<= admin-count 1))
+      (throw (ex-info "Cannot leave organization: you are the last administrator."
+                      {:type :bad-request
+                       :message "Cannot leave organization: you are the last administrator."})))
+    (jdbc/with-transaction [tx db]
+      (when is-admin?
+        (db.admin/delete-organization-admin-by-org-and-user org-id user-id tx))
+      (when player
+        (db.player/delete-player (:id player) tx)))))
+
+(s/defn list-monthly-substitutions
+  [org-id :- s/Uuid db]
+  (db.monthly-sub/list-substitutions-by-org org-id db))

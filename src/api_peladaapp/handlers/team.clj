@@ -44,7 +44,8 @@
              user-id (auth/get-user-id-from-request request)
              org-id (get-org-id-from-team team-id db)]
          (auth/require-organization-admin! user-id org-id db)
-         (created (controller.team/add-player team-id player-id is-goalkeeper db)))
+         (created (adapter.team/team-player->response
+                   (controller.team/add-player team-id player-id is-goalkeeper db))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn remove-player [request]

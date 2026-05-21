@@ -6,6 +6,7 @@
   {:id s/Uuid
    :name s/Str
    (s/optional-key :owner_id) (s/maybe s/Uuid)
+   (s/optional-key :role) (s/maybe s/Str)
    (s/optional-key :waha_api_url) (s/maybe s/Str)
    (s/optional-key :waha_instance) (s/maybe s/Str)
    (s/optional-key :waha_group_id) (s/maybe s/Str)

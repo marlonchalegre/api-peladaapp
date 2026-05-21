@@ -2,7 +2,6 @@
   (:require
    [api-peladaapp.db.team :as db.team]
    [api-peladaapp.models.team :as models.team]
-   [api-peladaapp.responses.team :as responses.team]
    [schema.core :as s]))
 
 (s/defn create-team :- models.team/Team
@@ -36,12 +35,12 @@
   [pelada-id :- s/Uuid db]
   (db.team/list-pelada-teams pelada-id db))
 
-(s/defn add-player :- responses.team/TeamPlayerResponse
+(s/defn add-player :- models.team/TeamPlayer
   ([team-id :- s/Uuid player-id :- s/Uuid db]
    (add-player team-id player-id false db))
   ([team-id :- s/Uuid player-id :- s/Uuid is-goalkeeper :- s/Bool db]
    (db.team/add-player-to-team team-id player-id is-goalkeeper db)
-   {:team_id team-id :player_id player-id :is_goalkeeper is-goalkeeper}))
+   {:team-id team-id :player-id player-id :is-goalkeeper is-goalkeeper}))
 
 (s/defn remove-player :- s/Int
   [team-id :- s/Uuid player-id :- s/Uuid db]

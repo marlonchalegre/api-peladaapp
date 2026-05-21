@@ -14,6 +14,10 @@
   [pelada-id :- s/Uuid db]
   (db.match/list-matches-by-pelada pelada-id db))
 
+(s/defn get-match :- (s/maybe models.match/Match)
+  [match-id :- s/Uuid db]
+  (db.match/get-match match-id db))
+
 (s/defn update-score :- models.match/Match
   [match-id :- s/Uuid score-update db]
   (let [validated-update (match.logic/build-score-update score-update)]

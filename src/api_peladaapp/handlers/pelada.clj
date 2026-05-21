@@ -85,9 +85,10 @@
              org-id (:organization-id pelada)]
          ;; Only admins can begin peladas
          (auth/require-organization-admin! user-id org-id db)
-         (ok (if matches-per-team
-               (controller.pelada/begin-pelada id db {:matches_per_team matches-per-team})
-               (controller.pelada/begin-pelada id db))))
+         (ok (adapter.pelada/begin-model->response
+              (if matches-per-team
+                (controller.pelada/begin-pelada id db {:matches_per_team matches-per-team})
+                (controller.pelada/begin-pelada id db)))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn close [request]
@@ -182,7 +183,7 @@
              org-id (:organization-id pelada)]
          ;; Members can view peladas
          (auth/require-organization-member! user-id org-id db)
-         (ok (controller.pelada/get-pelada-dashboard-data id user-id db)))
+         (ok (adapter.pelada/dashboard->response (controller.pelada/get-pelada-dashboard-data id user-id db))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn update [request]
