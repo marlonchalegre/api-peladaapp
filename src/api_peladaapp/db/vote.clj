@@ -121,7 +121,7 @@
                             [:= :pa.pelada_id pelada-id]
                             [:= :pa.status [:cast "confirmed" :attendance_status]]
                             [:not-exists (-> (h/select 1)
-                                             (h/from :Votes :v)
+                                             (h/from [:Votes :v])
                                              (h/where [:= :v.pelada_id :pa.pelada_id] [:= :v.voter_id :pa.player_id]))]]))
         results (jdbc/execute! db (hsql/format query) hsql/opts)]
     (map (fn [r] {:player-id (:player_id r) :player-name (:player_name r) :phone (:phone r)}) results)))

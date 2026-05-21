@@ -38,7 +38,7 @@
           ;; Check pelada keys
           (is (some? (:organization_id (:pelada details))))
           (is (contains? (:pelada details) :has_schedule_plan))
-          
+
           ;; Check team keys (regression: was returning pelada-id instead of pelada_id)
           (is (some? (:pelada_id team)))
           (is (not (contains? team :pelada-id)))
@@ -53,7 +53,7 @@
               _ (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/schedule"))
                          (auth)
                          (mock/json-body {"matches" custom-matches})))
-              
+
               plan-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/schedule")) (auth)))
               plan (th/decode-body plan-resp)]
           (is (= 200 (:status plan-resp)))
