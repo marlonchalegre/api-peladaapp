@@ -76,7 +76,6 @@
                               :created-at (:created_at row)
                               :pelada-date (:pelada_date row)))))
 
-
 (defn transaction->db [model]
   (when model
     (medley.core/assoc-some {}
@@ -133,7 +132,6 @@
                             :creator-name (:creator-name model)
                             :created_at (:created-at model)
                             :pelada_date (some-> (:pelada-date model) str))))
-
 
 ;; --- Monthly Payments ---
 
