@@ -128,10 +128,20 @@
 
 (s/defn list-eligible-players-for-voting
   [pelada-id :- s/Uuid voter-player-id :- (s/maybe s/Uuid) db]
-  (let [where-clause (cond-> [:and [:in :op.id (-> (h/select :player_id)
-                                                   (h/from [:TeamPlayers :sub_tp])
-                                                   (h/join [:Teams :sub_t] [:= :sub_t.id :sub_tp.team_id])
-                                                   (h/where [:= :sub_t.pelada_id pelada-id]))]]
+  (let [where-clause (cond-> [:and
+                              [:or
+                               [:in :op.id (-> (h/select :player_id)
+                                               (h/from [:TeamPlayers :sub_tp])
+                                               (h/join [:Teams :sub_t] [:= :sub_t.id :sub_tp.team_id])
+                                               (h/where [:= :sub_t.pelada_id pelada-id]))]
+                               [:in :op.id (-> (h/select :home_fixed_goalkeeper_id)
+                                               (h/from [:Peladas :sub_p1])
+                                               (h/where [:= :sub_p1.id pelada-id]
+                                                        [:is-not :sub_p1.home_fixed_goalkeeper_id nil]))]
+                               [:in :op.id (-> (h/select :away_fixed_goalkeeper_id)
+                                               (h/from [:Peladas :sub_p2])
+                                               (h/where [:= :sub_p2.id pelada-id]
+                                                        [:is-not :sub_p2.away_fixed_goalkeeper_id nil]))]]]
                        voter-player-id (conj [:!= :op.id voter-player-id]))
         query (-> (h/select [:op.id :player_id] [:u.id :user_id] :u.name :u.position :u.avatar_filename
                             [[:coalesce :pa.voting_enabled true] :voting_enabled]
@@ -154,8 +164,17 @@
                   (h/from [:OrganizationPlayers :op])
                   (h/join [:Users :u] [:= :u.id :op.user_id])
                   (h/left-join [:PeladaPlayerStats :s] [:and [:= :s.player_id :op.id] [:= :s.pelada_id pelada-id]])
-                  (h/where [:in :op.id (-> (h/select :player_id)
-                                           (h/from [:TeamPlayers :sub_tp])
-                                           (h/join [:Teams :sub_t] [:= :sub_t.id :sub_tp.team_id])
-                                           (h/where [:= :sub_t.pelada_id pelada-id]))]))]
+                  (h/where [:or
+                            [:in :op.id (-> (h/select :player_id)
+                                            (h/from [:TeamPlayers :sub_tp])
+                                            (h/join [:Teams :sub_t] [:= :sub_t.id :sub_tp.team_id])
+                                            (h/where [:= :sub_t.pelada_id pelada-id]))]
+                            [:in :op.id (-> (h/select :home_fixed_goalkeeper_id)
+                                            (h/from [:Peladas :sub_p1])
+                                            (h/where [:= :sub_p1.id pelada-id]
+                                                     [:is-not :sub_p1.home_fixed_goalkeeper_id nil]))]
+                            [:in :op.id (-> (h/select :away_fixed_goalkeeper_id)
+                                            (h/from [:Peladas :sub_p2])
+                                            (h/where [:= :sub_p2.id pelada-id]
+                                                     [:is-not :sub_p2.away_fixed_goalkeeper_id nil]))]]))]
     (jdbc/execute! db (hsql/format query) hsql/opts)))

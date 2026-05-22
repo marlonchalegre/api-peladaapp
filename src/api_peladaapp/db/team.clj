@@ -176,9 +176,17 @@
 (s/defn did-player-participate-in-pelada? :- s/Bool
   [pelada-id :- s/Uuid player-id :- s/Uuid db]
   (let [query (-> (h/select 1)
-                  (h/from [:TeamPlayers :tp])
-                  (h/join [:Teams :t] [:= :t.id :tp.team_id])
-                  (h/where [:= :t.pelada_id pelada-id] [:= :tp.player_id player-id]))]
+                  (h/from [:Peladas :p])
+                  (h/where [:and
+                            [:= :p.id pelada-id]
+                            [:or
+                             [:exists (-> (h/select 1)
+                                          (h/from [:TeamPlayers :tp])
+                                          (h/join [:Teams :t] [:= :t.id :tp.team_id])
+                                          (h/where [:= :t.pelada_id pelada-id]
+                                                   [:= :tp.player_id player-id]))]
+                             [:= :p.home_fixed_goalkeeper_id player-id]
+                             [:= :p.away_fixed_goalkeeper_id player-id]]]))]
     (some? (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
 (s/defn is-goalkeeper? :- s/Bool
