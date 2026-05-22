@@ -27,7 +27,7 @@
         exists-query (-> (h/select 1)
                          (h/from :OrganizationFinances)
                          (h/where [:= :organization_id org-id]))
-        exists? (jdbc/execute-one! db (hsql/format exists-query))]
+        exists? (jdbc/execute-one! db (hsql/format exists-query) hsql/opts)]
     (if exists?
       (let [query (-> (h/update :OrganizationFinances)
                       (h/set {:mensalista_price (:mensalista_price row)
@@ -36,10 +36,10 @@
                               :monthly_cut_off_day (:monthly_cut_off_day row)
                               :currency (:currency row)})
                       (h/where [:= :organization_id org-id]))]
-        (jdbc/execute! db (hsql/format query)))
+        (jdbc/execute! db (hsql/format query) hsql/opts))
       (let [query (-> (h/insert-into :OrganizationFinances)
                       (h/values [row]))]
-        (jdbc/execute! db (hsql/format query))))
+        (jdbc/execute! db (hsql/format query) hsql/opts)))
     1))
 
 (s/defn add-transaction
