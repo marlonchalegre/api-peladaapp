@@ -100,3 +100,57 @@
         (is (= #{p-30m-in} (ids-by-type :vote_30m)) "Only 45m pelada should be in 30m window")
         (is (= #{p-12h-in} (ids-by-type :vote_12h)) "Only 12.5h pelada should be in 12h window")
         (is (= #{p-23h-in} (ids-by-type :vote_23h)) "Only 23.5h pelada should be in 23h window")))))
+
+(deftest test-scheduler-vote-reminders-workflow
+  (let [db-val (-> th/*test-system* :database :database)
+        db (if (fn? db-val) (db-val) db-val)]
+    (testing "execute-tasks! sends and records vote reminders without throwing database constraint errors"
+      (let [org-id (db.organization/insert-organization {:name "Org Vote Reminder Test" :owner-id nil} db)
+            _ (db.organization/update-organization
+               org-id
+               {:waha-enabled true
+                :waha-vote-reminder-enabled true}
+               db)
+
+            ;; Setup users/players (voter and target)
+            voter-user-id (db.user/insert-user {:email "voter-rem@test.com" :password "pwd" :name "Voter Rem" :username "voter_rem"} db)
+            voter-player-id (db.player/insert-player {:organization-id org-id :user-id voter-user-id :grade 5.0} db)
+            target-user-id (db.user/insert-user {:email "target-rem@test.com" :password "pwd" :name "Target Rem" :username "target_rem"} db)
+            target-player-id (db.player/insert-player {:organization-id org-id :user-id target-user-id :grade 5.0} db)
+
+            ;; Create a Pelada closed 12.5h ago
+            now (java.time.OffsetDateTime/now)
+            closed-at (.minus now (java.time.Duration/ofMinutes (+ (* 12 60) 30)))
+            pelada-id (db.pelada/insert-pelada {:organization-id org-id :status "closed"} db)]
+
+        (jdbc/execute! db (hsql/format (-> (h/update :Peladas)
+                                           (h/set {:status [:cast "closed" :pelada_status] :closed_at [[:cast closed-at :timestamp]]})
+                                           (h/where [:= :id (misc/as-uuid pelada-id)]))))
+
+        ;; Setup attendance to make target-player a pending voter
+        (jdbc/execute! db (hsql/format (-> (h/insert-into :Attendance)
+                                           (h/values [{:pelada_id (misc/as-uuid pelada-id) :player_id (misc/as-uuid target-player-id) :status [:cast "confirmed" :attendance_status] :voting_enabled true}
+                                                      {:pelada_id (misc/as-uuid pelada-id) :player_id (misc/as-uuid voter-player-id) :status [:cast "confirmed" :attendance_status] :voting_enabled true}]))))
+
+        ;; Ensure no reminder exists yet
+        (is (nil? (db.reminder/get-last-reminder-at pelada-id "vote_12h" db)))
+
+        ;; 5. Run scheduler
+        (scheduler/execute-tasks! db)
+
+        ;; 6. Verify reminder was successfully recorded in the database
+        (is (some? (db.reminder/get-last-reminder-at pelada-id "vote_12h" db))
+            "PeladaReminder 'vote_12h' should have been inserted")
+
+        ;; 7. Run scheduler again and verify that it does not insert a duplicate or fail
+        (let [before-count (:count (jdbc/execute-one! db (hsql/format (-> (h/select [[:count :*] :count])
+                                                                          (h/from :PeladaReminders)
+                                                                          (h/where [:= :pelada_id (misc/as-uuid pelada-id)] [:= :type [:cast "vote_12h" :reminder_type]])))
+                                                      hsql/opts))]
+          (scheduler/execute-tasks! db)
+          (let [after-count (:count (jdbc/execute-one! db (hsql/format (-> (h/select [[:count :*] :count])
+                                                                           (h/from :PeladaReminders)
+                                                                           (h/where [:= :pelada_id (misc/as-uuid pelada-id)] [:= :type [:cast "vote_12h" :reminder_type]])))
+                                                       hsql/opts))]
+            (is (= before-count after-count) "Should not record duplicate reminders")))))))
+

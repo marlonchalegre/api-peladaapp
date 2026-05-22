@@ -70,3 +70,21 @@
       (is (re-find #"7.5" msg))
       (is (re-find #"Jogador D" msg))
       (is (re-find #"6.0" msg)))))
+
+(deftest generate-matches-results-message-test
+  (testing "generates correct match results message with aligned names and scores"
+    (let [data {:teams [{:id (parse-uuid "00000000-0000-0000-0000-000000000001") :name "Short"}
+                        {:id (parse-uuid "00000000-0000-0000-0000-000000000002") :name "VeryLongTeamName"}]
+                :matches [{:home-team-id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                           :away-team-id (parse-uuid "00000000-0000-0000-0000-000000000002")
+                           :home-score 3 :away-score 2}
+                          {:home-team-id (parse-uuid "00000000-0000-0000-0000-000000000002")
+                           :away-team-id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                           :home-score 0 :away-score 0}]}
+          msg (notifications/generate-matches-results-message data)]
+      (is (re-find #"⚽ \*RESULTADOS DAS PARTIDAS\*" msg))
+      (is (re-find #"Jogo 1:            Short  3 x 2  VeryLongTeamName" msg))
+      (is (re-find #"Jogo 2: VeryLongTeamName  0 x 0  Short           " msg))
+      (is (re-find #"```" msg)))))
+
+

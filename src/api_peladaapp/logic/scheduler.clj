@@ -47,6 +47,15 @@
                       (log/debug "No pending attendance for pelada" (:id p) "- skipping reminder")))
                   (log/trace "Not the right time or already sent for pelada" (:id p)))))))))))
 
+(defn- reminder-type->db-type [type]
+  (case type
+    :vote_30m "vote_30m"
+    :vote_12h "vote_12h"
+    :vote_23h "vote_23h"
+    :attendance "attendance"
+    :vote_ended "vote_ended"
+    (name type)))
+
 (defn- check-vote-ended! [db]
   ;; 1. Check for Ended Voting (24h)
   (let [peladas (db.pelada/list-peladas-for-vote-notification db)]
@@ -94,10 +103,7 @@
               (log/debug "No pending voters for pelada" (:id pelada) "- skipping" type "reminder")))
           (log/debug "Vote reminder" type "due for pelada" (:id pelada) "but disabled for organization" (or (:name org) org-id)))
         (db.reminder/insert-reminder! (:id pelada)
-                                      (case type
-                                        :30m "vote_30m"
-                                        :12h "vote_12h"
-                                        :23h "vote_23h")
+                                      (reminder-type->db-type type)
                                       db)))))
 (defn execute-tasks! [db]
   (let [now (br-now)]

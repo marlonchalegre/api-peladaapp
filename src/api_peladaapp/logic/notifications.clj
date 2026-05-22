@@ -26,6 +26,11 @@
     s
     (str s (str/join (repeat (- length (count s)) " ")))))
 
+(defn- pad-start [s length]
+  (if (>= (count s) length)
+    s
+    (str (str/join (repeat (- length (count s)) " ")) s)))
+
 (defn- get-base-url []
   (or (System/getenv "FRONTEND_URL") "http://localhost:5173"))
 
@@ -61,9 +66,9 @@
                                                                         (get pos-map (some-> (:position p) str/lower-case) "?"))]
                                                               (str "• " (pad-end (:player_name p) name-width) pos))))
                                                      (str/join "\n"))]
-                                (str "*" (str/upper-case (:name team)) "*\n" players-str))))
+                                (str "*" (str/upper-case (:name team)) "*\n```\n" players-str "\n```"))))
                        (str/join "\n\n"))]
-    (str "```\n" title teams-str "\n```")))
+    (str title teams-str)))
 
 (defn- format-date [date-str]
   (try
@@ -204,6 +209,25 @@
                          (str/join "\n"))]
     (str title players-str "\n\nAcesse o app e deixe seu voto!\n" (generate-voting-link pelada-id))))
 
+(defn generate-matches-results-message [{:keys [matches teams]}]
+  (let [title "⚽ *RESULTADOS DAS PARTIDAS*\n\n"
+        team-map (into {} (map (juxt :id :name) teams))
+        max-name-len (->> teams
+                          (map #(count (:name %)))
+                          (reduce max 10))
+        matches-str (->> matches
+                         (map-indexed (fn [idx m]
+                                        (let [home-name (get team-map (:home-team-id m) "Unknown")
+                                              away-name (get team-map (:away-team-id m) "Unknown")
+                                              home-score (or (:home-score m) 0)
+                                              away-score (or (:away-score m) 0)]
+                                          (str "Jogo " (inc idx) ": "
+                                               (pad-start home-name max-name-len)
+                                               "  " home-score " x " away-score "  "
+                                               (pad-end away-name max-name-len)))))
+                         (str/join "\n"))]
+    (str title "```\n" matches-str "\n```")))
+
 (defn send-notification!
   "Sends a notification if enabled for the organization."
   [org-id type data db]
@@ -243,4 +267,7 @@
             (waha/send-message org final-message final-mentions)
             (when (= type :start)
               (let [team-names (map :name (:teams data))]
-                (waha/send-poll org "Quem será o campeão?" team-names false)))))))))
+                (waha/send-poll org "Quem será o campeão?" team-names false)))
+            (when (= type :end)
+              (let [results-message (generate-matches-results-message data)]
+                (waha/send-message org results-message nil)))))))))

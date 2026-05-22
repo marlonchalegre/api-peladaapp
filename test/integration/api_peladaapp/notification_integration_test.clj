@@ -67,3 +67,42 @@
           (is (some? @sent-payload))
           (is (= ["5511911111111@c.us"] (:mentions @sent-payload)))
           (is (not (re-find #"@all" (:message @sent-payload)))))))))
+
+(deftest send-end-notification-with-results-test
+  (let [db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
+        org-id (db.organization/insert-organization {:name "Waha End Results Org"} ds)]
+
+    (jdbc/execute! ds (hsql/format (-> (h/insert-into :OrganizationWahaConfigs)
+                                       (h/values [{:organization_id org-id
+                                                   :enabled true
+                                                   :api_url "http://waha:3000"
+                                                   :instance "default"
+                                                   :group_id "group123"
+                                                   :end_msg_enabled true}]))))
+
+    (testing "Sends both summary and matches results messages on :end"
+      (let [data {:pelada {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                           :scheduled-at "2023-01-01T10:00:00Z"}
+                  :teams [{:id (parse-uuid "00000000-0000-0000-0000-000000000001") :name "Time A"}
+                          {:id (parse-uuid "00000000-0000-0000-0000-000000000002") :name "Time B"}]
+                  :matches [{:home-team-id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                             :away-team-id (parse-uuid "00000000-0000-0000-0000-000000000002")
+                             :home-score 2 :away-score 1}]
+                  :events []
+                  :lineups []
+                  :team-players []}
+            sent-messages (atom [])]
+        (with-redefs [waha/send-message (fn [_ message mentions]
+                                          (swap! sent-messages conj {:message message :mentions mentions}))]
+          (notifications/send-notification! org-id :end data ds)
+
+          (is (= 2 (count @sent-messages)))
+          (let [[msg1 msg2] @sent-messages]
+            ;; First message check
+            (is (re-find #"Resumo da rodada 01/01" (:message msg1)))
+            (is (re-find #"Time A +3 pts" (:message msg1)))
+            ;; Second message check
+            (is (re-find #"⚽ \*RESULTADOS DAS PARTIDAS\*" (:message msg2)))
+            (is (re-find #"Jogo 1:     Time A  2 x 1  Time B" (:message msg2)))))))))
+
