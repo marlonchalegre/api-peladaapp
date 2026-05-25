@@ -39,7 +39,7 @@
           login-resp (app login-req)
           login-body (decode-body login-resp)
           token (:token login-body)
-          ds (-> *test-system* :database :database)
+          ds (->> *test-system* :database :database)
           ds (if (fn? ds) (ds) ds)]
       ;; Ensure the user record is visible in the DB before proceeding to inserts.
       (loop [i 0]
@@ -47,7 +47,14 @@
           (when-not (user-id-by-email ds email)
             (Thread/sleep 100)
             (recur (inc i)))))
+      ;; Grant org creation permission to test users (default is false for real users).
+      (when-let [user-id (user-id-by-email ds email)]
+        (jdbc/execute! ds [(str "UPDATE \"Users\" SET allow_org_creation = true WHERE id = '" user-id "'")]))
       token)))
+
+(defn grant-org-creation! [ds email]
+  (when-let [user-id (user-id-by-email ds email)]
+    (jdbc/execute! ds [(str "UPDATE \"Users\" SET allow_org_creation = true WHERE id = '" user-id "'")])))
 
 (defn- ensure-uuid [x]
   (if (string? x) (parse-uuid x) x))
@@ -105,6 +112,16 @@
   (jdbc/execute! ds [(str "CREATE SCHEMA " TEST_SCHEMA)])
   (jdbc/execute! ds [(str "GRANT ALL ON SCHEMA " TEST_SCHEMA " TO public")]))
 
+(defn truncate-all-tables! [ds schema]
+  (let [tables (jdbc/execute! ds
+                              ["SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE' AND table_name <> 'schema_migrations'" schema]
+                              {:builder-fn rs/as-unqualified-lower-maps})
+        table-names (map :table_name tables)]
+    (when (seq table-names)
+      (let [quoted-names (map #(str "\"" % "\"") table-names)
+            sql (str "TRUNCATE TABLE " (str/join ", " quoted-names) " CASCADE")]
+        (jdbc/execute! ds [sql])))))
+
 (defn- seed-positions [ds]
   (let [positions [{:value "Goalkeeper"}
                    {:value "Defender"}
@@ -116,25 +133,31 @@
         (catch Exception _)))))
 
 (defonce migrations-run? (atom false))
+(defonce test-system-instance (atom nil))
+
+(defn- get-or-start-test-system [ds]
+  (if-let [sys @test-system-instance]
+    sys
+    (let [new-sys (-> (components/system {:db-spec {:datasource ds} :skip-migrations true})
+                      (dissoc :server)
+                      (assoc-in [:database :database] ds)
+                      component/start)]
+      (reset! test-system-instance new-sys)
+      new-sys)))
 
 (defn test-system-fixture [f]
   (let [ds (get-test-datasource)]
-    ;; We recreate the schema and run migrations for EVERY test to ensure total isolation.
-    ;; If this becomes too slow, we can optimize to only truncate, but recreating the schema
-    ;; avoids the need to maintain a list of tables.
-    (recreate-test-schema ds)
-    (let [config {:store :database
-                  :migration-dir "migrations"
-                  :db {:datasource ds}
-                  :schema TEST_SCHEMA}]
-      (migratus/migrate config))
+    ;; Recreate the schema and run migrations once per test run.
+    ;; For subsequent runs, truncate tables to keep them fast.
+    (if (compare-and-set! migrations-run? false true)
+      (do
+        (recreate-test-schema ds)
+        (let [config {:store :database
+                      :migration-dir "migrations"
+                      :db {:datasource ds}
+                      :schema TEST_SCHEMA}]
+          (migratus/migrate config)))
+      (truncate-all-tables! ds TEST_SCHEMA))
     (seed-positions ds)
-    (binding [*test-system* (let [sys (components/system {:db-spec {:datasource ds} :skip-migrations true})]
-                              (-> sys
-                                  (dissoc :server)
-                                  (assoc-in [:database :database] ds)
-                                  component/start))]
-      (try
-        (f)
-        (finally
-          (component/stop *test-system*))))))
+    (binding [*test-system* (get-or-start-test-system ds)]
+      (f))))

@@ -1,0 +1,1 @@
+ALTER TABLE "Users" ALTER COLUMN allow_org_creation SET DEFAULT TRUE;

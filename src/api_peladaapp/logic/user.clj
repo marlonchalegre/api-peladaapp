@@ -12,13 +12,15 @@
     user))
 
 (s/defn build-token :- s/Str
-  [{:keys [id email phone admin-orgs avatar-filename]} :- (assoc models.user/User :admin-orgs [s/Uuid])
+  [{:keys [id email phone admin-orgs avatar-filename is-super-admin]} :- (assoc models.user/User :admin-orgs [s/Uuid])
    secret :- s/Str]
   (-> {:id id
        :email email
        :phone phone
        :avatar_filename avatar-filename
-       :admin? false
+       :admin? (true? is-super-admin)
+       :is-admin? (true? is-super-admin)
        :admin_orgs (or admin-orgs [])}
       (jwt/sign secret {:alg :hs512})))
+
 

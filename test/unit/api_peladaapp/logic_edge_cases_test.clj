@@ -41,9 +41,9 @@
   (testing "model->response with missing email"
     (let [id "00000000-0000-0000-0000-000000000001"
           user {:id id :name "No Email"}]
-      (is (= {:id id :name "No Email" :admin_orgs []} (adapter.user/model->response user)))))
+      (is (= {:id id :name "No Email" :admin_orgs [] :is_blocked false :is_super_admin false :allow_org_creation false} (adapter.user/model->response user)))))
 
   (testing "model->response with explicit false for exclude-email?"
     (let [id "00000000-0000-0000-0000-000000000001"
           user {:id id :name "Test" :email "t@t.com"}]
-      (is (= {:id id :name "Test" :email "t@t.com" :admin_orgs []} (adapter.user/model->response user false))))))
+      (is (= {:id id :name "Test" :email "t@t.com" :admin_orgs [] :is_blocked false :is_super_admin false :allow_org_creation false} (adapter.user/model->response user false))))))

@@ -266,3 +266,17 @@
                               (h/where [:= :op.organization_id organization-id]))]
     [(jdbc/execute! db (hsql/format query) hsql/opts)
      (:total (jdbc/execute-one! db (hsql/format total-count-query) hsql/opts))]))
+
+(s/defn update-user-flags :- s/Int
+  "Update user flags in the database"
+  [id :- s/Uuid
+   flags :- {(s/optional-key :is_super_admin) s/Bool
+             (s/optional-key :is_blocked) s/Bool
+             (s/optional-key :allow_org_creation) s/Bool}
+   db]
+  (let [query (-> (h/update :Users)
+                  (h/set flags)
+                  (h/where [:= :id id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
+

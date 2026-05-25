@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.adapters.organization :as adapter.organization]
    [api-peladaapp.helpers.sql :as hsql]
+   [clojure.string :as str]
    [honey.sql.helpers :as h]
    [medley.core :as medley.core]
    [next.jdbc :as jdbc]
@@ -201,3 +202,49 @@
                         (h/left-join [:PlayerRatings :pr] [:= :ap.player_id :pr.player_id])
                         (h/group-by :ap.player_id :u.id :u.name :u.position :u.avatar_filename :pp.peladas_count :pr.avg_rating :pe.event_type))]
     (jdbc/execute! db (hsql/format final-query) hsql/opts)))
+
+(s/defn update-organization-flags :- s/Int
+  "Update organization flags (is_blocked) in the database"
+  [id :- s/Uuid
+   flags :- {(s/optional-key :is_blocked) s/Bool}
+   db]
+  (let [query (-> (h/update :Organizations)
+                  (h/set flags)
+                  (h/where [:= :id id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
+
+(s/defn search-organizations :- [s/Any]
+  [db query limit offset]
+  (let [lower-pattern (str "%" (str/lower-case query) "%")
+        hsql-query (-> (h/select :o.*
+                                 [:owc.api_url :waha_api_url]
+                                 [:owc.instance :waha_instance]
+                                 [:owc.group_id :waha_group_id]
+                                 [:owc.enabled :waha_enabled]
+                                 [:owc.start_msg_enabled :waha_start_msg_enabled]
+                                 [:owc.end_msg_enabled :waha_end_msg_enabled]
+                                 [:owc.attendance_reminder_enabled :waha_attendance_reminder_enabled]
+                                 [:owc.vote_reminder_enabled :waha_vote_reminder_enabled]
+                                 [:owc.vote_ended_msg_enabled :waha_vote_ended_msg_enabled]
+                                 [:owc.use_all_mention :waha_use_all_mention])
+                       (h/from [:Organizations :o])
+                       (h/left-join [:OrganizationWahaConfigs :owc] [:= :owc.organization_id :o.id])
+                       (h/where [[:like [:lower :o.name] lower-pattern]])
+                       (h/order-by [:o.id :desc])
+                       (h/limit limit)
+                       (h/offset offset))]
+    (->> (jdbc/execute! db (hsql/format hsql-query) hsql/opts)
+         (map adapter.organization/db->model))))
+
+(s/defn count-searched-organizations :- s/Int
+  [db query]
+  (let [lower-pattern (str "%" (str/lower-case query) "%")
+        hsql-query (-> (h/select [[:count :*] :count])
+                       (h/from :Organizations)
+                       (h/where [[:like [:lower :name] lower-pattern]]))]
+    (-> (jdbc/execute-one! db (hsql/format hsql-query) hsql/opts)
+        :count
+        int)))
+
+

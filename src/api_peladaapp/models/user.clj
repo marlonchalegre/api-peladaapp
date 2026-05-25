@@ -20,7 +20,10 @@
    (s/optional-key :phone) (s/maybe s/Str)
    (s/optional-key :position) (s/enum "Striker" "Midfielder" "Defender" "Goalkeeper")
    (s/optional-key :admin-orgs) [s/Uuid]
-   (s/optional-key :avatar-filename) (s/maybe s/Str)})
+   (s/optional-key :avatar-filename) (s/maybe s/Str)
+   (s/optional-key :is-super-admin) s/Bool
+   (s/optional-key :is-blocked) s/Bool
+   (s/optional-key :allow-org-creation) s/Bool})
 
 (s/defschema UserProfileUpdate
   "Schema for user profile updates - excludes score and other protected fields"
@@ -40,4 +43,8 @@
    (s/optional-key :email) s/Str
    (s/optional-key :phone) (s/maybe s/Str)
    (s/optional-key :position) (s/enum "Striker" "Midfielder" "Defender" "Goalkeeper")
-   (s/optional-key :avatar-filename) (s/maybe s/Str)})
+   (s/optional-key :avatar-filename) (s/maybe s/Str)
+   (s/optional-key :is-super-admin) s/Bool
+   (s/optional-key :is-blocked) s/Bool
+   (s/optional-key :allow-org-creation) s/Bool})
+

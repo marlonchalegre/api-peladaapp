@@ -23,14 +23,14 @@
 (s/defn model->response :- responses.organization/OrganizationResponse
   [model :- models.organization/Organization]
   (-> model
-      (select-keys [:id :name :owner-id :role :waha-api-url :waha-instance :waha-group-id :waha-enabled :waha-start-msg-enabled :waha-end-msg-enabled :waha-attendance-reminder-enabled :waha-vote-reminder-enabled :waha-vote-ended-msg-enabled :waha-use-all-mention])
+      (select-keys [:id :name :owner-id :role :waha-api-url :waha-instance :waha-group-id :waha-enabled :waha-start-msg-enabled :waha-end-msg-enabled :waha-attendance-reminder-enabled :waha-vote-reminder-enabled :waha-vote-ended-msg-enabled :waha-use-all-mention :is-blocked])
       (update-keys (comp keyword #(str/replace % "-" "_") name))))
 
 (s/defn db->model :- models.organization/Organization
   [o]
   (some-> o
           misc/unamespace
-          (select-keys [:id :name :role :owner_id :waha_api_url :waha_instance :waha_group_id :waha_enabled :waha_start_msg_enabled :waha_end_msg_enabled :waha_attendance_reminder_enabled :waha_vote_reminder_enabled :waha_vote_ended_msg_enabled :waha_use_all_mention])
+          (select-keys [:id :name :role :owner_id :waha_api_url :waha_instance :waha_group_id :waha_enabled :waha_start_msg_enabled :waha_end_msg_enabled :waha_attendance_reminder_enabled :waha_vote_reminder_enabled :waha_vote_ended_msg_enabled :waha_use_all_mention :is_blocked])
           (update-keys (comp keyword #(str/replace % "_" "-") name))
           (update :waha-enabled #(if (boolean? %) % (= 1 %)))
           (update :waha-start-msg-enabled #(if (boolean? %) % (= 1 %)))
@@ -38,7 +38,8 @@
           (update :waha-attendance-reminder-enabled #(if (boolean? %) % (= 1 %)))
           (update :waha-vote-reminder-enabled #(if (boolean? %) % (= 1 %)))
           (update :waha-vote-ended-msg-enabled #(if (boolean? %) % (= 1 %)))
-          (update :waha-use-all-mention #(if (nil? %) true (if (boolean? %) % (= 1 %))))))
+          (update :waha-use-all-mention #(if (nil? %) true (if (boolean? %) % (= 1 %))))
+          (update :is-blocked #(if (nil? %) false %))))
 (s/defn model->db [model :- models.organization/Organization]
   (-> model
       (select-keys [:id :name :owner-id])

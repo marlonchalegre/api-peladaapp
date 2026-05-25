@@ -3,6 +3,7 @@
   (:require
    [api-peladaapp.adapters.pelada :as adapter.pelada]
    [api-peladaapp.controllers.pelada :as controller.pelada]
+   [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.helpers.exception :as exception]
    [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.pagination :as pagination]
@@ -17,9 +18,14 @@
              org-id (:organization-id pelada)]
          ;; Only admins can create peladas
          (auth/require-organization-admin! user-id org-id db)
-         (-> (controller.pelada/create-pelada pelada db)
-             adapter.pelada/model->response
-             created))
+         ;; Check if organization is blocked
+         (let [org (db.organization/get-organization org-id db)]
+           (if (and org (:is-blocked org))
+             (throw (ex-info "Esta organização está bloqueada e não pode criar novas peladas."
+                             {:type :forbidden :message "Esta organização está bloqueada e não pode criar novas peladas."}))
+             (-> (controller.pelada/create-pelada pelada db)
+                 adapter.pelada/model->response
+                 created))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn get-full-details [request]
