@@ -54,13 +54,98 @@ jobs:
             ${{ runner.os }}-maven-
 
       - name: Run Lint
-        run: clj-kondo --lint src
+        run: |
+          clj-kondo --lint src --format json > lint-results.json || true
+          # Also run regular lint for console output
+          clj-kondo --lint src
 
       - name: Lein Check
         run: lein check
 
       - name: Run Tests
-        run: lein test
+        run: |
+          set -o pipefail
+          lein cloverage --text | tee test-output.txt
+
+      - name: Generate Summary
+        if: always()
+        id: summary
+        run: |
+          SUMMARY="### 📊 Test & Lint Summary (API)
+          
+          | Category | Status | Details |
+          | :--- | :--- | :--- |"
+          
+          # Lint Summary
+          LINT_STATUS="❓ Unknown"
+          LINT_DETAILS="N/A"
+          if [ -f lint-results.json ]; then
+            ERROR_COUNT=$(jq '.summary.error // 0' lint-results.json)
+            WARNING_COUNT=$(jq '.summary.warning // 0' lint-results.json)
+            if [ "$ERROR_COUNT" -eq "0" ] && [ "$WARNING_COUNT" -eq "0" ]; then
+              LINT_STATUS="✅ Clean"
+              LINT_DETAILS="No issues found"
+            else
+              LINT_STATUS="⚠️ Issues"
+              [ "$ERROR_COUNT" -gt "0" ] && LINT_STATUS="❌ Errors"
+              LINT_DETAILS="$ERROR_COUNT errors, $WARNING_COUNT warnings"
+            fi
+          fi
+          SUMMARY="$SUMMARY
+          | 🔍 Linting | $LINT_STATUS | $LINT_DETAILS |"
+          
+          # Test Summary
+          TEST_STATUS="❓ Unknown"
+          TEST_DETAILS="N/A"
+          if [ -f test-output.txt ]; then
+            TEST_SUMMARY_LINE1=$(grep "Ran.*tests containing.*assertions" test-output.txt | tail -n 1)
+            TEST_SUMMARY_LINE2=$(grep -A 1 "Ran.*tests containing.*assertions" test-output.txt | tail -n 1)
+            
+            if [ -n "$TEST_SUMMARY_LINE1" ]; then
+              if echo "$TEST_SUMMARY_LINE2" | grep -q "0 failures, 0 errors"; then
+                TEST_STATUS="✅ Passed"
+              else
+                TEST_STATUS="❌ Failed"
+              fi
+              TEST_DETAILS="$TEST_SUMMARY_LINE1 $TEST_SUMMARY_LINE2"
+            fi
+          fi
+          SUMMARY="$SUMMARY
+          | 🧪 Tests | $TEST_STATUS | $TEST_DETAILS |"
+
+          # Coverage Summary
+          COVERAGE_STATUS="❓ Unknown"
+          COVERAGE_DETAILS="N/A"
+          if [ -f test-output.txt ]; then
+            PCT=$(grep "ALL FILES" test-output.txt | awk -F'|' '{print $4}' | xargs)
+            if [ -n "$PCT" ]; then
+              COVERAGE_DETAILS="Lines: $PCT%"
+              if [ "$(echo "$PCT > 80" | awk '{print ($1 > 80)}')" -eq "1" ]; then
+                COVERAGE_STATUS="✅ Good"
+              elif [ "$(echo "$PCT > 50" | awk '{print ($1 > 50)}')" -eq "1" ]; then
+                COVERAGE_STATUS="⚠️ Fair"
+              else
+                COVERAGE_STATUS="❌ Poor"
+              fi
+            fi
+          fi
+          SUMMARY="$SUMMARY
+          | 📈 Coverage | $COVERAGE_STATUS | $COVERAGE_DETAILS |"
+          
+          echo "$SUMMARY" >> $GITHUB_STEP_SUMMARY
+          
+          # Export for PR comment
+          echo "content<<EOF" >> $GITHUB_OUTPUT
+          echo "$SUMMARY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Post PR Comment
+        if: always() && github.event_name == 'pull_request'
+        uses: mshick/add-pr-comment@v2
+        with:
+          message: ${{ steps.summary.outputs.content }}
+          message-id: api-test-lint-summary
+          allow-repeats: false
 
   build-and-push:
     name: Build Image
@@ -119,6 +204,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to Kubernetes
+        id: deploy
         env:
           IMAGE_TAG: ghcr.io/${{ github.repository }}:latest
           KUBECONFIG: ~/.kube/config
@@ -129,3 +215,17 @@ jobs:
           export KUBECONFIG=/tmp/kubeconfig
           kubectl rollout restart deployment/backend -n peladaapp
           kubectl rollout status deployment/backend -n peladaapp --timeout=90s
+
+      - name: Generate Deployment Summary
+        if: always()
+        run: |
+          echo "### 🚀 Deployment Summary (API)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Resource | Status | Namespace |" >> $GITHUB_STEP_SUMMARY
+          echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.deploy.outcome }}" == "success" ]; then
+            echo "| 🚢 deployment/backend | ✅ Rolled out | peladaapp |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| 🚢 deployment/backend | ❌ Failed/Timeout | peladaapp |" >> $GITHUB_STEP_SUMMARY
+          fi

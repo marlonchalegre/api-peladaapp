@@ -32,7 +32,8 @@
                  [org.slf4j/slf4j-api "2.0.16"]]
   :main ^:skip-aot api-peladaapp.core
   :plugins [[lein-ring "0.12.6"]
-            [lein-ancient "1.0.0-RC3"]]
+            [lein-ancient "1.0.0-RC3"]
+            [lein-cloverage "1.2.4"]]
   :profiles {:dev {:dependencies [[javax.servlet/servlet-api "2.5"]
                                   [org.clojure/tools.namespace "1.5.1"]
                                   [com.clojure-goes-fast/clj-async-profiler "1.7.0"]
