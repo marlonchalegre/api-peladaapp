@@ -44,6 +44,10 @@
           identity (:identity request)
           current-user-id (:id identity)
           is-global-admin? (:is-admin? identity)
+          admin-orgs (:admin_orgs identity)
+          _ (when-not (or is-global-admin? (seq admin-orgs))
+              (throw (ex-info "Forbidden: Search users access required"
+                              {:type :forbidden :message "You don't have permission to search users."})))
           query-params (:query-params request)
           query (get query-params "q" "")
           pagination (pagination/parse-pagination-params query-params)
