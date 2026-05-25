@@ -112,6 +112,16 @@
   (jdbc/execute! ds [(str "CREATE SCHEMA " TEST_SCHEMA)])
   (jdbc/execute! ds [(str "GRANT ALL ON SCHEMA " TEST_SCHEMA " TO public")]))
 
+(defn truncate-all-tables! [ds schema]
+  (let [tables (jdbc/execute! ds
+                              ["SELECT table_name FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE' AND table_name <> 'schema_migrations'" schema]
+                              {:builder-fn rs/as-unqualified-lower-maps})
+        table-names (map :table_name tables)]
+    (when (seq table-names)
+      (let [quoted-names (map #(str "\"" % "\"") table-names)
+            sql (str "TRUNCATE TABLE " (str/join ", " quoted-names) " CASCADE")]
+        (jdbc/execute! ds [sql])))))
+
 (defn- seed-positions [ds]
   (let [positions [{:value "Goalkeeper"}
                    {:value "Defender"}
@@ -123,25 +133,31 @@
         (catch Exception _)))))
 
 (defonce migrations-run? (atom false))
+(defonce test-system-instance (atom nil))
+
+(defn- get-or-start-test-system [ds]
+  (if-let [sys @test-system-instance]
+    sys
+    (let [new-sys (-> (components/system {:db-spec {:datasource ds} :skip-migrations true})
+                      (dissoc :server)
+                      (assoc-in [:database :database] ds)
+                      component/start)]
+      (reset! test-system-instance new-sys)
+      new-sys)))
 
 (defn test-system-fixture [f]
   (let [ds (get-test-datasource)]
-    ;; We recreate the schema and run migrations for EVERY test to ensure total isolation.
-    ;; If this becomes too slow, we can optimize to only truncate, but recreating the schema
-    ;; avoids the need to maintain a list of tables.
-    (recreate-test-schema ds)
-    (let [config {:store :database
-                  :migration-dir "migrations"
-                  :db {:datasource ds}
-                  :schema TEST_SCHEMA}]
-      (migratus/migrate config))
+    ;; Recreate the schema and run migrations once per test run.
+    ;; For subsequent runs, truncate tables to keep them fast.
+    (if (compare-and-set! migrations-run? false true)
+      (do
+        (recreate-test-schema ds)
+        (let [config {:store :database
+                      :migration-dir "migrations"
+                      :db {:datasource ds}
+                      :schema TEST_SCHEMA}]
+          (migratus/migrate config)))
+      (truncate-all-tables! ds TEST_SCHEMA))
     (seed-positions ds)
-    (binding [*test-system* (let [sys (components/system {:db-spec {:datasource ds} :skip-migrations true})]
-                              (-> sys
-                                  (dissoc :server)
-                                  (assoc-in [:database :database] ds)
-                                  component/start))]
-      (try
-        (f)
-        (finally
-          (component/stop *test-system*))))))
+    (binding [*test-system* (get-or-start-test-system ds)]
+      (f))))
