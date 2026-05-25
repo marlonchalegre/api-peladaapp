@@ -212,6 +212,15 @@
         total  (db.organization/count-organizations db)]
     (pagination/with-pagination-headers orgs total page per-page)))
 
+(s/defn search-organizations
+  [db query pagination]
+  (let [page (or (:page pagination) 1)
+        per-page (or (:per-page pagination) 20)
+        offset (* (dec page) per-page)
+        orgs   (db.organization/search-organizations db query per-page offset)
+        total  (db.organization/count-searched-organizations db query)]
+    (pagination/with-pagination-headers orgs total page per-page)))
+
 (s/defn list-user-organizations
   [user-id :- s/Uuid db]
   (db.organization/list-by-user user-id db))

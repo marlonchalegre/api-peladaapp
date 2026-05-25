@@ -7,12 +7,16 @@
 (use-fixtures :each th/test-system-fixture)
 
 (deftest schedule-regression-test
-  (let [app (-> th/*test-system* :app :app-handler)]
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)]
     ;; Setup Admin and Org
     (app (-> (mock/request :post "/auth/register") (mock/json-body {"name" "Admin" "email" "admin@test.com" "password" "pass123"})))
     (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {"email" "admin@test.com" "password" "pass123"})))
           token (:token (th/decode-body login))
           auth (th/auth-cookie token)
+
+          _ (th/grant-org-creation! ds "admin@test.com")
 
           org-resp (app (-> (mock/request :post "/api/organizations") (mock/json-body {"name" "Regression Club"}) auth))
           org-id (:id (th/decode-body org-resp))

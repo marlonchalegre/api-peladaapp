@@ -1,5 +1,6 @@
 (ns api-peladaapp.server
   (:require
+   [api-peladaapp.db.user    :as db.user]
    [api-peladaapp.handlers.auth :as auth]
    [api-peladaapp.routes     :as routes]
    [buddy.auth.accessrules   :refer [wrap-access-rules]]
@@ -77,8 +78,37 @@
         (log/error e "[FATAL ERROR]" (:uri request))
         (throw e)))))
 
+(defn wrap-blocked-user-check [handler]
+  (fn [request]
+    (let [identity (:identity request)
+          db (:database request)]
+      (if (and identity db)
+        (let [user-id (:id identity)
+              ;; Convert user-id string to UUID if it's not already
+              user-uuid (if (string? user-id) (java.util.UUID/fromString user-id) user-id)
+              user (when user-uuid (db.user/find-user-by-id user-uuid db))]
+          (if (and user (:is-blocked user))
+            (let [uri (:uri request)
+                  allowed-profile? (or
+                                    (= uri "/api/users/me")
+                                    (= uri (str "/api/user/" user-uuid))
+                                    (= uri (str "/api/user/" user-uuid "/profile"))
+                                    (= uri (str "/api/user/" user-uuid "/avatar"))
+                                    (str/starts-with? uri "/auth/")
+                                    (= uri "/api/health")
+                                    (str/starts-with? uri "/internal/"))]
+              (if allowed-profile?
+                (handler request)
+                {:status 403
+                 :headers {"Content-Type" "application/json; charset=utf-8"}
+                 :body {:error "Sua conta está bloqueada. Você só pode acessar seu perfil."
+                        :type "forbidden"}}))
+            (handler request)))
+        (handler request)))))
+
 (def app (as-> #'routes/app-handler $
            (wrap-exception-log $)
+           (wrap-blocked-user-check $)
            ;; Provide the DataSource directly
            (wrap-assoc $ :database datasource)
            (wrap-multipart-params $)
@@ -89,3 +119,4 @@
            (auth/wrap-manual-auth $)
            (wrap-cookies $)
            (wrap-json-response $ {:charset "utf-8"})))
+

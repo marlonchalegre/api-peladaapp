@@ -39,7 +39,7 @@
           login-resp (app login-req)
           login-body (decode-body login-resp)
           token (:token login-body)
-          ds (-> *test-system* :database :database)
+          ds (->> *test-system* :database :database)
           ds (if (fn? ds) (ds) ds)]
       ;; Ensure the user record is visible in the DB before proceeding to inserts.
       (loop [i 0]
@@ -47,7 +47,14 @@
           (when-not (user-id-by-email ds email)
             (Thread/sleep 100)
             (recur (inc i)))))
+      ;; Grant org creation permission to test users (default is false for real users).
+      (when-let [user-id (user-id-by-email ds email)]
+        (jdbc/execute! ds [(str "UPDATE \"Users\" SET allow_org_creation = true WHERE id = '" user-id "'")]))
       token)))
+
+(defn grant-org-creation! [ds email]
+  (when-let [user-id (user-id-by-email ds email)]
+    (jdbc/execute! ds [(str "UPDATE \"Users\" SET allow_org_creation = true WHERE id = '" user-id "'")])))
 
 (defn- ensure-uuid [x]
   (if (string? x) (parse-uuid x) x))

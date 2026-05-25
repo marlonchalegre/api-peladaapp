@@ -44,6 +44,8 @@
           auth (th/auth-cookie token)
           user-id (th/user-id-by-email ds "p1@ex.com")
 
+          _ (th/grant-org-creation! ds "p1@ex.com")
+
           ;; Create organization (user becomes admin automatically)
           org-resp (app (-> (mock/request :post "/api/organizations")
                             (mock/json-body {:name "Attendance Club"})
@@ -114,6 +116,7 @@
           u3-id (th/user-id-by-email ds "u3@ex.com")
 
           ;; 2. Create organization (automatically creates player for admin with grade 5.0)
+          _ (th/grant-org-creation! ds "admin@ex.com")
           org-resp (app (-> (mock/request :post "/api/organizations")
                             (mock/json-body {:name "Batch Club"})
                             auth))
@@ -169,6 +172,7 @@
           convidado-id (th/user-id-by-email ds "convidado@ex.com")
 
           ;; 2. Create organization
+          _ (th/grant-org-creation! ds "admin@ex.com")
           org-resp (app (-> (mock/request :post "/api/organizations")
                             (mock/json-body {:name "Waitlist Club"})
                             admin-auth))

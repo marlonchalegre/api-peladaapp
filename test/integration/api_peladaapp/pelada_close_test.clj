@@ -34,14 +34,16 @@
   (jdbc/execute! ds (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps}))
 
 (deftest pelada-close-test
-  (let [app (-> th/*test-system* :app :app-handler)
-        db-val (-> th/*test-system* :database :database)
-        ds (if (fn? db-val) (db-val) db-val)]
+  (let [app (-> th/*test-system* :app :app-handler)]
     ;; Register and login user
     (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Test User" :email "test@user.com" :password "password"})))
     (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "test@user.com" :password "password"})))
           token (:token (decode-body login))
           auth (th/auth-cookie token)
+          db-val (-> th/*test-system* :database :database)
+          ds (if (fn? db-val) (db-val) db-val)
+
+          _ (th/grant-org-creation! ds "test@user.com")
 
           ;; Create organization
           org-resp (app (-> (mock/request :post "/api/organizations")

@@ -16,10 +16,14 @@
   (try (let [db (:database request)
              body (:body request)
              org (adapter.organization/create-request->model body)
-             user-id (auth/get-user-id-from-request request)]
-         (-> (controller.organization/create-organization org user-id db)
-             adapter.organization/model->response
-             created))
+             user-id (auth/get-user-id-from-request request)
+             user (controller.user/get-user user-id db)]
+         (if (false? (:allow-org-creation user))
+           (throw (ex-info "Você não tem permissão para criar organizações"
+                           {:type :forbidden :message "Você não tem permissão para criar organizações"}))
+           (-> (controller.organization/create-organization org user-id db)
+               adapter.organization/model->response
+               created)))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn leave [request]
