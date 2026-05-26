@@ -117,7 +117,7 @@ jobs:
           COVERAGE_STATUS="❓ Unknown"
           COVERAGE_DETAILS="N/A"
           if [ -f test-output.txt ]; then
-            PCT=$(grep "ALL FILES" test-output.txt | awk -F'|' '{print $4}' | xargs)
+            PCT=$(grep "ALL FILES" test-output.txt | awk -F'|' '{print $4}' | sed 's/\x1b\[[0-9;]*m//g' | xargs)
             if [ -n "$PCT" ]; then
               COVERAGE_DETAILS="Lines: $PCT%"
               if [ "$(echo "$PCT > 80" | awk '{print ($1 > 80)}')" -eq "1" ]; then
