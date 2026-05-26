@@ -55,7 +55,7 @@ jobs:
 
       - name: Run Lint
         run: |
-          clj-kondo --lint src --format json > lint-results.json || true
+          clj-kondo --lint src --config '{:output {:format :json}}' > lint-results.json || true
           # Also run regular lint for console output
           clj-kondo --lint src
 
