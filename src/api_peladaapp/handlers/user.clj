@@ -2,10 +2,12 @@
   (:require
    [api-peladaapp.adapters.user :as adapter.user]
    [api-peladaapp.controllers.user :as controller.user]
+   [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.exception :as exception]
    [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.helpers.responses :as responses]
-   [api-peladaapp.logic.authorization :as auth]))
+   [api-peladaapp.logic.authorization :as auth]
+   [buddy.hashers :as hashers]))
 
 (defn- create-action [request]
   (let [body (-> request :body)
@@ -92,5 +94,20 @@
       (auth/require-self-or-admin! request id)
       (controller.user/delete-user id db)
       (responses/no-content))
+    (catch Exception e
+      (exception/api-exception-handler e))))
+
+(defn reset-password [request]
+  (try
+    (let [id (-> request :params :id parse-uuid)
+          db (-> request :database)
+          body (-> request :body)
+          new-password (or (get body :password) (get body "password"))]
+      (auth/require-self-or-admin! request id)
+      (if (and new-password (>= (count new-password) 4))
+        (let [hashed-password (hashers/encrypt new-password)]
+          (db.user/update-password id hashed-password db)
+          (responses/ok {:id id :message "Password updated successfully"}))
+        (responses/bad-request {:error "Invalid password. Password must be at least 4 characters long."})))
     (catch Exception e
       (exception/api-exception-handler e))))

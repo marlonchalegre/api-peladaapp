@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.db.admin :as db.admin]
    [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.db.user :as db.user]
    [api-peladaapp.logic.authorization :as auth]
    [clojure.test :refer [deftest is testing]]))
 
@@ -96,3 +97,24 @@
           (is (thrown-with-msg? clojure.lang.ExceptionInfo
                                 #"User is not a member of this organization"
                                 (auth/require-organization-member! user-id org-id mock-db))))))))
+
+(deftest test-super-admin-bypass-authorization
+  (let [user-id (parse-uuid "00000000-0000-0000-0000-000000000001")
+        org-id (parse-uuid "00000000-0000-0000-0000-000000000010")]
+    (testing "Super Admin is allowed to admin organization even if not explicitly in OrganizationAdmins"
+      (let [mock-db (fn [] nil)]
+        (with-redefs [db.user/find-user-by-id
+                      (fn [_ _] {:id user-id :is-super-admin true})
+                      db.admin/is-user-admin-of-organization?
+                      (fn [_ _ _] false)]
+          (is (true? (auth/user-can-admin-organization? user-id org-id mock-db))))))
+
+    (testing "Super Admin is considered a member of organization"
+      (let [mock-db (fn [] nil)]
+        (with-redefs [db.user/find-user-by-id
+                      (fn [_ _] {:id user-id :is-super-admin true})
+                      db.admin/is-user-admin-of-organization?
+                      (fn [_ _ _] false)
+                      db.player/get-org-player-by-user-id
+                      (fn [_ _ _] nil)]
+          (is (true? (auth/user-is-in-organization? user-id org-id mock-db))))))))

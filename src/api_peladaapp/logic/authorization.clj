@@ -2,17 +2,22 @@
   (:require
    [api-peladaapp.db.admin :as db.admin]
    [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.db.user :as db.user]
    [schema.core :as s]))
 
 (s/defn user-can-admin-organization? :- s/Bool
   "Check if user has admin permissions for an organization"
   [user-id organization-id db]
-  (db.admin/is-user-admin-of-organization? user-id organization-id db))
+  (let [user (try
+               (db.user/find-user-by-id user-id db)
+               (catch Throwable _ nil))]
+    (or (true? (:is-super-admin user))
+        (db.admin/is-user-admin-of-organization? user-id organization-id db))))
 
 (s/defn user-is-in-organization? :- s/Bool
   "Check if user is part of an organization (as player or admin)"
   [user-id organization-id db]
-  (let [admin? (db.admin/is-user-admin-of-organization? user-id organization-id db)
+  (let [admin? (user-can-admin-organization? user-id organization-id db)
         player? (boolean (db.player/get-org-player-by-user-id user-id organization-id db))]
     (or admin? player?)))
 

@@ -42,6 +42,7 @@
     (GET "/user/:id" [] handler.user/get-by-id)
     (PUT "/user/:id/profile" [] handler.user/update-profile)
     (DELETE "/user/:id" [] handler.user/delete)
+    (POST "/user/:id/reset-password" [] handler.user/reset-password)
     (GET "/users/me" [] auth/get-me-handler)
     (GET "/users/:user_id/organizations" [] handler.organization/list-by-user)
 
