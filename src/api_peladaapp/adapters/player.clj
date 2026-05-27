@@ -14,7 +14,13 @@
                           :organization-id (misc/as-uuid (:organization_id request))
                           :grade (:grade request)
                           :position (:position request)
-                          :member-type (:member_type request)))
+                          :member-type (:member_type request)
+                          :passing (:passing request)
+                          :ball-control (:ball_control request)
+                          :carrying (:carrying request)
+                          :shooting (:shooting request)
+                          :dribbling (:dribbling request)
+                          :defending (:defending request)))
 
 (s/defn update-request->model :- models.player/Player
   [request :- requests.player/UpdatePlayerRequest]
@@ -23,10 +29,16 @@
                           :organization-id (misc/as-uuid (:organization_id request))
                           :grade (:grade request)
                           :position (:position request)
-                          :member-type (:member_type request)))
+                          :member-type (:member_type request)
+                          :passing (:passing request)
+                          :ball-control (:ball_control request)
+                          :carrying (:carrying request)
+                          :shooting (:shooting request)
+                          :dribbling (:dribbling request)
+                          :defending (:defending request)))
 
 (s/defn model->response :- responses.player/PlayerResponse
-  [{:keys [id user-id organization-id grade position member-type user-name user-username user-position user-avatar-filename attendance-status attendance-updated-at]}]
+  [{:keys [id user-id organization-id grade position member-type user-name user-username user-position user-avatar-filename attendance-status attendance-updated-at passing ball-control carrying shooting dribbling defending]}]
   (let [m (medley.core/assoc-some {}
                                   :id id
                                   :user_id user-id
@@ -38,7 +50,13 @@
                                   :user_username user-username
                                   :user_position user-position
                                   :attendance_status attendance-status
-                                  :attendance_updated_at attendance-updated-at)]
+                                  :attendance_updated_at attendance-updated-at
+                                  :passing passing
+                                  :ball_control ball-control
+                                  :carrying carrying
+                                  :shooting shooting
+                                  :dribbling dribbling
+                                  :defending defending)]
     (assoc m :user_avatar_filename user-avatar-filename)))
 
 (s/defn db->model :- models.player/Player
@@ -54,4 +72,10 @@
                             :user-name (or (:user_name row) (:user-name row))
                             :user-username (or (:user_username row) (:user-username row))
                             :user-position (or (:user_position row) (:user-position row))
-                            :user-avatar-filename (:avatar_filename row))))
+                            :user-avatar-filename (:avatar_filename row)
+                            :passing (:passing row)
+                            :ball-control (:ball_control row)
+                            :carrying (:carrying row)
+                            :shooting (:shooting row)
+                            :dribbling (:dribbling row)
+                            :defending (:defending row))))

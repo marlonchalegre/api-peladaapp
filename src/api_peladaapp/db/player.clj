@@ -8,17 +8,29 @@
    [schema.core :as s]))
 
 (s/defn insert-player :- s/Uuid
-  [{:keys [user-id organization-id grade position member-type]} :- {:user-id s/Uuid
-                                                                    :organization-id s/Uuid
-                                                                    (s/optional-key :grade) (s/maybe s/Num)
-                                                                    (s/optional-key :position) (s/maybe s/Str)
-                                                                    (s/optional-key :member-type) (s/maybe s/Str)}
+  [{:keys [user-id organization-id grade position member-type passing ball-control carrying shooting dribbling defending]} :- {:user-id s/Uuid
+                                                                                                                               :organization-id s/Uuid
+                                                                                                                               (s/optional-key :grade) (s/maybe s/Num)
+                                                                                                                               (s/optional-key :position) (s/maybe s/Str)
+                                                                                                                               (s/optional-key :member-type) (s/maybe s/Str)
+                                                                                                                               (s/optional-key :passing) (s/maybe s/Int)
+                                                                                                                               (s/optional-key :ball-control) (s/maybe s/Int)
+                                                                                                                               (s/optional-key :carrying) (s/maybe s/Int)
+                                                                                                                               (s/optional-key :shooting) (s/maybe s/Int)
+                                                                                                                               (s/optional-key :dribbling) (s/maybe s/Int)
+                                                                                                                               (s/optional-key :defending) (s/maybe s/Int)}
    db]
   (let [row (cond-> {:user_id user-id
                      :organization_id organization-id
                      :grade grade
                      :member_type [:cast (or member-type "convidado") :member_type]}
-              position (assoc :position [:cast position :player_position]))
+              position (assoc :position [:cast position :player_position])
+              passing (assoc :passing passing)
+              ball-control (assoc :ball_control ball-control)
+              carrying (assoc :carrying carrying)
+              shooting (assoc :shooting shooting)
+              dribbling (assoc :dribbling dribbling)
+              defending (assoc :defending defending))
         query (-> (h/insert-into :OrganizationPlayers)
                   (h/values [row])
                   (h/returning :id))]
@@ -29,7 +41,13 @@
   (let [row (medley.core/assoc-some {}
                                     :grade (:grade player)
                                     :position (when (:position player) [:cast (:position player) :player_position])
-                                    :member_type (when (:member-type player) [:cast (:member-type player) :member_type]))
+                                    :member_type (when (:member-type player) [:cast (:member-type player) :member_type])
+                                    :passing (:passing player)
+                                    :ball_control (:ball-control player)
+                                    :carrying (:carrying player)
+                                    :shooting (:shooting player)
+                                    :dribbling (:dribbling player)
+                                    :defending (:defending player))
         query (-> (h/update :OrganizationPlayers)
                   (h/set row)
                   (h/where [:= :id id]))]

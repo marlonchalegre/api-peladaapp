@@ -85,4 +85,52 @@
                        :body {:grade 7.5}
                        :identity {:id admin-id :is-admin? false}}
               response (handler.player/update-player-score request)]
-          (is (= 404 (:status response))))))))
+          (is (= 404 (:status response))))))
+
+    (testing "Successfully updates player characteristics"
+      (let [get-calls (atom 0)
+            mock-player-char {:id player-id :organization-id org-id :user-id user-id
+                              :passing 2 :ball-control 3 :carrying 4 :shooting 5 :dribbling 1 :defending 0}
+            updated-player-char {:id player-id :organization-id org-id :user-id user-id
+                                 :passing 4 :ball-control 4 :carrying 4 :shooting 5 :dribbling 2 :defending 1}]
+        (with-redefs [db.player/get-player (fn [id _]
+                                             (if (= id player-id)
+                                               (if (= @get-calls 0)
+                                                 (do (swap! get-calls inc) mock-player-char)
+                                                 updated-player-char)
+                                               nil))
+                      db.player/update-player (fn [_ update-data _]
+                                                (is (= 4 (:passing update-data)))
+                                                (is (= 4 (:ball-control update-data)))
+                                                (is (= 2 (:dribbling update-data)))
+                                                (is (= 1 (:defending update-data)))
+                                                1)
+                      auth/require-organization-admin! (fn [_ _ _] true)]
+          (let [request {:database db
+                         :params {:id player-id}
+                         :body {:passing 4 :ball_control 4 :dribbling 2 :defending 1}
+                         :identity {:id admin-id :is-admin? false}}
+                response (handler.player/update-player-score request)]
+            (is (= 200 (:status response)))
+            (is (= 4 (:passing (:body response))))
+            (is (= 4 (:ball_control (:body response))))
+            (is (= 2 (:dribbling (:body response))))
+            (is (= 1 (:defending (:body response))))))))
+
+    (testing "Fails with 400 if any characteristic is out of range 0-5"
+      (with-redefs [db.player/get-player (fn [id _] (if (= id player-id) mock-player nil))
+                    auth/require-organization-admin! (fn [_ _ _] true)]
+        (let [request {:database db
+                       :params {:id player-id}
+                       :body {:passing 6}
+                       :identity {:id admin-id :is-admin? false}}
+              response (handler.player/update-player-score request)]
+          (is (= 400 (:status response)))
+          (is (= "passing must be between 0 and 5" (:message (:body response)))))
+        (let [request {:database db
+                       :params {:id player-id}
+                       :body {:defending -1}
+                       :identity {:id admin-id :is-admin? false}}
+              response (handler.player/update-player-score request)]
+          (is (= 400 (:status response)))
+          (is (= "defending must be between 0 and 5" (:message (:body response)))))))))
