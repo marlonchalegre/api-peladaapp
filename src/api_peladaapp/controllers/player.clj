@@ -4,9 +4,16 @@
    [api-peladaapp.models.player :as models.player]
    [schema.core :as s]))
 
+(defn- validate-member-type!
+  [player]
+  (when (contains? #{"mensalista_temporario" "diarista_temporario"} (:member-type player))
+    (throw (ex-info "Temporary member types cannot be assigned directly"
+                    {:type :bad-request :message "Temporary member types must be managed by the Substitution feature"}))))
+
 (s/defn create-player :- models.player/Player
   [player :- models.player/Player
    db]
+  (validate-member-type! player)
   (let [id (db.player/insert-player player db)]
     (db.player/get-player id db)))
 
@@ -19,6 +26,7 @@
 
 (s/defn update-player :- models.player/Player
   [player-id :- s/Uuid player :- models.player/Player db]
+  (validate-member-type! player)
   (let [rows (db.player/update-player player-id player db)]
     (if (zero? rows)
       (throw (ex-info nil {:type :not-found :message "Player not found"}))

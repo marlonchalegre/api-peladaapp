@@ -65,6 +65,19 @@
               response (handler.player/update-player-score request)]
           (is (= 403 (:status response))))))
 
+    (testing "Fails with 400 if trying to update member_type to a temporary type"
+      (with-redefs [db.player/get-player (fn [id _] (if (= id player-id) mock-player nil))
+                    auth/require-organization-admin! (fn [_ _ _] true)]
+        (doseq [temp-role ["mensalista_temporario" "diarista_temporario"]]
+          (let [request {:database db
+                         :params {:id player-id}
+                         :body {:member_type temp-role}
+                         :identity {:id admin-id :is-admin? false}}
+                response (handler.player/update-player-score request)]
+            (is (= 400 (:status response)))
+            (is (= "Temporary member types must be managed by the Substitution feature"
+                   (:message (:body response))))))))
+
     (testing "Fails with 404 if player not found"
       (with-redefs [db.player/get-player (fn [_ _] nil)]
         (let [request {:database db
