@@ -177,7 +177,7 @@ flowchart TD
 - `POST /api/votes`, `GET /api/peladas/:id/votes`
 - `POST /api/scores/normalized`
 
-All `/api/**` require `Authorization: Token <jwt>`.
+All `/api/**` require authentication via the `authToken` cookie.
 
 ---
 
