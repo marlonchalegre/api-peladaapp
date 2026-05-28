@@ -86,6 +86,7 @@
     (POST "/matches/:id/timer/pause" [] handler.match/pause-timer)
     (POST "/matches/:id/timer/reset" [] handler.match/reset-timer)
     (POST "/matches/:id/events" [] handler.match/create-event)
+    (PUT "/matches/:id/events/:event_id" [] handler.match/update-event)
     (DELETE "/matches/:id/events" [] handler.match/delete-event)
     (POST "/matches/:id/lineups" [] handler.match/add-lineup-player)
     (POST "/matches/:id/lineups/replace" [] handler.match/replace-lineup-player)

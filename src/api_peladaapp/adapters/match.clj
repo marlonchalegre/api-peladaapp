@@ -17,12 +17,19 @@
   (cond-> {:player-id (misc/as-uuid (:player_id request))
            :event-type (:event_type request)}
     (:session_time_ms request) (assoc :session-time-ms (:session_time_ms request))
-    (:match_time_ms request) (assoc :match-time-ms (:match_time_ms request))))
+    (:match_time_ms request) (assoc :match-time-ms (:match_time_ms request))
+    (:assistant_id request) (assoc :assistant-id (misc/as-uuid (:assistant_id request)))))
 
 (s/defn delete-event-request->model :- (s/pred map?)
   [request :- requests.match/DeleteMatchEventRequest]
-  {:player-id (misc/as-uuid (:player_id request))
-   :event-type (:event_type request)})
+  (cond-> {:player-id (misc/as-uuid (:player_id request))
+           :event-type (:event_type request)}
+    (:id request) (assoc :id (misc/as-uuid (:id request)))))
+
+(s/defn update-event-request->model :- (s/pred map?)
+  [request :- requests.match/UpdateMatchEventRequest]
+  (cond-> {:player-id (misc/as-uuid (:player_id request))}
+    (contains? request :assistant_id) (assoc :assistant-id (some-> (:assistant_id request) misc/as-uuid))))
 
 (s/defn add-lineup-request->model :- (s/pred map?)
   [request :- requests.match/AddLineupPlayerRequest]

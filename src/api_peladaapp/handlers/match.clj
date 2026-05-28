@@ -95,6 +95,24 @@
     (catch Exception e
       (exception/api-exception-handler e))))
 
+(defn update-event [request]
+  (try
+    (let [db (:database request)
+          id (parse-uuid (clojure.core/str (get-in request [:params :id])))
+          event-id (parse-uuid (clojure.core/str (get-in request [:params :event_id])))
+          body (:body request)
+          user-id (auth/get-user-id-from-request request)
+          match (match-controller/get-match id db)
+          pelada (pelada-controller/get-pelada (:pelada-id match) db)
+          org-id (:organization-id pelada)]
+      (auth/require-organization-admin! user-id org-id db)
+      (pelada-logic/ensure-running pelada {:allow-closed? true})
+      (-> (match-controller/update-event id event-id (adapter.match/update-event-request->model body) db)
+          adapter.match/event->response
+          ok))
+    (catch Exception e
+      (exception/api-exception-handler e))))
+
 ;; Lineups (per-match players)
 (defn add-lineup-player [request]
   (try

@@ -61,6 +61,45 @@
     (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         (as-> res (if (map? res) 1 0)))))
 
+(s/defn get-last-event :- (s/maybe models.match-event/MatchEvent)
+  [match-id :- s/Uuid player-id :- s/Uuid event-type :- s/Str db]
+  (let [query (-> (h/select :*)
+                  (h/from :MatchEvents)
+                  (h/where [:= :match_id match-id]
+                           [:= :player_id player-id]
+                           [:= :event_type [:cast event-type :match_event_type]])
+                  (h/order-by [:id :desc])
+                  (h/limit 1))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        adapter.match/db-event->model)))
+
+(s/defn get-assist-by-time :- (s/maybe models.match-event/MatchEvent)
+  [match-id :- s/Uuid session-time-ms :- (s/maybe s/Int) match-time-ms :- (s/maybe s/Int) db]
+  (let [query (-> (h/select :*)
+                  (h/from :MatchEvents)
+                  (h/where [:= :match_id match-id]
+                           [:= :event_type [:cast "assist" :match_event_type]]
+                           [:= :session_time_ms session-time-ms]
+                           [:= :match_time_ms match-time-ms])
+                  (h/limit 1))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        adapter.match/db-event->model)))
+
+(s/defn delete-event-by-id :- s/Int
+  [id :- s/Uuid db]
+  (let [query (-> (h/delete-from :MatchEvents)
+                  (h/where [:= :id id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        (as-> res (if (map? res) 1 0)))))
+
+(s/defn update-event-player :- (s/maybe models.match-event/MatchEvent)
+  [id :- s/Uuid player-id :- s/Uuid db]
+  (let [query (-> (h/update :MatchEvents)
+                  (h/set {:player_id player-id})
+                  (h/where [:= :id id]))]
+    (jdbc/execute-one! db (hsql/format query) hsql/opts)
+    (get-event id db)))
+
 (s/defn list-player-stats-by-pelada :- [models.match/PlayerStats]
   [pelada-id :- s/Uuid db]
   (let [query (-> (h/select :s.player_id :p.user_id :u.name :u.avatar_filename :s.goals :s.assists :s.own_goals)
