@@ -17,7 +17,7 @@
                           :member-type (:member_type request)
                           :passing (:passing request)
                           :ball-control (:ball_control request)
-                          :carrying (:carrying request)
+                          :velocity (:velocity request)
                           :shooting (:shooting request)
                           :dribbling (:dribbling request)
                           :defending (:defending request)))
@@ -32,13 +32,13 @@
                           :member-type (:member_type request)
                           :passing (:passing request)
                           :ball-control (:ball_control request)
-                          :carrying (:carrying request)
+                          :velocity (:velocity request)
                           :shooting (:shooting request)
                           :dribbling (:dribbling request)
                           :defending (:defending request)))
 
 (s/defn model->response :- responses.player/PlayerResponse
-  [{:keys [id user-id organization-id grade position member-type user-name user-username user-position user-avatar-filename attendance-status attendance-updated-at passing ball-control carrying shooting dribbling defending]}]
+  [{:keys [id user-id organization-id grade position member-type user-name user-username user-position user-avatar-filename attendance-status attendance-updated-at passing ball-control velocity shooting dribbling defending]}]
   (let [m (medley.core/assoc-some {}
                                   :id id
                                   :user_id user-id
@@ -53,7 +53,7 @@
                                   :attendance_updated_at attendance-updated-at
                                   :passing passing
                                   :ball_control ball-control
-                                  :carrying carrying
+                                  :velocity velocity
                                   :shooting shooting
                                   :dribbling dribbling
                                   :defending defending)]
@@ -75,7 +75,7 @@
                             :user-avatar-filename (:avatar_filename row)
                             :passing (:passing row)
                             :ball-control (:ball_control row)
-                            :carrying (:carrying row)
+                            :velocity (:velocity row)
                             :shooting (:shooting row)
                             :dribbling (:dribbling row)
                             :defending (:defending row))))

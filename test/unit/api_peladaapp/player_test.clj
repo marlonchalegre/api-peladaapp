@@ -90,9 +90,9 @@
     (testing "Successfully updates player characteristics"
       (let [get-calls (atom 0)
             mock-player-char {:id player-id :organization-id org-id :user-id user-id
-                              :passing 2 :ball-control 3 :carrying 4 :shooting 5 :dribbling 1 :defending 0}
+                              :passing 2 :ball-control 3 :velocity 4 :shooting 5 :dribbling 1 :defending 0}
             updated-player-char {:id player-id :organization-id org-id :user-id user-id
-                                 :passing 4 :ball-control 4 :carrying 4 :shooting 5 :dribbling 2 :defending 1}]
+                                 :passing 4 :ball-control 4 :velocity 4 :shooting 5 :dribbling 2 :defending 1}]
         (with-redefs [db.player/get-player (fn [id _]
                                              (if (= id player-id)
                                                (if (= @get-calls 0)

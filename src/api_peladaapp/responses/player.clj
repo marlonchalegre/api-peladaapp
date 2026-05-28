@@ -17,7 +17,7 @@
    (s/optional-key :attendance_updated_at) (s/maybe s/Any)
    (s/optional-key :passing) (s/maybe s/Int)
    (s/optional-key :ball_control) (s/maybe s/Int)
-   (s/optional-key :carrying) (s/maybe s/Int)
+   (s/optional-key :velocity) (s/maybe s/Int)
    (s/optional-key :shooting) (s/maybe s/Int)
    (s/optional-key :dribbling) (s/maybe s/Int)
    (s/optional-key :defending) (s/maybe s/Int)})

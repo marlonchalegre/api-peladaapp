@@ -15,7 +15,7 @@
    (s/optional-key :user-avatar-filename) (s/maybe s/Str)
    (s/optional-key :passing) (s/maybe s/Int)
    (s/optional-key :ball-control) (s/maybe s/Int)
-   (s/optional-key :carrying) (s/maybe s/Int)
+   (s/optional-key :velocity) (s/maybe s/Int)
    (s/optional-key :shooting) (s/maybe s/Int)
    (s/optional-key :dribbling) (s/maybe s/Int)
    (s/optional-key :defending) (s/maybe s/Int)})

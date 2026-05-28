@@ -10,7 +10,7 @@
    (s/optional-key :member_type) s/Str
    (s/optional-key :passing) s/Int
    (s/optional-key :ball_control) s/Int
-   (s/optional-key :carrying) s/Int
+   (s/optional-key :velocity) s/Int
    (s/optional-key :shooting) s/Int
    (s/optional-key :dribbling) s/Int
    (s/optional-key :defending) s/Int})
@@ -23,7 +23,7 @@
    (s/optional-key :member_type) s/Str
    (s/optional-key :passing) s/Int
    (s/optional-key :ball_control) s/Int
-   (s/optional-key :carrying) s/Int
+   (s/optional-key :velocity) s/Int
    (s/optional-key :shooting) s/Int
    (s/optional-key :dribbling) s/Int
    (s/optional-key :defending) s/Int})

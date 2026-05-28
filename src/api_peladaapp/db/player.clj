@@ -8,14 +8,14 @@
    [schema.core :as s]))
 
 (s/defn insert-player :- s/Uuid
-  [{:keys [user-id organization-id grade position member-type passing ball-control carrying shooting dribbling defending]} :- {:user-id s/Uuid
+  [{:keys [user-id organization-id grade position member-type passing ball-control velocity shooting dribbling defending]} :- {:user-id s/Uuid
                                                                                                                                :organization-id s/Uuid
                                                                                                                                (s/optional-key :grade) (s/maybe s/Num)
                                                                                                                                (s/optional-key :position) (s/maybe s/Str)
                                                                                                                                (s/optional-key :member-type) (s/maybe s/Str)
                                                                                                                                (s/optional-key :passing) (s/maybe s/Int)
                                                                                                                                (s/optional-key :ball-control) (s/maybe s/Int)
-                                                                                                                               (s/optional-key :carrying) (s/maybe s/Int)
+                                                                                                                               (s/optional-key :velocity) (s/maybe s/Int)
                                                                                                                                (s/optional-key :shooting) (s/maybe s/Int)
                                                                                                                                (s/optional-key :dribbling) (s/maybe s/Int)
                                                                                                                                (s/optional-key :defending) (s/maybe s/Int)}
@@ -27,7 +27,7 @@
               position (assoc :position [:cast position :player_position])
               passing (assoc :passing passing)
               ball-control (assoc :ball_control ball-control)
-              carrying (assoc :carrying carrying)
+              velocity (assoc :velocity velocity)
               shooting (assoc :shooting shooting)
               dribbling (assoc :dribbling dribbling)
               defending (assoc :defending defending))
@@ -44,7 +44,7 @@
                                     :member_type (when (:member-type player) [:cast (:member-type player) :member_type])
                                     :passing (:passing player)
                                     :ball_control (:ball-control player)
-                                    :carrying (:carrying player)
+                                    :velocity (:velocity player)
                                     :shooting (:shooting player)
                                     :dribbling (:dribbling player)
                                     :defending (:defending player))

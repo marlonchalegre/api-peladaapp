@@ -12,7 +12,7 @@
 
 (defn- validate-characteristics!
   [player]
-  (doseq [field [:passing :ball-control :carrying :shooting :dribbling :defending]]
+  (doseq [field [:passing :ball-control :velocity :shooting :dribbling :defending]]
     (when-let [val (get player field)]
       (when (or (< val 0) (> val 5))
         (throw (ex-info (str (name field) " must be between 0 and 5")
