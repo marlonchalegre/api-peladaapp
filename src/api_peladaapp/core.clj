@@ -17,10 +17,10 @@
         jdbc-url ;; Already has it
         (str jdbc-url separator "currentSchema=" schema)))))
 
-(defn- ensure-super-admin [db]
+(defn- ensure-global-admin [db]
   (when-let [admin-email (System/getenv "SUPER_ADMIN_EMAIL")]
     (when-not (str/blank? admin-email)
-      (log/info (str "[BOOTSTRAP] Ensuring super admin status for email: " admin-email))
+      (log/info (str "[BOOTSTRAP] Ensuring global admin status for email: " admin-email))
       (try
         (let [existing-user (next.jdbc/execute-one! db ["SELECT id FROM \"Users\" WHERE LOWER(email) = LOWER(?)" admin-email])]
           (if (nil? existing-user)
@@ -30,17 +30,17 @@
                       username (or (first (str/split admin-email #"@")) "superadmin")
                       id (java.util.UUID/randomUUID)
                       insert-query ["INSERT INTO \"Users\" (id, name, username, email, password, is_super_admin, allow_org_creation) VALUES (?, ?, ?, ?, ?, TRUE, TRUE)"
-                                    id "Super Admin" username admin-email hashed-password]]
+                                    id "Global Admin" username admin-email hashed-password]]
                   (next.jdbc/execute! db insert-query)
-                  (log/info "[BOOTSTRAP] Created super admin user successfully."))
-                (log/warn "[BOOTSTRAP] SUPER_ADMIN_EMAIL set but SUPER_ADMIN_PASSWORD is empty. Skipping super admin creation."))
-              (log/warn "[BOOTSTRAP] SUPER_ADMIN_EMAIL set but SUPER_ADMIN_PASSWORD is not provided. Skipping super admin creation."))
-            ;; If exists, update flags to ensure they are super admin
+                  (log/info "[BOOTSTRAP] Created global admin user successfully."))
+                (log/warn "[BOOTSTRAP] SUPER_ADMIN_EMAIL set but SUPER_ADMIN_PASSWORD is empty. Skipping global admin creation."))
+              (log/warn "[BOOTSTRAP] SUPER_ADMIN_EMAIL set but SUPER_ADMIN_PASSWORD is not provided. Skipping global admin creation."))
+            ;; If exists, update flags to ensure they are global admin
             (let [update-query ["UPDATE \"Users\" SET is_super_admin = TRUE, allow_org_creation = TRUE WHERE LOWER(email) = LOWER(?)" admin-email]
                   result (next.jdbc/execute! db update-query)]
-              (log/info (str "[BOOTSTRAP] Ensured existing super admin flags: " result)))))
+              (log/info (str "[BOOTSTRAP] Ensured existing global admin flags: " result)))))
         (catch Exception e
-          (log/error e "[BOOTSTRAP] Failed to ensure super admin status: " (.getMessage e)))))))
+          (log/error e "[BOOTSTRAP] Failed to ensure global admin status: " (.getMessage e)))))))
 
 (defn -main
   [& _args]
@@ -92,7 +92,7 @@
       (let [system (core.components/system options)
             started-system (component/start system)
             db-val (get-in started-system [:database :database])]
-        (ensure-super-admin db-val)
+        (ensure-global-admin db-val)
         (log/info "[SYSTEM] All components started and running."))
       (catch Exception e
         (log/error e "[SYSTEM] ERROR during component startup:")

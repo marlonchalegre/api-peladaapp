@@ -28,7 +28,7 @@
   (try
     (let [db (-> request :database)
           identity (:identity request)
-          _ (when-not (:is-admin? identity)
+          _ (when-not (:is-global-admin? identity)
               (throw (ex-info "Forbidden: Global admin access required"
                               {:type :forbidden :message "You don't have permission to list all users."})))
           query-params (:query-params request)
@@ -45,7 +45,7 @@
     (let [db (-> request :database)
           identity (:identity request)
           current-user-id (:id identity)
-          is-global-admin? (:is-admin? identity)
+          is-global-admin? (:is-global-admin? identity)
           admin-orgs (:admin_orgs identity)
           _ (when-not (or is-global-admin? (seq admin-orgs))
               (throw (ex-info "Forbidden: Search users access required"

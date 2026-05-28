@@ -104,7 +104,7 @@
     (testing "Super Admin is allowed to admin organization even if not explicitly in OrganizationAdmins"
       (let [mock-db (fn [] nil)]
         (with-redefs [db.user/find-user-by-id
-                      (fn [_ _] {:id user-id :is-super-admin true})
+                      (fn [_ _] {:id user-id :is-global-admin true})
                       db.admin/is-user-admin-of-organization?
                       (fn [_ _ _] false)]
           (is (true? (auth/user-can-admin-organization? user-id org-id mock-db))))))
@@ -112,7 +112,7 @@
     (testing "Super Admin is considered a member of organization"
       (let [mock-db (fn [] nil)]
         (with-redefs [db.user/find-user-by-id
-                      (fn [_ _] {:id user-id :is-super-admin true})
+                      (fn [_ _] {:id user-id :is-global-admin true})
                       db.admin/is-user-admin-of-organization?
                       (fn [_ _ _] false)
                       db.player/get-org-player-by-user-id

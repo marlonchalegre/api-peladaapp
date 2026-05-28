@@ -165,7 +165,7 @@
             :message "Authentication required. Please provide a valid token."})))
 
 (defn admin-access
-  "Check if request with JWT token has :is-admin? claim.
+  "Check if request with JWT token has :is-global-admin? claim.
   Returns error with :forbidden type if user is authenticated but not admin."
   [request]
   (cond
@@ -174,7 +174,7 @@
             :message "Authentication required. Please provide a valid token."})
 
     (not (and (:identity request)
-              (:is-admin? (:identity request))))
+              (:is-global-admin? (:identity request))))
     (error {:type :forbidden
             :message "Admin access required."})
 

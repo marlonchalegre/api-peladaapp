@@ -11,7 +11,7 @@
   (let [user (try
                (db.user/find-user-by-id user-id db)
                (catch Throwable _ nil))]
-    (or (true? (:is-super-admin user))
+    (or (true? (:is-global-admin user))
         (db.admin/is-user-admin-of-organization? user-id organization-id db))))
 
 (s/defn user-is-in-organization? :- s/Bool
@@ -47,8 +47,8 @@
   [request target-user-id]
   (let [identity (:identity request)
         current-user-id (:id identity)
-        is-admin? (:is-admin? identity)]
-    (when-not (or (= current-user-id target-user-id) is-admin?)
+        is-global-admin? (:is-global-admin? identity)]
+    (when-not (or (= current-user-id target-user-id) is-global-admin?)
       (throw (ex-info "Forbidden: You don't have permission to access this resource"
                       {:type :forbidden
                        :message "You don't have permission to access this resource"})))))

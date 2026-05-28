@@ -31,14 +31,14 @@
 (deftest admin-access-with-admin-user
   (testing "admin-access returns true when user is authenticated and is admin"
     (with-redefs [buddy-auth/authenticated? (fn [_] true)]
-      (let [request {:identity {:user-id 1 :is-admin? true}}
+      (let [request {:identity {:user-id 1 :is-global-admin? true}}
             result (auth/admin-access request)]
         (is (true? result))))))
 
 (deftest admin-access-with-non-admin-user
   (testing "admin-access returns RuleError when user is authenticated but not admin"
     (with-redefs [buddy-auth/authenticated? (fn [_] true)]
-      (let [request {:identity {:user-id 1 :is-admin? false}}
+      (let [request {:identity {:user-id 1 :is-global-admin? false}}
             result (auth/admin-access request)]
         (is (instance? buddy.auth.accessrules.RuleError result))))))
 

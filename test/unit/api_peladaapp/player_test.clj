@@ -27,7 +27,7 @@
           (let [request {:database db
                          :params {:id player-id}
                          :body {:grade 7.5}
-                         :identity {:id admin-id :is-admin? false}}
+                         :identity {:id admin-id :is-global-admin? false}}
                 response (handler.player/update-player-score request)]
             (is (= 200 (:status response)))
             (is (= 7.5 (:grade (:body response))))))))
@@ -49,7 +49,7 @@
           (let [request {:database db
                          :params {:id player-id}
                          :body {:member_type "mensalista"}
-                         :identity {:id admin-id :is-admin? false}}
+                         :identity {:id admin-id :is-global-admin? false}}
                 response (handler.player/update-player-score request)]
             (is (= 200 (:status response)))
             (is (= "mensalista" (:member_type (:body response))))))))
@@ -61,7 +61,7 @@
         (let [request {:database db
                        :params {:id player-id}
                        :body {:grade 7.5}
-                       :identity {:id admin-id :is-admin? false}}
+                       :identity {:id admin-id :is-global-admin? false}}
               response (handler.player/update-player-score request)]
           (is (= 403 (:status response))))))
 
@@ -72,7 +72,7 @@
           (let [request {:database db
                          :params {:id player-id}
                          :body {:member_type temp-role}
-                         :identity {:id admin-id :is-admin? false}}
+                         :identity {:id admin-id :is-global-admin? false}}
                 response (handler.player/update-player-score request)]
             (is (= 400 (:status response)))
             (is (= "Temporary member types must be managed by the Substitution feature"
@@ -83,7 +83,7 @@
         (let [request {:database db
                        :params {:id (parse-uuid "00000000-0000-0000-0000-000000000999")}
                        :body {:grade 7.5}
-                       :identity {:id admin-id :is-admin? false}}
+                       :identity {:id admin-id :is-global-admin? false}}
               response (handler.player/update-player-score request)]
           (is (= 404 (:status response))))))
 
@@ -109,7 +109,7 @@
           (let [request {:database db
                          :params {:id player-id}
                          :body {:passing 4 :ball_control 4 :dribbling 2 :defending 1}
-                         :identity {:id admin-id :is-admin? false}}
+                         :identity {:id admin-id :is-global-admin? false}}
                 response (handler.player/update-player-score request)]
             (is (= 200 (:status response)))
             (is (= 4 (:passing (:body response))))
@@ -123,14 +123,14 @@
         (let [request {:database db
                        :params {:id player-id}
                        :body {:passing 6}
-                       :identity {:id admin-id :is-admin? false}}
+                       :identity {:id admin-id :is-global-admin? false}}
               response (handler.player/update-player-score request)]
           (is (= 400 (:status response)))
           (is (= "passing must be between 0 and 5" (:message (:body response)))))
         (let [request {:database db
                        :params {:id player-id}
                        :body {:defending -1}
-                       :identity {:id admin-id :is-admin? false}}
+                       :identity {:id admin-id :is-global-admin? false}}
               response (handler.player/update-player-score request)]
           (is (= 400 (:status response)))
           (is (= "defending must be between 0 and 5" (:message (:body response)))))))))

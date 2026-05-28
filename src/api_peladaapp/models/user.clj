@@ -21,7 +21,7 @@
    (s/optional-key :position) (s/enum "Striker" "Midfielder" "Defender" "Goalkeeper")
    (s/optional-key :admin-orgs) [s/Uuid]
    (s/optional-key :avatar-filename) (s/maybe s/Str)
-   (s/optional-key :is-super-admin) s/Bool
+   (s/optional-key :is-global-admin) s/Bool
    (s/optional-key :is-blocked) s/Bool
    (s/optional-key :allow-org-creation) s/Bool})
 
@@ -44,7 +44,7 @@
    (s/optional-key :phone) (s/maybe s/Str)
    (s/optional-key :position) (s/enum "Striker" "Midfielder" "Defender" "Goalkeeper")
    (s/optional-key :avatar-filename) (s/maybe s/Str)
-   (s/optional-key :is-super-admin) s/Bool
+   (s/optional-key :is-global-admin) s/Bool
    (s/optional-key :is-blocked) s/Bool
    (s/optional-key :allow-org-creation) s/Bool})
 

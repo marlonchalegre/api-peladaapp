@@ -25,12 +25,12 @@
    (model->response user true))
   ([user :- models.user/User exclude-email? :- s/Bool]
    (let [fields (if exclude-email?
-                  [:id :name :username :position :avatar-filename :avatar_filename :phone :is-super-admin :is-blocked :allow-org-creation]
-                  [:id :name :username :email :position :avatar-filename :avatar_filename :phone :is-super-admin :is-blocked :allow-org-creation])]
+                  [:id :name :username :position :avatar-filename :avatar_filename :phone :is-global-admin :is-blocked :allow-org-creation]
+                  [:id :name :username :email :position :avatar-filename :avatar_filename :phone :is-global-admin :is-blocked :allow-org-creation])]
      (-> (select-keys user fields)
          (assoc :admin_orgs (or (:admin-orgs user) []))
          (misc/rename-key :avatar-filename :avatar_filename)
-         (misc/rename-key :is-super-admin :is_super_admin)
+         (misc/rename-key :is-global-admin :is_super_admin)
          (misc/rename-key :is-blocked :is_blocked)
          (misc/rename-key :allow-org-creation :allow_org_creation)
          (update :is_super_admin #(if (nil? %) false %))
@@ -43,9 +43,9 @@
           misc/unamespace
           (select-keys [:id :name :username :email :password :position :avatar_filename :phone :is_super_admin :is_blocked :allow_org_creation])
           (misc/rename-key :avatar_filename :avatar-filename)
-          (misc/rename-key :is_super_admin :is-super-admin)
+          (misc/rename-key :is_super_admin :is-global-admin)
           (misc/rename-key :is_blocked :is-blocked)
           (misc/rename-key :allow_org_creation :allow-org-creation)
-          (update :is-super-admin #(if (nil? %) false %))
+          (update :is-global-admin #(if (nil? %) false %))
           (update :is-blocked #(if (nil? %) false %))
           (update :allow-org-creation #(if (nil? %) false %))))

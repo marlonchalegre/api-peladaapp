@@ -13,7 +13,7 @@
    [api-peladaapp.handlers.pelada :as handler.pelada]
    [api-peladaapp.handlers.player :as handler.player]
    [api-peladaapp.handlers.randomize :as handlers.randomize]
-   [api-peladaapp.handlers.super-admin :as handler.super-admin]
+   [api-peladaapp.handlers.global-admin :as handler.global-admin]
    [api-peladaapp.handlers.team :as handler.team]
    [api-peladaapp.handlers.user :as handler.user]
    [api-peladaapp.handlers.vote :as handler.vote]
@@ -154,11 +154,11 @@
 
 (defroutes admin-routes
   (context "/api/admin" []
-    (GET "/organizations" [] handler.super-admin/list-organizations)
-    (POST "/organizations/:id/toggle-block" [] handler.super-admin/toggle-organization-block)
-    (POST "/users/:id/toggle-block" [] handler.super-admin/toggle-user-block)
-    (POST "/users/:id/toggle-org-creation" [] handler.super-admin/toggle-user-org-creation)
-    (POST "/users/:id/toggle-super-admin" [] handler.super-admin/toggle-user-super-admin)))
+    (GET "/organizations" [] handler.global-admin/list-organizations)
+    (POST "/organizations/:id/toggle-block" [] handler.global-admin/toggle-organization-block)
+    (POST "/users/:id/toggle-block" [] handler.global-admin/toggle-user-block)
+    (POST "/users/:id/toggle-org-creation" [] handler.global-admin/toggle-user-org-creation)
+    (POST "/users/:id/toggle-global-admin" [] handler.global-admin/toggle-user-global-admin)))
 
 (defroutes gen-routes
   (not-found {:status 404 :body {:error "Backend route not found"}}))

@@ -1,4 +1,4 @@
-(ns api-peladaapp.handlers.super-admin
+(ns api-peladaapp.handlers.global-admin
   (:require
    [api-peladaapp.adapters.organization :as adapter.organization]
    [api-peladaapp.controllers.organization :as controller.organization]
@@ -66,16 +66,16 @@
     (catch Exception e
       (exception/api-exception-handler e))))
 
-(defn toggle-user-super-admin [request]
+(defn toggle-user-global-admin [request]
   (try
     (let [db (:database request)
           user-id (parse-uuid (get-in request [:params :id]))
           user (db.user/find-user-by-id user-id db)]
       (if user
-        (let [new-super-admin-state (not (true? (:is-super-admin user)))]
-          (db.user/update-user-flags user-id {:is_super_admin new-super-admin-state} db)
+        (let [new-global-admin-state (not (true? (:is-global-admin user)))]
+          (db.user/update-user-flags user-id {:is_super_admin new-global-admin-state} db)
           (responses/ok {:id user-id
-                         :is_super_admin new-super-admin-state}))
+                         :is_super_admin new-global-admin-state}))
         (responses/not-found {:error "User not found"})))
     (catch Exception e
       (exception/api-exception-handler e))))
