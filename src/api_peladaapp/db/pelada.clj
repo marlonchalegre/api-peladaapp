@@ -260,3 +260,17 @@
        :users-map users-map
        :org-players-map players-map})
     (throw (ex-info "Pelada not found" {:type :not-found :message "Pelada not found"}))))
+
+(s/defn count-peladas-in-month-by-org :- s/Int
+  [organization-id :- s/Uuid year :- s/Int month :- s/Int db]
+  (let [start-date (java.time.LocalDate/of year month 1)
+        end-date (.plusMonths start-date 1)
+        query (-> (h/select [[:count :*] :count])
+                  (h/from :Peladas)
+                  (h/where [:= :organization_id organization-id]
+                           [:>= :scheduled_at [:cast (str start-date " 00:00:00") :timestamp]]
+                           [:< :scheduled_at [:cast (str end-date " 00:00:00") :timestamp]]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        :count
+        int)))
+

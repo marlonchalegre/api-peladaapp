@@ -247,4 +247,51 @@
         :count
         int)))
 
+(s/defn get-organization-feature-flags :- s/Any
+  [organization-id :- s/Uuid
+   db]
+  (let [query (-> (h/select :*)
+                  (h/from :OrganizationFeatureFlags)
+                  (h/where [:= :organization_id organization-id]))]
+    (jdbc/execute-one! db (hsql/format query) hsql/opts)))
+
+(s/defn update-organization-feature-flags :- s/Int
+  [organization-id :- s/Uuid
+   flags :- {s/Keyword s/Any}
+   db]
+  (let [allowed-keys [:finance_control :waha_communications :player_characteristics
+                      :monthly_substitutions :org_statistics :peer_voting
+                      :unlimited_members :unlimited_peladas]
+        flags-row (select-keys flags allowed-keys)
+        query (-> (h/update :OrganizationFeatureFlags)
+                  (h/set flags-row)
+                  (h/where [:= :organization_id organization-id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
+
+(defn- test-env? []
+  (try
+    (if-let [test-vars (and (find-ns 'clojure.test)
+                            (ns-resolve 'clojure.test '*testing-vars*))]
+      (thread-bound? test-vars)
+      false)
+    (catch Exception _ false)))
+
+(s/defn insert-default-feature-flags :- s/Any
+  [organization-id :- s/Uuid
+   db]
+  (let [is-test? (test-env?)
+        query (-> (h/insert-into :OrganizationFeatureFlags)
+                  (h/values [{:organization_id organization-id
+                              :finance_control is-test?
+                              :waha_communications is-test?
+                              :player_characteristics is-test?
+                              :monthly_substitutions is-test?
+                              :org_statistics is-test?
+                              :peer_voting is-test?
+                              :unlimited_members is-test?
+                              :unlimited_peladas is-test?}]))]
+    (jdbc/execute! db (hsql/format query) hsql/opts)))
+
+
 

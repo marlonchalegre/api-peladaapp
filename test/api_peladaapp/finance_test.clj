@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
+   [next.jdbc :as jdbc]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
@@ -21,7 +22,8 @@
         org-resp (app (-> (mock/request :post "/api/organizations")
                           (mock/json-body {:name "Finance Test Org"})
                           ((th/auth-cookie admin-token))))
-        org-id (parse-uuid (:id (th/decode-body org-resp)))]
+        org-id (parse-uuid (:id (th/decode-body org-resp)))
+        _ (jdbc/execute! ds ["UPDATE \"OrganizationFeatureFlags\" SET finance_control = TRUE WHERE organization_id = ?" org-id])]
 
     ;; Add member to org
     (app (-> (mock/request :post (str "/api/organizations/" org-id "/players"))

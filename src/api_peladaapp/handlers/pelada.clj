@@ -18,6 +18,7 @@
              org-id (:organization-id pelada)]
          ;; Only admins can create peladas
          (auth/require-organization-admin! user-id org-id db)
+         (auth/check-pelada-limit! org-id db)
          ;; Check if organization is blocked
          (let [org (db.organization/get-organization org-id db)]
            (if (and org (:is-blocked org))

@@ -231,8 +231,10 @@
 (defn send-notification!
   "Sends a notification if enabled for the organization."
   [org-id type data db]
-  (let [org (db.organization/get-organization org-id db)]
-    (when (and org (:waha-enabled org))
+  (let [org (db.organization/get-organization org-id db)
+        flags (db.organization/get-organization-feature-flags org-id db)
+        waha-enabled? (if (nil? flags) true (true? (:waha_communications flags)))]
+    (when (and org (:waha-enabled org) waha-enabled?)
       (let [enabled-key (case type
                           :start :waha-start-msg-enabled
                           :end :waha-end-msg-enabled

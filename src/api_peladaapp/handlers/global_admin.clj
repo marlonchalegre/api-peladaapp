@@ -79,3 +79,36 @@
         (responses/not-found {:error "User not found"})))
     (catch Exception e
       (exception/api-exception-handler e))))
+
+(defn get-organization-feature-flags [request]
+  (try
+    (let [db (:database request)
+          org-id (parse-uuid (get-in request [:params :id]))
+          flags (db.organization/get-organization-feature-flags org-id db)]
+      (if flags
+        (responses/ok (dissoc flags :created_at :updated_at))
+        (let [org (db.organization/get-organization org-id db)]
+          (if org
+            (do
+              (db.organization/insert-default-feature-flags org-id db)
+              (responses/ok (dissoc (db.organization/get-organization-feature-flags org-id db) :created_at :updated_at)))
+            (responses/not-found {:error "Organization not found"})))))
+    (catch Exception e
+      (exception/api-exception-handler e))))
+
+(defn update-organization-feature-flags [request]
+  (try
+    (let [db (:database request)
+          org-id (parse-uuid (get-in request [:params :id]))
+          body (:body request)
+          org (db.organization/get-organization org-id db)]
+      (if org
+        (do
+          (when-not (db.organization/get-organization-feature-flags org-id db)
+            (db.organization/insert-default-feature-flags org-id db))
+          (db.organization/update-organization-feature-flags org-id body db)
+          (responses/ok (dissoc (db.organization/get-organization-feature-flags org-id db) :created_at :updated_at)))
+        (responses/not-found {:error "Organization not found"})))
+    (catch Exception e
+      (exception/api-exception-handler e))))
+

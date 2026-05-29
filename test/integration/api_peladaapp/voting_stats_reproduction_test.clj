@@ -27,7 +27,8 @@
 
         org-id (:id (th/decode-body (app (-> (mock/request :post "/api/organizations")
                                              (mock/json-body {:name "Stats Org"})
-                                             auth1))))]
+                                             auth1))))
+        _ (jdbc/execute! ds ["UPDATE \"OrganizationFeatureFlags\" SET peer_voting = TRUE WHERE organization_id = ?" (parse-uuid org-id)])]
 
     (doseq [email ["u2@test.com"]]
       (let [uid (th/user-id-by-email ds email)]

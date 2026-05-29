@@ -100,6 +100,7 @@
     ;; Organizations
     (POST "/organizations" [] handler.organization/create)
     (GET "/organizations/:id" [] handler.organization/get-by-id)
+    (GET "/organizations/:id/feature-flags" [] handler.organization/get-organization-feature-flags)
     (PUT "/organizations/:id" [] handler.organization/update)
     (DELETE "/organizations/:id" [] handler.organization/delete)
     (POST "/organizations/:id/leave" [] handler.organization/leave)
@@ -156,6 +157,8 @@
   (context "/api/admin" []
     (GET "/organizations" [] handler.global-admin/list-organizations)
     (POST "/organizations/:id/toggle-block" [] handler.global-admin/toggle-organization-block)
+    (GET "/organizations/:id/feature-flags" [] handler.global-admin/get-organization-feature-flags)
+    (PUT "/organizations/:id/feature-flags" [] handler.global-admin/update-organization-feature-flags)
     (POST "/users/:id/toggle-block" [] handler.global-admin/toggle-user-block)
     (POST "/users/:id/toggle-org-creation" [] handler.global-admin/toggle-user-org-creation)
     (POST "/users/:id/toggle-global-admin" [] handler.global-admin/toggle-user-global-admin)))

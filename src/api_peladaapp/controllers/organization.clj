@@ -135,6 +135,16 @@
             (throw (ex-info "Invitation does not belong to this user"
                             {:type :forbidden :message "This invitation was sent to another identifier."}))))
 
+        (when-not is-in-org?
+          (let [flags (db.organization/get-organization-feature-flags org-id db)
+                unlimited? (if (nil? flags) true (true? (:unlimited_members flags)))]
+            (when-not unlimited?
+              (let [count (db.player/count-players-by-org org-id db)]
+                (when (>= count 15)
+                  (throw (ex-info "Limite de membros atingido"
+                                  {:type :forbidden
+                                   :message "Esta organização atingiu o limite máximo de 15 membros para a versão gratuita. Por favor, peça ao administrador para fazer o upgrade para Premium."})))))))
+
         (jdbc/with-transaction [tx db]
           (when-not is-in-org?
             (db.player/insert-player {:user-id user-id :organization-id org-id :grade 5.0 :member-type "convidado"} tx))
@@ -162,6 +172,7 @@
   (jdbc/with-transaction [tx db]
     (let [org-with-owner (if user-id (assoc org :owner-id user-id) org)
           id (db.organization/insert-organization org-with-owner tx)]
+      (db.organization/insert-default-feature-flags id tx)
       ;; Add creator as admin and player (if user-id is provided)
       (when user-id
         (db.admin/insert-organization-admin {:organization-id id :user-id user-id} tx)

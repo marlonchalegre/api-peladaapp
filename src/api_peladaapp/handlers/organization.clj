@@ -5,6 +5,7 @@
    [api-peladaapp.adapters.organization :as adapter.organization]
    [api-peladaapp.controllers.organization :as controller.organization]
    [api-peladaapp.controllers.user :as controller.user]
+   [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.helpers.exception :as exception]
    [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.responses :refer [bad-request created deleted ok]]
@@ -78,6 +79,7 @@
              year (or (some-> (get-in request [:query-params "year"]) str Integer/parseInt) 0)
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-member! user-id id db)
+         (auth/require-feature-flag! id :org_statistics db)
          (-> (controller.organization/get-statistics id year db)
              ok))
        (catch NumberFormatException _ (bad-request "Invalid ID or Year format"))
@@ -90,6 +92,7 @@
              email (get-in request [:body :email])
              name (get-in request [:body :name])]
          (auth/require-organization-admin! user-id organization-id db)
+         (auth/check-member-limit! organization-id db)
          (if (and (str/blank? email) (str/blank? name))
            (bad-request "Email or Name is required")
            (-> (controller.organization/invite-player-improved organization-id email name user-id db)
@@ -159,6 +162,7 @@
              id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id id db)
+         (auth/require-feature-flag! id :waha_communications db)
          (ok (controller.organization/test-waha-connection id db)))
        (catch Exception e (exception/api-exception-handler e))))
 
@@ -167,6 +171,7 @@
              org-id (misc/as-uuid (get-in request [:params :organization_id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-member! user-id org-id db)
+         (auth/require-feature-flag! org-id :monthly_substitutions db)
          (let [subs (controller.organization/list-monthly-substitutions org-id db)]
            (ok (map (comp adapter.organization/model->substitution-response
                           adapter.organization/db->substitution)
@@ -182,6 +187,7 @@
              temporary-player-id (misc/as-uuid (:temporary_player_id body))
              start-date (:start_date body)]
          (auth/require-organization-admin! user-id org-id db)
+         (auth/require-feature-flag! org-id :monthly_substitutions db)
          (ok (logic.monthly-sub/substitute-player! org-id permanent-player-id temporary-player-id start-date db)))
        (catch Exception e (exception/api-exception-handler e))))
 
@@ -192,7 +198,22 @@
              sub-id (misc/as-uuid (get-in request [:params :sub_id]))
              end-date (get-in request [:body :end_date] (str (java.time.LocalDate/now)))]
          (auth/require-organization-admin! user-id org-id db)
+         (auth/require-feature-flag! org-id :monthly_substitutions db)
          (ok (logic.monthly-sub/end-substitution! sub-id end-date db)))
        (catch Exception e (exception/api-exception-handler e))))
+
+(defn get-organization-feature-flags [request]
+  (try (let [db (:database request)
+             id (misc/as-uuid (get-in request [:params :id]))
+             user-id (auth/get-user-id-from-request request)]
+         (auth/require-organization-member! user-id id db)
+         (let [flags (db.organization/get-organization-feature-flags id db)]
+           (if flags
+             (ok (dissoc flags :created_at :updated_at))
+             (do
+               (db.organization/insert-default-feature-flags id db)
+               (ok (dissoc (db.organization/get-organization-feature-flags id db) :created_at :updated_at))))))
+       (catch Exception e (exception/api-exception-handler e))))
+
 
 

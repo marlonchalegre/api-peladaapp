@@ -14,6 +14,7 @@
              user-id (auth/get-user-id-from-request request)
              org-id (:organization-id player)]
          (auth/require-organization-admin! user-id org-id db)
+         (auth/check-member-limit! org-id db)
          (-> (controller.player/create-player player db)
              adapter.player/model->response
              created))
@@ -28,6 +29,10 @@
              player (controller.player/get-player id db)
              org-id (:organization-id player)]
          (auth/require-organization-admin! user-id org-id db)
+         (let [has-characteristics? (some #(some? (get body %))
+                                          [:passing :ball_control :velocity :shooting :dribbling :defending])]
+           (when has-characteristics?
+             (auth/require-feature-flag! org-id :player_characteristics db)))
          (ok (adapter.player/model->response (controller.player/update-player id player-update db))))
        (catch Exception e (exception/api-exception-handler e))))
 

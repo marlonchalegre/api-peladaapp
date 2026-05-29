@@ -120,3 +120,13 @@
                     (h/where [:= :op.organization_id organization-id]
                              [:in :op.id player-ids]))]
       (jdbc/execute! db (hsql/format query) hsql/opts))))
+
+(s/defn count-players-by-org :- s/Int
+  [organization-id :- s/Uuid db]
+  (let [query (-> (h/select [[:count :*] :count])
+                  (h/from :OrganizationPlayers)
+                  (h/where [:= :organization_id organization-id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        :count
+        int)))
+

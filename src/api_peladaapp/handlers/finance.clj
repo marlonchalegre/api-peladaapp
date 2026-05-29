@@ -13,6 +13,7 @@
              org-id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id org-id db)
+         (auth/require-feature-flag! org-id :finance_control db)
          (ok (adapter.finance/model->finance-response (controller.finance/get-finance org-id db))))
        (catch Exception e (exception/api-exception-handler e))))
 
@@ -22,6 +23,7 @@
              body (:body request)
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id org-id db)
+         (auth/require-feature-flag! org-id :finance_control db)
          (let [model (adapter.finance/payload->finance body)]
            (controller.finance/update-finance org-id model db)
            (ok {:message "Finance settings updated"})))
@@ -34,6 +36,7 @@
              {:keys [page per-page]} (pagination/parse-pagination-params (:query-params request))
              offset (* (dec page) per-page)]
          (auth/require-organization-admin! user-id org-id db)
+         (auth/require-feature-flag! org-id :finance_control db)
          (let [txs (controller.finance/list-transactions org-id per-page offset db)
                total-count (controller.finance/count-transactions org-id db)
                pagination-headers (:headers (pagination/with-pagination-headers nil total-count page per-page))]
@@ -46,6 +49,7 @@
              body (:body request)
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id org-id db)
+         (auth/require-feature-flag! org-id :finance_control db)
          (let [transaction (assoc (adapter.finance/payload->transaction body)
                                   :organization-id org-id
                                   :created-by user-id)
@@ -59,6 +63,7 @@
              tx-id (misc/as-uuid (get-in request [:params :tx_id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id org-id db)
+         (auth/require-feature-flag! org-id :finance_control db)
          (controller.finance/reverse-transaction tx-id db)
          (ok {:message "Transaction reversed"}))
        (catch Exception e (exception/api-exception-handler e))))
@@ -70,6 +75,7 @@
              month (Integer/parseInt (get-in request [:query-params "month"]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id org-id db)
+         (auth/require-feature-flag! org-id :finance_control db)
          (ok (map adapter.finance/model->monthly-payment-response (controller.finance/get-monthly-payments org-id year month db))))
        (catch Exception e (exception/api-exception-handler e))))
 
@@ -79,6 +85,7 @@
              body (:body request)
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id org-id db)
+         (auth/require-feature-flag! org-id :finance_control db)
          (let [payment-req (adapter.finance/payload->monthly-payment body)
                res (controller.finance/mark-monthly-payment org-id user-id payment-req body db)]
            (ok {:message "Payment status updated"
@@ -91,9 +98,9 @@
              org-id (misc/as-uuid (get-in request [:params :id]))
              user-id (auth/get-user-id-from-request request)]
          (auth/require-organization-admin! user-id org-id db)
+         (auth/require-feature-flag! org-id :finance_control db)
          (let [summary (controller.finance/get-summary org-id db)]
            (ok {:total_income (:total-income summary)
                 :total_expense (:total-expense summary)
                 :total_balance (:total-balance summary)})))
        (catch Exception e (exception/api-exception-handler e))))
-

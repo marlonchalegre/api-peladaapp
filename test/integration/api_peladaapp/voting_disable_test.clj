@@ -32,7 +32,8 @@
         ;; Admin creates org
         org-id (:id (th/decode-body (app (-> (mock/request :post "/api/organizations")
                                              (mock/json-body {:name "Voting Test Org"})
-                                             auth1))))]
+                                             auth1))))
+        _ (jdbc/execute! ds ["UPDATE \"OrganizationFeatureFlags\" SET peer_voting = TRUE WHERE organization_id = ?" (parse-uuid org-id)])]
 
     ;; Add P1 and P2 to org
     (doseq [email ["p1@test.com" "p2@test.com"]]

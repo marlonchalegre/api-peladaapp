@@ -106,3 +106,39 @@
             (is (re-find #"⚽ \*RESULTADOS DAS PARTIDAS\*" (:message msg2)))
             (is (re-find #"Jogo 1:     Time A  2 x 1  Time B" (:message msg2)))))))))
 
+(deftest send-notification-waha-feature-flag-test
+  (let [db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
+        org-id (db.organization/insert-organization {:name "Waha Flag Test Org"} ds)]
+
+    ;; Insert default feature flags (defaults to true in tests)
+    (db.organization/insert-default-feature-flags org-id ds)
+
+    ;; Setup WAHA config enabled for this org
+    (jdbc/execute! ds (hsql/format (-> (h/insert-into :OrganizationWahaConfigs)
+                                       (h/values [{:organization_id org-id
+                                                   :enabled true
+                                                   :api_url "http://waha:3000"
+                                                   :instance "default"
+                                                   :group_id "group123"
+                                                   :attendance_reminder_enabled true
+                                                   :use_all_mention false}]))))
+
+    (testing "Does not send notifications if waha_communications feature flag is disabled"
+      (db.organization/update-organization-feature-flags org-id {:waha_communications false} ds)
+      (let [pending-players [{:player-name "User 1" :phone "5511911111111"}]
+            sent-payload (atom nil)]
+        (with-redefs [waha/send-message (fn [_ message mentions]
+                                          (reset! sent-payload {:message message :mentions mentions}))]
+          (notifications/send-notification! org-id :attendance-reminder {:pending-players pending-players} ds)
+          (is (nil? @sent-payload)))))
+
+    (testing "Sends notifications if waha_communications feature flag is enabled"
+      (db.organization/update-organization-feature-flags org-id {:waha_communications true} ds)
+      (let [pending-players [{:player-name "User 1" :phone "5511911111111"}]
+            sent-payload (atom nil)]
+        (with-redefs [waha/send-message (fn [_ message mentions]
+                                          (reset! sent-payload {:message message :mentions mentions}))]
+          (notifications/send-notification! org-id :attendance-reminder {:pending-players pending-players} ds)
+          (is (some? @sent-payload))
+          (is (= ["5511911111111@c.us"] (:mentions @sent-payload))))))))
