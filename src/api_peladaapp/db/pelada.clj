@@ -113,10 +113,11 @@
    offset :- s/Int
    db]
   (let [one-day-ago (-> (Instant/now) (.minus (Duration/ofDays 1)) Timestamp/from)
-        query (-> (h/select :p.* [:o.name :organization_name])
+        query (-> (h/select :p.* [:o.name :organization_name] [:a.status :user_attendance_status])
                   (h/from [:Peladas :p])
                   (h/join [:OrganizationPlayers :op] [:= :op.organization_id :p.organization_id])
                   (h/join [:Organizations :o] [:= :o.id :p.organization_id])
+                  (h/left-join [:Attendance :a] [:and [:= :a.pelada_id :p.id] [:= :a.player_id :op.id]])
                   (h/where [:= :op.user_id user-id])
                   (h/order-by
                    [[:case

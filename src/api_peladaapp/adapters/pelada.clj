@@ -62,7 +62,8 @@
          :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id model)
          :timer_started_at (:timer-started-at model)
          :timer_accumulated_ms (:timer-accumulated-ms model)
-         :timer_status (:timer-status model)))))
+         :timer_status (:timer-status model)
+         :user_attendance_status (:user-attendance-status model)))))
 
 (defn begin-model->response [model]
   {:matches_created (:matches-created model)})
@@ -86,7 +87,8 @@
                             :closed-at (:closed_at p)
                             :timer-started-at (:timer_started_at p)
                             :timer-accumulated-ms (:timer_accumulated_ms p)
-                            :timer-status (:timer_status p))))
+                            :timer-status (:timer_status p)
+                            :user-attendance-status (some-> (:user_attendance_status p) (as-> x (if (keyword? x) (name x) (str x)))))))
 
 (defn user->response [user]
   (when user
