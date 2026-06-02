@@ -1,9 +1,11 @@
 (ns api-peladaapp.pelada-adapter-test
   (:require
    [api-peladaapp.adapters.pelada :as adapter.pelada]
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing]])
   (:import
-   [java.time Duration Instant]))
+   [java.sql Timestamp]
+   [java.time Duration Instant LocalDateTime]))
 
 (deftest test-model->response-voting-status
   (testing "Should return voting status and preserve scheduled_at when voting is open"
@@ -34,3 +36,20 @@
           response (adapter.pelada/model->response model)]
       (is (= "open" (:status response)))
       (is (= "2023-01-01T10:00:00Z" (:scheduled_at response))))))
+
+(deftest test-model->response-scheduled-at-formatting
+  (testing "Should format java.time.LocalDateTime scheduled-at as UTC ISO string"
+    (let [dt (LocalDateTime/of 2026 6 3 19 0 0)
+          model {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                 :organization-id (parse-uuid "00000000-0000-0000-0000-000000000010")
+                 :scheduled-at dt}
+          response (adapter.pelada/model->response model)]
+      (is (= "2026-06-03T19:00:00Z" (:scheduled_at response)))))
+
+  (testing "Should format java.sql.Timestamp scheduled-at as UTC ISO string"
+    (let [ts (Timestamp/valueOf "2026-06-03 19:00:00")
+          model {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                 :organization-id (parse-uuid "00000000-0000-0000-0000-000000000010")
+                 :scheduled-at ts}
+          response (adapter.pelada/model->response model)]
+      (is (str/ends-with? (:scheduled_at response) "Z")))))

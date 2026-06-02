@@ -27,7 +27,7 @@
                                                                    (s/optional-key :away-fixed-goalkeeper-id) (s/maybe s/Uuid)}
    db]
   (let [row (cond-> {:organization_id organization-id :status [:cast "attendance" :pelada_status]}
-              scheduled-at (assoc :scheduled_at [[:cast scheduled-at :timestamp]])
+              scheduled-at (assoc :scheduled_at [[:cast (helpers.time/to-utc-timestamp-str scheduled-at) :timestamp]])
               num-teams (assoc :num_teams num-teams)
               players-per-team (assoc :players_per_team players-per-team)
               (some? fixed-goalkeepers) (assoc :fixed_goalkeepers (boolean fixed-goalkeepers))
@@ -54,14 +54,14 @@
    db]
   (let [db-row (cond-> (medley.core/assoc-some {}
                                                :organization_id (:organization-id pelada)
-                                               :scheduled_at (when (:scheduled-at pelada) [[:cast (:scheduled-at pelada) :timestamp]])
+                                               :scheduled_at (when (:scheduled-at pelada) [[:cast (helpers.time/to-utc-timestamp-str (:scheduled-at pelada)) :timestamp]])
                                                :num_teams (:num-teams pelada)
                                                :players_per_team (:players-per-team pelada)
                                                :fixed_goalkeepers (when (some? (:fixed-goalkeepers pelada))
                                                                     (boolean (:fixed-goalkeepers pelada)))
                                                :status (when (:status pelada) [[:cast (:status pelada) :pelada_status]])
-                                               :closed_at (when (:closed-at pelada) [[:cast (:closed-at pelada) :timestamp]])
-                                               :timer_started_at (when (:timer-started-at pelada) [[:cast (:timer-started-at pelada) :timestamp]])
+                                               :closed_at (when (:closed-at pelada) [[:cast (helpers.time/to-utc-timestamp-str (:closed-at pelada)) :timestamp]])
+                                               :timer_started_at (when (:timer-started-at pelada) [[:cast (helpers.time/to-utc-timestamp-str (:timer-started-at pelada)) :timestamp]])
                                                :timer_accumulated_ms (:timer-accumulated-ms pelada)
                                                :timer_status (when (:timer-status pelada) [[:cast (:timer-status pelada) :timer_status]]))
                  (contains? pelada :home-fixed-goalkeeper-id) (assoc :home_fixed_goalkeeper_id (:home-fixed-goalkeeper-id pelada))
@@ -175,8 +175,8 @@
                                                     [:not-exists (-> (h/select 1)
                                                                      (h/from :PeladaReminders)
                                                                      (h/where [:= :pelada_id :p.id] [:= :type [:cast (name type) :reminder_type]]))]]
-                                                   [:>= :p.closed_at [[:cast start :timestamp]]]
-                                                   [:< :p.closed_at [[:cast end :timestamp]]]))]
+                                                   [:>= :p.closed_at [[:cast (helpers.time/to-utc-timestamp-str start) :timestamp]]]
+                                                   [:< :p.closed_at [[:cast (helpers.time/to-utc-timestamp-str end) :timestamp]]]))]
                             (->> (jdbc/execute! db (hsql/format query) hsql/opts)
                                  (map (fn [p] {:pelada (adapter.pelada/db->model p) :type type})))))]
     (concat (fetch-reminders :vote_30m rem-30m-start rem-30m-end)

@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.adapters.match :as adapter.match]
    [api-peladaapp.helpers.sql :as hsql]
+   [api-peladaapp.helpers.time :as helpers.time]
    [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
    [schema.core :as s]))
@@ -49,7 +50,7 @@
                  (some? home-score) (assoc :home_score home-score)
                  (some? away-score) (assoc :away_score away-score)
                  status (assoc :status [:cast status :match_status])
-                 timer-started-at (assoc :timer_started_at [[:cast timer-started-at :timestamp]])
+                 timer-started-at (assoc :timer_started_at [[:cast (helpers.time/to-utc-timestamp-str timer-started-at) :timestamp]])
                  (some? timer-accumulated-ms) (assoc :timer_accumulated_ms timer-accumulated-ms)
                  timer-status (assoc :timer_status [:cast timer-status :timer_status]))]
     (if (empty? db-row)

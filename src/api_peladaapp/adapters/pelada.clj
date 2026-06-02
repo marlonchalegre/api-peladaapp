@@ -50,7 +50,7 @@
                          (:status model))]
     (-> {:id (:id model)
          :organization_id (:organization-id model)
-         :scheduled_at (:scheduled-at model)
+         :scheduled_at (some-> (:scheduled-at model) helpers.time/->instant str)
          :num_teams (:num-teams model)
          :players_per_team (:players-per-team model)
          :fixed_goalkeepers (boolean (:fixed-goalkeepers model))
