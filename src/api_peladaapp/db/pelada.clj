@@ -91,7 +91,7 @@
                   (h/from [:Peladas :p])
                   (h/join [:Organizations :o] [:= :o.id :p.organization_id])
                   (h/where [:= :p.organization_id organization-id])
-                  (h/order-by [:p.id :desc])
+                  (h/order-by [:p.scheduled_at :desc] [:p.id :desc])
                   (h/limit limit)
                   (h/offset offset))]
     (->> (jdbc/execute! db (hsql/format query) hsql/opts)

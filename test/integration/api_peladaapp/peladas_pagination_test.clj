@@ -39,7 +39,10 @@
       (is (= 20 (count body)))
       (is (= "25" (get headers "X-Total")))
       (is (= "2" (get headers "X-Total-Pages")))
-      (is (= "1" (get headers "X-Page"))))
+      (is (= "1" (get headers "X-Page")))
+      ;; Verify ordering is scheduled_at desc
+      (let [dates (map :scheduled_at body)]
+        (is (= dates (sort (comp - compare) dates)))))
 
       ;; Test second page
     (let [resp (app (-> (mock/request :get (str "/api/organizations/" org-id "/peladas?page=2&per_page=20"))
