@@ -63,14 +63,15 @@
     timer-status (assoc :timer_status timer-status)))
 
 (s/defn event->response :- responses.match/MatchEventResponse
-  [{:keys [id match-id player-id event-type created-at session-time-ms match-time-ms]}]
+  [{:keys [id match-id player-id event-type created-at session-time-ms match-time-ms parent-event-id]}]
   (cond-> {:id id
            :match_id match-id
            :player_id player-id
            :event_type event-type}
     created-at (assoc :created_at created-at)
     session-time-ms (assoc :session_time_ms session-time-ms)
-    match-time-ms (assoc :match_time_ms match-time-ms)))
+    match-time-ms (assoc :match_time_ms match-time-ms)
+    parent-event-id (assoc :parent_event_id parent-event-id)))
 
 (s/defn stats->response :- responses.match/PlayerStatsResponse
   [{:keys [player-id user-id name goals assists own-goals avatar-filename]}]
@@ -105,4 +106,5 @@
              :event-type (:event_type p)}
       (:created_at p) (assoc :created-at (:created_at p))
       (:session_time_ms p) (assoc :session-time-ms (:session_time_ms p))
-      (:match_time_ms p) (assoc :match-time-ms (:match_time_ms p)))))
+      (:match_time_ms p) (assoc :match-time-ms (:match_time_ms p))
+      (:parent_event_id p) (assoc :parent-event-id (:parent_event_id p)))))
