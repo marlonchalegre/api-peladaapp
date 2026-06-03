@@ -83,8 +83,8 @@
                            :home-score 0 :away-score 0}]}
           msg (notifications/generate-matches-results-message data)]
       (is (re-find #"⚽ \*RESULTADOS DAS PARTIDAS\*" msg))
-      (is (re-find #"Jogo 1:            Short  3 x 2  VeryLongTeamName" msg))
-      (is (re-find #"Jogo 2: VeryLongTeamName  0 x 0  Short           " msg))
+      (is (re-find #"           Short  3 x 2  VeryLongTeamName" msg))
+      (is (re-find #"VeryLongTeamName  0 x 0  Short           " msg))
       (is (re-find #"```" msg)))))
 
 

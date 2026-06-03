@@ -216,15 +216,14 @@
                           (map #(count (:name %)))
                           (reduce max 10))
         matches-str (->> matches
-                         (map-indexed (fn [idx m]
-                                        (let [home-name (get team-map (:home-team-id m) "Unknown")
-                                              away-name (get team-map (:away-team-id m) "Unknown")
-                                              home-score (or (:home-score m) 0)
-                                              away-score (or (:away-score m) 0)]
-                                          (str "Jogo " (inc idx) ": "
-                                               (pad-start home-name max-name-len)
-                                               "  " home-score " x " away-score "  "
-                                               (pad-end away-name max-name-len)))))
+                         (map (fn [m]
+                                (let [home-name (get team-map (:home-team-id m) "Unknown")
+                                      away-name (get team-map (:away-team-id m) "Unknown")
+                                      home-score (or (:home-score m) 0)
+                                      away-score (or (:away-score m) 0)]
+                                  (str (pad-start home-name max-name-len)
+                                       "  " home-score " x " away-score "  "
+                                       (pad-end away-name max-name-len)))))
                          (str/join "\n"))]
     (str title "```\n" matches-str "\n```")))
 
