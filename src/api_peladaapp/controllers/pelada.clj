@@ -255,14 +255,16 @@
               teams (db.team/list-pelada-teams pelada-id db)
               events (db.match-event/list-events-by-pelada pelada-id db)
               lineups (db.match-lineup/list-match-lineups-by-pelada pelada-id db)
-              team-players (db.team/list-team-players-with-names-by-pelada pelada-id db)]
+              team-players (db.team/list-team-players-with-names-by-pelada pelada-id db)
+              org-players (db.player/list-players-by-organization (:organization-id pelada) db)
+              all-players (distinct (concat team-players (map (fn [p] {:player_id (:id p) :player_name (:user-name p)}) org-players)))]
           (notifications/send-notification! (:organization-id pelada) :end
                                             {:pelada pelada
                                              :matches matches
                                              :teams teams
                                              :events events
                                              :lineups lineups
-                                             :team-players team-players}
+                                             :team-players all-players}
                                             db))
         (catch Exception e (log/error e "Error sending close/reminder notification:"))))
     pelada))
