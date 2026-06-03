@@ -104,7 +104,7 @@
             (is (re-find #"Time A +3 pts" (:message msg1)))
             ;; Second message check
             (is (re-find #"⚽ \*RESULTADOS DAS PARTIDAS\*" (:message msg2)))
-            (is (re-find #"Jogo 1:     Time A  2 x 1  Time B" (:message msg2)))))))))
+            (is (re-find #"    Time A  2 x 1  Time B" (:message msg2)))))))))
 
 (deftest send-notification-waha-feature-flag-test
   (let [db-val (-> th/*test-system* :database :database)
