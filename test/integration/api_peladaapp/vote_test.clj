@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.controllers.vote :as controller.vote]
    [api-peladaapp.db.admin :as db.admin]
+   [api-peladaapp.db.attendance :as db.attendance]
    [api-peladaapp.db.organization :as db.org]
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.player :as db.player]
@@ -134,7 +135,15 @@
           (is (contains? eligible-player-ids gk-id))
           (is (not (contains? eligible-player-ids player-id))))))
 
-    (testing "Fixed goalkeeper should be able to get voting info and vote"
+    (testing "Fixed goalkeeper is blocked by default"
+      (let [info (controller.vote/get-voting-info pelada-id gk-user-id ds)]
+        (is (some? info))
+        (is (false? (:can-vote info)))))
+
+    (testing "Admin unblocks fixed goalkeeper"
+      (db.attendance/update-voting-enabled pelada-id gk-id true ds))
+
+    (testing "Fixed goalkeeper should be able to get voting info and vote after unblock"
       (let [info (controller.vote/get-voting-info pelada-id gk-user-id ds)]
         (is (some? info))
         (is (true? (:can-vote info)))

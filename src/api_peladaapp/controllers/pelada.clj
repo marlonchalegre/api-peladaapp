@@ -138,6 +138,16 @@
       (when (zero? rows)
         (throw (ex-info nil {:type :not-found :message "Pelada not found"})))
 
+      (doseq [gk-key [:home-fixed-goalkeeper-id :away-fixed-goalkeeper-id]]
+        (when (contains? pelada gk-key)
+          (let [old-gk-id (get old-pelada gk-key)
+                new-gk-id (get pelada gk-key)]
+            (when (not= old-gk-id new-gk-id)
+              (when (some? new-gk-id)
+                (db.attendance/update-voting-enabled pelada-id new-gk-id false tx))
+              (when (some? old-gk-id)
+                (db.attendance/update-voting-enabled pelada-id old-gk-id true tx))))))
+
       ;; Handle player redistribution if players-per-team decreased
       (when-let [new-count (:players-per-team pelada)]
         (when (and (:players-per-team old-pelada)

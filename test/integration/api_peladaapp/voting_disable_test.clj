@@ -1,5 +1,6 @@
 (ns api-peladaapp.voting-disable-test
   (:require
+   [api-peladaapp.db.vote :as db.vote]
    [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.test-helpers :as th]
@@ -98,3 +99,76 @@
             (is (= 400 status) (str "Expected status 400, got " status " with body: " body))
             (is (= "Cannot vote for a player who has voting disabled for this pelada" (:message body))
                 (str "Unexpected error message: " (:message body)))))))))
+
+(deftest goalkeeper-default-blocked-test
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
+
+        token1 (th/register-and-login! app {:name "Admin" :email "admin-gk@test.com" :password "pass"})
+        auth1 (th/auth-cookie token1)
+        token2 (th/register-and-login! app {:name "Goalkeeper" :email "gk@test.com" :password "pass"})
+        auth2 (th/auth-cookie token2)
+
+        org-id (:id (th/decode-body (app (-> (mock/request :post "/api/organizations")
+                                             (mock/json-body {:name "GK Test Org"})
+                                             auth1))))
+        _ (jdbc/execute! ds ["UPDATE \"OrganizationFeatureFlags\" SET peer_voting = TRUE WHERE organization_id = ?" (parse-uuid org-id)])]
+
+    (let [uid (th/user-id-by-email ds "gk@test.com")]
+      (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id (misc/as-uuid org-id) :user_id (misc/as-uuid uid) :member_type [:cast "diarista" :member_type]}]))))
+
+    (let [pelada-id (:id (th/decode-body (app (-> (mock/request :post "/api/peladas")
+                                                  (mock/json-body {:organization_id org-id :num_teams 2 :fixed_goalkeepers true})
+                                                  auth1))))
+          admin-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (misc/as-uuid (th/user-id-by-email ds "admin-gk@test.com"))]))))
+          gk-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (misc/as-uuid (th/user-id-by-email ds "gk@test.com"))]))))]
+
+      (app (-> (mock/request :put (str "/api/peladas/" pelada-id))
+               (mock/json-body {:home_fixed_goalkeeper_id gk-id})
+               auth1))
+
+      (app (-> (mock/request :post "/api/teams") (mock/json-body {:pelada_id pelada-id :name "Team A"}) auth1))
+      (app (-> (mock/request :post "/api/teams") (mock/json-body {:pelada_id pelada-id :name "Team B"}) auth1))
+
+      (exec! ds (-> (h/insert-into :TeamPlayers) (h/values [{:team_id (misc/as-uuid (:id (first (exec! ds (-> (h/select :id) (h/from :Teams) (h/where [:= :pelada_id (misc/as-uuid pelada-id)])))))) :player_id (misc/as-uuid admin-id)}])))
+
+      (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance")) (mock/json-body {:status "confirmed"}) auth1))
+      (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance")) (mock/json-body {:status "confirmed" :player_id gk-id}) auth1))
+
+      (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth1))
+      (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin")) auth1))
+      (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close")) auth1))
+
+      (testing "Goalkeeper is blocked from voting by default"
+        (let [info (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/voting-info")) auth2)))]
+          (is (false? (:can_vote info)) "Goalkeeper can-vote should be false by default")
+          (is (= "Sua participação nesta pelada foi desabilitada para votação pelo administrador." (:message info)))))
+
+      (testing "Goalkeeper trying to vote should fail with 403"
+        (let [resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/votes/batch"))
+                            (mock/json-body {:voter_id gk-id
+                                             :votes [{:target_id admin-id :stars 5}]})
+                            auth2))
+              status (:status resp)
+              body (th/decode-body resp)]
+          (is (= 403 status))
+          (is (= "Sua participação nesta pelada foi desabilitada para votação pelo administrador." (:message body)))))
+
+      (testing "Goalkeeper is not listed in pending voters for reminder"
+        (let [pending (db.vote/list-pending-voters-by-pelada (parse-uuid pelada-id) ds)]
+          (is (not (some #(= (str gk-id) (str (:player-id %))) pending)) "Goalkeeper should not be listed as pending voter")))
+
+      (testing "Admin can enable voting for goalkeeper"
+        (let [resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance/voting-enabled"))
+                            (mock/json-body {:player_id gk-id :enabled true})
+                            auth1))
+              status (:status resp)]
+          (is (= 200 status))
+
+          (let [info (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/voting-info")) auth2)))]
+            (is (true? (:can_vote info)) "Goalkeeper can-vote should be true after being enabled"))))
+
+      (testing "Goalkeeper is listed in pending voters for reminder after being enabled"
+        (let [pending (db.vote/list-pending-voters-by-pelada (parse-uuid pelada-id) ds)]
+          (is (some #(= (str gk-id) (str (:player-id %))) pending) "Goalkeeper should be listed as pending voter"))))))

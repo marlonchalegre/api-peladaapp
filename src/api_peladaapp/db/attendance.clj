@@ -11,8 +11,9 @@
    status :- s/Str
    db]
   (let [now (java.sql.Timestamp. (System/currentTimeMillis))
+        row {:pelada_id pelada-id :player_id player-id :status [:cast status :attendance_status] :updated_at now}
         query (-> (h/insert-into :Attendance)
-                  (h/values [{:pelada_id pelada-id :player_id player-id :status [:cast status :attendance_status] :updated_at now}])
+                  (h/values [row])
                   (h/on-conflict :pelada_id :player_id)
                   (h/do-update-set :status :updated_at))]
     (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
@@ -90,8 +91,10 @@
    player-id :- s/Uuid
    enabled? :- s/Bool
    db]
-  (let [query (-> (h/update :Attendance)
-                  (h/set {:voting_enabled (boolean enabled?)})
-                  (h/where [:and [:= :pelada_id pelada-id] [:= :player_id player-id]]))]
+  (let [now (java.sql.Timestamp. (System/currentTimeMillis))
+        query (-> (h/insert-into :Attendance)
+                  (h/values [{:pelada_id pelada-id :player_id player-id :status [:cast "confirmed" :attendance_status] :updated_at now :voting_enabled (boolean enabled?)}])
+                  (h/on-conflict :pelada_id :player_id)
+                  (h/do-update-set :voting_enabled :updated_at))]
     (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         hsql/affected-rows-count)))

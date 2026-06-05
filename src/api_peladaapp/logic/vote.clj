@@ -65,3 +65,12 @@
     true
     (catch Exception _
       false)))
+
+(defn player-voting-enabled?
+  "Determine if a player is enabled to vote in a pelada.
+   If player has an explicit status in attendance, respects their voting_enabled flag.
+   Otherwise, if they are a fixed goalkeeper, defaults to false, else defaults to true."
+  [player-id attendance-voting-enabled gk-ids]
+  (if (nil? attendance-voting-enabled)
+    (not (contains? gk-ids player-id))
+    (boolean attendance-voting-enabled)))

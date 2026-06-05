@@ -12,11 +12,16 @@
    [schema.core :as s]))
 
 (s/defn cast-vote :- models.vote/Vote
-  [{:keys [pelada-id] :as vote} :- models.vote/Vote db]
-  ;; Validate pelada voting eligibility
-  (let [pelada (db.pelada/get-pelada pelada-id db)]
-    (vote.logic/validate-voting-eligibility pelada))
-  ;; Validate individual vote
+  [{:keys [pelada-id voter-id] :as vote} :- models.vote/Vote db]
+  (let [pelada (db.pelada/get-pelada pelada-id db)
+        attendance (db.attendance/list-attendance-by-pelada pelada-id db)
+        voter-attendance (first (filter #(= voter-id (:player_id %)) attendance))
+        gk-ids (set (keep identity [(:home-fixed-goalkeeper-id pelada) (:away-fixed-goalkeeper-id pelada)]))]
+    (vote.logic/validate-voting-eligibility pelada)
+    (when-not (vote.logic/player-voting-enabled? voter-id (:voting_enabled voter-attendance) gk-ids)
+      (throw (ex-info "Voter has voting disabled"
+                      {:type :bad-request
+                       :message "Cannot vote because voting has been disabled for you in this pelada"}))))
   (vote.logic/validate-vote vote)
   (let [id (db.vote/insert-vote vote db)]
     (db.vote/get-vote id db)))
@@ -24,19 +29,21 @@
 (s/defn batch-cast-votes :- models.vote/BatchVote
   "Cast multiple votes at once. Replaces any existing votes by this voter."
   [pelada-id :- s/Uuid voter-id :- s/Uuid votes :- [{:target-id s/Uuid :stars s/Int}] db]
-  ;; Validate pelada voting eligibility
-  (let [pelada (db.pelada/get-pelada pelada-id db)]
-    (vote.logic/validate-voting-eligibility pelada))
-
-  ;; Validate that all target players have voting enabled
-  (let [attendance (db.attendance/list-attendance-by-pelada pelada-id db)
-        disabled-ids (set (map :player_id (filter #(= false (boolean (:voting_enabled %))) attendance)))]
+  (let [pelada (db.pelada/get-pelada pelada-id db)
+        attendance (db.attendance/list-attendance-by-pelada pelada-id db)
+        attendance-map (into {} (map (fn [a] [(:player_id a) (:voting_enabled a)]) attendance))
+        gk-ids (set (keep identity [(:home-fixed-goalkeeper-id pelada) (:away-fixed-goalkeeper-id pelada)]))]
+    (vote.logic/validate-voting-eligibility pelada)
+    (when-not (vote.logic/player-voting-enabled? voter-id (get attendance-map voter-id) gk-ids)
+      (throw (ex-info "Voter has voting disabled"
+                      {:type :bad-request
+                       :message "Cannot vote because voting has been disabled for you in this pelada"})))
     (doseq [v votes]
-      (when (contains? disabled-ids (:target-id v))
-        (throw (ex-info "Target player has voting disabled"
-                        {:type :bad-request
-                         :message "Cannot vote for a player who has voting disabled for this pelada"})))))
-
+      (let [pid (:target-id v)]
+        (when-not (vote.logic/player-voting-enabled? pid (get attendance-map pid) gk-ids)
+          (throw (ex-info "Target player has voting disabled"
+                          {:type :bad-request
+                           :message "Cannot vote for a player who has voting disabled for this pelada"}))))))
   ;; Delete existing votes by this voter
   (db.vote/delete-votes-by-voter pelada-id voter-id db)
   ;; Insert new votes in batch
@@ -70,13 +77,20 @@
           (throw (ex-info "User is not a player in this organization"
                           {:type :forbidden :message "User is not a player in this organization"})))
 
-        ;; Verify voter participated in the pelada (was in a team)
         (let [participated (boolean (and voter-player-id
-                                         (db.team/did-player-participate-in-pelada? pelada-id voter-player-id db)))]
+                                         (db.team/did-player-participate-in-pelada? pelada-id voter-player-id db)))
+              attendance (db.attendance/list-attendance-by-pelada pelada-id db)
+              voter-attendance (first (filter #(= voter-player-id (:player_id %)) attendance))
+              gk-ids (set (keep identity [(:home-fixed-goalkeeper-id pelada) (:away-fixed-goalkeeper-id pelada)]))
+              voter-voting-enabled? (vote.logic/player-voting-enabled? voter-player-id (:voting_enabled voter-attendance) gk-ids)]
 
           (when (and (not participated) (not is-admin))
             (throw (ex-info "Player did not participate in this pelada"
                             {:type :forbidden :message "Only players who participated can vote"})))
+
+          (when (and (not voter-voting-enabled?) (not is-admin))
+            (throw (ex-info "Voting is disabled for this player"
+                            {:type :forbidden :message "Sua participação nesta pelada foi desabilitada para votação pelo administrador."})))
 
           ;; Get all players who participated (were in teams) with their names and stats
           (let [eligible-players-raw (db.vote/list-eligible-players-for-voting pelada-id voter-player-id db)
@@ -97,7 +111,7 @@
                 current-votes (if (and voter-player-id has-voted)
                                 (db.vote/list-votes-by-voter pelada-id voter-player-id db)
                                 [])]
-            {:can-vote participated
+            {:can-vote (and participated voter-voting-enabled?)
              :has-voted has-voted
              :eligible-players eligible-players
              :current-votes current-votes
@@ -112,8 +126,12 @@
 (s/defn get-voting-status :- models.vote/VotingStatus
   [pelada-id :- s/Uuid db]
   (let [votes (db.vote/list-votes-by-pelada pelada-id db)
-        ;; Get all participants (potential voters)
         participants-raw (db.vote/list-pelada-participants pelada-id db)
+        voters-participants (filter (fn [p]
+                                      (let [up (misc/unamespace p)]
+                                        (boolean (:voting_enabled up))))
+                                    participants-raw)
+
         participants (mapv (fn [p]
                              (let [up (misc/unamespace p)]
                                {:player-id (:player_id up)
@@ -121,7 +139,7 @@
                                 :name (:name up)
                                 :avatar-filename (:avatar_filename up)
                                 :position (:position up)}))
-                           participants-raw)
+                           voters-participants)
         voted-ids (set (map :voter-id votes))
         voter-status (map (fn [p]
                             {:player-id (:player-id p)

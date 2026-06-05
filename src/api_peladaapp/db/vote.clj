@@ -3,6 +3,7 @@
    [api-peladaapp.adapters.vote :as adapter.vote]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.logic.grade :as logic.grade]
+   [api-peladaapp.logic.vote :as vote.logic]
    [api-peladaapp.models.vote :as models.vote]
    [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
@@ -120,11 +121,12 @@
                   (h/where [:and
                             [:= :pa.pelada_id pelada-id]
                             [:= :pa.status [:cast "confirmed" :attendance_status]]
+                            [:= [[:coalesce :pa.voting_enabled true]] true]
                             [:not-exists (-> (h/select 1)
                                              (h/from [:Votes :v])
                                              (h/where [:= :v.pelada_id :pa.pelada_id] [:= :v.voter_id :pa.player_id]))]]))
         results (jdbc/execute! db (hsql/format query) hsql/opts)]
-    (map (fn [r] {:player-id (:player_id r) :player-name (:player_name r) :phone (:phone r)}) results)))
+    (mapv (fn [r] {:player-id (:player_id r) :player-name (:player_name r) :phone (:phone r)}) results)))
 
 (s/defn list-eligible-players-for-voting
   [pelada-id :- s/Uuid voter-player-id :- (s/maybe s/Uuid) db]
@@ -144,7 +146,9 @@
                                                         [:is-not :sub_p2.away_fixed_goalkeeper_id nil]))]]]
                        voter-player-id (conj [:!= :op.id voter-player-id]))
         query (-> (h/select [:op.id :player_id] [:u.id :user_id] :u.name :u.position :u.avatar_filename
-                            [[:coalesce :pa.voting_enabled true] :voting_enabled]
+                            [:pa.voting_enabled :pa_voting_enabled]
+                            [:p.home_fixed_goalkeeper_id :home_fixed_goalkeeper_id]
+                            [:p.away_fixed_goalkeeper_id :away_fixed_goalkeeper_id]
                             [[:coalesce :s.goals 0] :goals]
                             [[:coalesce :s.assists 0] :assists]
                             [[:coalesce :s.own_goals 0] :own_goals])
@@ -152,18 +156,29 @@
                   (h/join [:Users :u] [:= :u.id :op.user_id])
                   (h/left-join [:Attendance :pa] [:and [:= :pa.player_id :op.id] [:= :pa.pelada_id pelada-id]])
                   (h/left-join [:PeladaPlayerStats :s] [:and [:= :s.player_id :op.id] [:= :s.pelada_id pelada-id]])
-                  (h/where where-clause))]
-    (jdbc/execute! db (hsql/format query) hsql/opts)))
+                  (h/left-join [:Peladas :p] [:= :p.id pelada-id])
+                  (h/where where-clause))
+        results (jdbc/execute! db (hsql/format query) hsql/opts)]
+    (mapv (fn [r]
+            (let [gk-ids (set (keep identity [(:home_fixed_goalkeeper_id r) (:away_fixed_goalkeeper_id r)]))]
+              (assoc r :voting_enabled
+                     (vote.logic/player-voting-enabled? (:player_id r) (:pa_voting_enabled r) gk-ids))))
+          results)))
 
 (s/defn list-pelada-participants
   [pelada-id :- s/Uuid db]
   (let [query (-> (h/select [:op.id :player_id] [:u.id :user_id] :u.name :u.position :u.avatar_filename
+                            [:pa.voting_enabled :pa_voting_enabled]
+                            [:p.home_fixed_goalkeeper_id :home_fixed_goalkeeper_id]
+                            [:p.away_fixed_goalkeeper_id :away_fixed_goalkeeper_id]
                             [[:coalesce :s.goals 0] :goals]
                             [[:coalesce :s.assists 0] :assists]
                             [[:coalesce :s.own_goals 0] :own_goals])
                   (h/from [:OrganizationPlayers :op])
                   (h/join [:Users :u] [:= :u.id :op.user_id])
                   (h/left-join [:PeladaPlayerStats :s] [:and [:= :s.player_id :op.id] [:= :s.pelada_id pelada-id]])
+                  (h/left-join [:Attendance :pa] [:and [:= :pa.player_id :op.id] [:= :pa.pelada_id pelada-id]])
+                  (h/left-join [:Peladas :p] [:= :p.id pelada-id])
                   (h/where [:or
                             [:in :op.id (-> (h/select :player_id)
                                             (h/from [:TeamPlayers :sub_tp])
@@ -176,5 +191,10 @@
                             [:in :op.id (-> (h/select :away_fixed_goalkeeper_id)
                                             (h/from [:Peladas :sub_p2])
                                             (h/where [:= :sub_p2.id pelada-id]
-                                                     [:is-not :sub_p2.away_fixed_goalkeeper_id nil]))]]))]
-    (jdbc/execute! db (hsql/format query) hsql/opts)))
+                                                     [:is-not :sub_p2.away_fixed_goalkeeper_id nil]))]]))
+        results (jdbc/execute! db (hsql/format query) hsql/opts)]
+    (mapv (fn [r]
+            (let [gk-ids (set (keep identity [(:home_fixed_goalkeeper_id r) (:away_fixed_goalkeeper_id r)]))]
+              (assoc r :voting_enabled
+                     (vote.logic/player-voting-enabled? (:player_id r) (:pa_voting_enabled r) gk-ids))))
+          results)))
