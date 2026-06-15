@@ -192,7 +192,7 @@
         short-name (str/join " " (take 2 words))
         jid (some-> (:phone player) waha/normalize-phone)]
     (if jid
-      (str short-name " (@" (str/replace jid "@c.us" "") ")")
+      (str "@" (str/replace jid "@c.us" "") " (" short-name ")")
       short-name)))
 
 (defn- generate-pelada-link [pelada-id]
