@@ -280,3 +280,48 @@
     (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         hsql/affected-rows-count)))
 
+(s/defn get-user-stats
+  [user-id :- s/Uuid
+   db]
+  (let [user-uuid [:cast user-id :uuid]
+        current-year (.getYear (java.time.LocalDate/now))
+        year-str (str current-year)
+        ;; 1. Goals and assists from PeladaPlayerStats
+        pelada-stats-query (-> (h/select [[:coalesce [:sum :ps.goals] 0] :goals]
+                                         [[:coalesce [:sum :ps.assists] 0] :assists])
+                               (h/from [:PeladaPlayerStats :ps])
+                               (h/join [:OrganizationPlayers :op] [:= :ps.player_id :op.id])
+                               (h/join [:Peladas :p] [:= :ps.pelada_id :p.id])
+                               (h/where [:and
+                                         [:= :op.user_id user-uuid]
+                                         [:= [:to_char :p.scheduled_at "YYYY"] year-str]]))
+        pelada-stats (jdbc/execute-one! db (hsql/format pelada-stats-query) hsql/opts)
+
+        ;; 2. Goals and assists from ManualStats
+        manual-stats-query (-> (h/select [[:coalesce [:sum :ms.goals] 0] :goals]
+                                         [[:coalesce [:sum :ms.assists] 0] :assists])
+                               (h/from [:ManualStats :ms])
+                               (h/join [:OrganizationPlayers :op] [:= :ms.player_id :op.id])
+                               (h/where [:and
+                                         [:= :op.user_id user-uuid]
+                                         [:= :ms.year current-year]]))
+        manual-stats (jdbc/execute-one! db (hsql/format manual-stats-query) hsql/opts)
+
+        ;; 3. Attendance confirmed / matches played.
+        attendance-query (-> (h/select [[:count [:distinct :a.pelada_id]] :count])
+                             (h/from [:Attendance :a])
+                             (h/join [:OrganizationPlayers :op] [:= :a.player_id :op.id])
+                             (h/join [:Peladas :p] [:= :a.pelada_id :p.id])
+                             (h/where [:and
+                                       [:= :op.user_id user-uuid]
+                                       [:= :a.status [:cast "confirmed" :attendance_status]]
+                                       [:= :p.status [:cast "closed" :pelada_status]]
+                                       [:= [:to_char :p.scheduled_at "YYYY"] year-str]]))
+        attendance-count (:count (jdbc/execute-one! db (hsql/format attendance-query) hsql/opts))]
+    {:goals (+ (int (or (:goals pelada-stats) 0))
+               (int (or (:goals manual-stats) 0)))
+     :assists (+ (int (or (:assists pelada-stats) 0))
+                 (int (or (:assists manual-stats) 0)))
+     :matches (int (or attendance-count 0))}))
+
+

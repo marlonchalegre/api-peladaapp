@@ -206,3 +206,59 @@
     (is (nil? (jdbc/execute-one! ds [(str "SELECT 1 FROM \"Attendance\" WHERE player_id = '" player-id "'")])))
     ;; Verify token is cascaded/deleted
     (is (nil? (jdbc/execute-one! ds [(str "SELECT 1 FROM password_reset_tokens WHERE user_id = '" user-id "'")])))))
+
+(deftest get-user-profile-includes-stats
+  (let [app (-> th/*test-system* :app :app-handler)
+        ds (api-peladaapp.test-helpers/get-test-datasource)
+
+        token (th/register-and-login! app {:name "Stats User" :email "stats@example.com" :password "pass"})
+        user-id (th/user-id-by-email ds "stats@example.com")
+
+        ;; Verify default stats are 0
+        resp1 (app (-> (mock/request :get (str "/api/user/" user-id))
+                       (mock/cookie "authToken" token)))
+        body1 (decode-body resp1)]
+    (is (= 200 (:status resp1)))
+    (is (= {:goals 0 :assists 0 :matches 0} (:stats body1)))
+
+    ;; Now let's insert some mock manual stats and a completed match attendance
+    (let [org-resp (app (-> (mock/request :post "/api/organizations")
+                            (mock/cookie "authToken" token)
+                            (mock/json-body {:name "Stats Org"})))
+          org-body (th/decode-body org-resp)
+          org-id (parse-uuid (:id org-body))
+          player-id (th/player-id-by-user-id ds user-id org-id)
+
+          ;; Insert manual stats
+          _ (jdbc/execute! ds ["INSERT INTO \"ManualStats\" (organization_id, player_id, year, goals, assists, own_goals) VALUES (?, ?, 2026, 5, 3, 0)" org-id player-id])
+
+          ;; Create a Pelada
+          pelada-resp (app (-> (mock/request :post "/api/peladas")
+                               (mock/cookie "authToken" token)
+                               (mock/json-body {:organization_id (str org-id)
+                                                :name "Pelada Stats"
+                                                :scheduled_at "2026-06-15T18:00:00Z"
+                                                :duration_minutes 60
+                                                :location "Stadium"
+                                                :max_players 10})))
+          pelada-body (th/decode-body pelada-resp)
+          pelada-id (parse-uuid (:id pelada-body))
+
+          ;; Add attendance
+          _ (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance"))
+                     (mock/cookie "authToken" token)
+                     (mock/json-body {:status "confirmed"})))
+
+          ;; Close the pelada
+          _ (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close"))
+                     (mock/cookie "authToken" token)))
+
+          ;; Fetch user profile again
+          resp2 (app (-> (mock/request :get (str "/api/user/" user-id))
+                         (mock/cookie "authToken" token)))
+          body2 (decode-body resp2)]
+      (is (= 200 (:status resp2)))
+      (is (= 5 (get-in body2 [:stats :goals])))
+      (is (= 3 (get-in body2 [:stats :assists])))
+      (is (= 1 (get-in body2 [:stats :matches]))))))
+

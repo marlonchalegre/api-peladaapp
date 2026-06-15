@@ -23,7 +23,10 @@
    (s/optional-key :avatar-filename) (s/maybe s/Str)
    (s/optional-key :is-global-admin) s/Bool
    (s/optional-key :is-blocked) s/Bool
-   (s/optional-key :allow-org-creation) s/Bool})
+   (s/optional-key :allow-org-creation) s/Bool
+   (s/optional-key :stats) (s/maybe {:goals s/Int
+                                     :assists s/Int
+                                     :matches s/Int})})
 
 (s/defschema UserProfileUpdate
   "Schema for user profile updates - excludes score and other protected fields"

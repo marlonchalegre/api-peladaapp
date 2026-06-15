@@ -25,8 +25,8 @@
    (model->response user true))
   ([user :- models.user/User exclude-email? :- s/Bool]
    (let [fields (if exclude-email?
-                  [:id :name :username :position :avatar-filename :avatar_filename :phone :is-global-admin :is-blocked :allow-org-creation]
-                  [:id :name :username :email :position :avatar-filename :avatar_filename :phone :is-global-admin :is-blocked :allow-org-creation])]
+                  [:id :name :username :position :avatar-filename :avatar_filename :phone :is-global-admin :is-blocked :allow-org-creation :stats]
+                  [:id :name :username :email :position :avatar-filename :avatar_filename :phone :is-global-admin :is-blocked :allow-org-creation :stats])]
      (-> (select-keys user fields)
          (assoc :admin_orgs (or (:admin-orgs user) []))
          (misc/rename-key :avatar-filename :avatar_filename)
