@@ -101,11 +101,19 @@
   "Create pelada and optionally seed default teams. Returns pelada model."
   [pelada :- models.pelada/Pelada
    db]
-  (jdbc/with-transaction [tx db]
-    (let [pelada-id (db.pelada/insert-pelada pelada tx)]
-      (when-let [team-count (:num-teams pelada)]
-        (auto-create-teams! pelada-id team-count tx))
-      (db.pelada/get-pelada pelada-id tx))))
+  (let [result (jdbc/with-transaction [tx db]
+                 (let [pelada-id (db.pelada/insert-pelada pelada tx)]
+                   (when-let [team-count (:num-teams pelada)]
+                     (auto-create-teams! pelada-id team-count tx))
+                   (db.pelada/get-pelada pelada-id tx)))]
+    ;; WAHA Notification - Async outside transaction
+    (future
+      (try
+        (let [org-id (:organization-id result)
+              pelada-id (:id result)]
+          (notifications/send-notification! org-id :new-pelada {:pelada-id pelada-id :scheduled-at (:scheduled-at result) :confirmed-players []} db))
+        (catch Exception e (log/error e "Error sending new pelada notification:"))))
+    result))
 
 (s/defn get-pelada :- models.pelada/Pelada
   [pelada-id :- s/Uuid db]

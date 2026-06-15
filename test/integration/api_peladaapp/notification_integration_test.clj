@@ -32,7 +32,7 @@
             sent-payload (atom nil)]
         (with-redefs [waha/send-message (fn [_ message mentions]
                                           (reset! sent-payload {:message message :mentions mentions}))]
-          (notifications/send-notification! org-id :attendance-reminder {:pending-players pending-players} ds)
+          (notifications/send-notification! org-id :attendance-reminder {:pending-players pending-players :pelada-id (parse-uuid "00000000-0000-0000-0000-000000000001")} ds)
 
           (is (some? @sent-payload))
           (let [{:keys [message mentions]} @sent-payload]
@@ -62,7 +62,7 @@
             sent-payload (atom nil)]
         (with-redefs [waha/send-message (fn [_ message mentions]
                                           (reset! sent-payload {:message message :mentions mentions}))]
-          (notifications/send-notification! org-id :attendance-reminder {:pending-players pending-players} ds)
+          (notifications/send-notification! org-id :attendance-reminder {:pending-players pending-players :pelada-id (parse-uuid "00000000-0000-0000-0000-000000000001")} ds)
 
           (is (some? @sent-payload))
           (is (= ["5511911111111@c.us"] (:mentions @sent-payload)))
@@ -130,7 +130,7 @@
             sent-payload (atom nil)]
         (with-redefs [waha/send-message (fn [_ message mentions]
                                           (reset! sent-payload {:message message :mentions mentions}))]
-          (notifications/send-notification! org-id :attendance-reminder {:pending-players pending-players} ds)
+          (notifications/send-notification! org-id :attendance-reminder {:pending-players pending-players :pelada-id (parse-uuid "00000000-0000-0000-0000-000000000001")} ds)
           (is (nil? @sent-payload)))))
 
     (testing "Sends notifications if waha_communications feature flag is enabled"
@@ -139,6 +139,35 @@
             sent-payload (atom nil)]
         (with-redefs [waha/send-message (fn [_ message mentions]
                                           (reset! sent-payload {:message message :mentions mentions}))]
-          (notifications/send-notification! org-id :attendance-reminder {:pending-players pending-players} ds)
+          (notifications/send-notification! org-id :attendance-reminder {:pending-players pending-players :pelada-id (parse-uuid "00000000-0000-0000-0000-000000000001")} ds)
           (is (some? @sent-payload))
           (is (= ["5511911111111@c.us"] (:mentions @sent-payload))))))))
+
+(deftest send-new-pelada-notification-test
+  (let [db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
+        org-id (db.organization/insert-organization {:name "Waha New Pelada Org"} ds)]
+
+    (jdbc/execute! ds (hsql/format (-> (h/insert-into :OrganizationWahaConfigs)
+                                       (h/values [{:organization_id org-id
+                                                   :enabled true
+                                                   :api_url "http://waha:3000"
+                                                   :instance "default"
+                                                   :group_id "group123"
+                                                   :attendance_reminder_enabled true
+                                                   :use_all_mention true}]))))
+
+    (testing "Send new pelada convocacao notification"
+      (let [pelada-id (parse-uuid "00000000-0000-0000-0000-000000000001")
+            sent-payload (atom nil)]
+        (with-redefs [waha/send-message (fn [_ message mentions]
+                                          (reset! sent-payload {:message message :mentions mentions}))]
+          (notifications/send-notification! org-id :new-pelada {:pelada-id pelada-id :scheduled-at "2023-01-01T10:00:00Z" :confirmed-players []} ds)
+
+          (is (some? @sent-payload))
+          (let [{:keys [message mentions]} @sent-payload]
+            (is (re-find #"⚽ \*Nova Pelada Confirmada! @all\*" message))
+            (is (re-find #"01/01" message))
+            (is (re-find #"/peladas/00000000-0000-0000-0000-000000000001" message))
+            (is (re-find #"Nenhum jogador confirmado ainda." message))
+            (is (= #{"all"} (set mentions)))))))))

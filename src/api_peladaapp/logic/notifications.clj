@@ -195,12 +195,28 @@
       (str short-name " (@" (str/replace jid "@c.us" "") ")")
       short-name)))
 
-(defn generate-attendance-reminder [pending-players]
+(defn- generate-pelada-link [pelada-id]
+  (str (get-base-url) "/peladas/" pelada-id))
+
+(defn generate-attendance-reminder [pelada-id pending-players]
   (let [title "⏰ *Lembrete de Presença!* ⏰\n\nAinda temos jogadores com presença pendente para a próxima pelada:\n\n"
         players-str (->> pending-players
                          (map #(str "• " (format-mention %)))
                          (str/join "\n"))]
-    (str title players-str "\n\nPor favor, confirmem no app o quanto antes!")))
+    (str title players-str "\n\nPor favor, confirmem no app o quanto antes!\n" (generate-pelada-link pelada-id))))
+
+(defn generate-new-pelada-message [pelada-id scheduled-at confirmed-players]
+  (let [date-str (format-date scheduled-at)
+        title (str "⚽ *Nova Pelada Confirmada!* ⚽\n\nUma nova pelada foi agendada para o dia " date-str ".\n\n"
+                   "A lista de presença está aberta! Acesse o app para confirmar ou recusar sua participação:\n"
+                   (generate-pelada-link pelada-id) "\n\n")
+        confirmations-title "*Confirmados:*\n"
+        confirmations-str (if (seq confirmed-players)
+                            (->> confirmed-players
+                                 (map #(str "• " (format-mention %)))
+                                 (str/join "\n"))
+                            "Nenhum jogador confirmado ainda.")]
+    (str title confirmations-title confirmations-str)))
 
 (defn generate-vote-reminder [pelada-id pending-voters]
   (let [title "🗳️ *Lembrete de Votação!* 🗳️\n\nAinda faltam alguns jogadores votarem nos melhores da pelada:\n\n"
@@ -235,6 +251,7 @@
         waha-enabled? (if (nil? flags) true (true? (:waha_communications flags)))]
     (when (and org (:waha-enabled org) waha-enabled?)
       (let [enabled-key (case type
+                          :new-pelada :waha-attendance-reminder-enabled
                           :start :waha-start-msg-enabled
                           :end :waha-end-msg-enabled
                           :vote-ended :waha-vote-ended-msg-enabled
@@ -243,10 +260,11 @@
             should-send? (get org enabled-key)]
         (when should-send?
           (let [message (case type
+                          :new-pelada (generate-new-pelada-message (:pelada-id data) (:scheduled-at data) (:confirmed-players data))
                           :start (generate-start-message (:teams data) (:team-players data))
                           :end (generate-end-message data)
                           :vote-ended (generate-vote-ended-message (:pelada-id data))
-                          :attendance-reminder (generate-attendance-reminder (:pending-players data))
+                          :attendance-reminder (generate-attendance-reminder (:pelada-id data) (:pending-players data))
                           :vote-reminder (generate-vote-reminder (:pelada-id data) (:pending-voters data)))
                 mentions (case type
                            :attendance-reminder (->> (:pending-players data)
@@ -257,11 +275,11 @@
                                                vec)
                            nil)
                 use-all? (:waha-use-all-mention org)
-                final-mentions (if (and (contains? #{:attendance-reminder :vote-reminder} type)
+                final-mentions (if (and (contains? #{:new-pelada :attendance-reminder :vote-reminder} type)
                                         use-all?)
                                  (conj mentions "all")
                                  mentions)
-                final-message (if (and (contains? #{:attendance-reminder :vote-reminder} type)
+                final-message (if (and (contains? #{:new-pelada :attendance-reminder :vote-reminder} type)
                                        use-all?)
                                 (str/replace message #"!\*" "! @all*")
                                 message)]

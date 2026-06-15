@@ -19,9 +19,20 @@
 (deftest generate-attendance-reminder-test
   (let [players [{:player-name "User Long Name" :phone "5511911111111"}
                  {:player-name "User 2" :phone nil}]
-        message (notifications/generate-attendance-reminder players)]
+        pelada-id (parse-uuid "00000000-0000-0000-0000-000000000001")
+        message (notifications/generate-attendance-reminder pelada-id players)]
     (is (re-find #"• User Long \(@5511911111111\)" message))
-    (is (re-find #"• User 2" message))))
+    (is (re-find #"• User 2" message))
+    (is (re-find #"/peladas/00000000-0000-0000-0000-000000000001" message))))
+
+(deftest generate-new-pelada-message-test
+  (testing "Generates new pelada notification"
+    (let [pelada-id (parse-uuid "00000000-0000-0000-0000-000000000001")
+          message (notifications/generate-new-pelada-message pelada-id "2023-01-01T10:00:00Z" [])]
+      (is (re-find #"⚽ \*Nova Pelada Confirmada!\* ⚽" message))
+      (is (re-find #"01/01" message))
+      (is (re-find #"/peladas/00000000-0000-0000-0000-000000000001" message))
+      (is (re-find #"Nenhum jogador confirmado ainda." message)))))
 
 (deftest generate-vote-reminder-test
   (let [players [{:player-name "User One Two Three" :phone "5511911111111"}

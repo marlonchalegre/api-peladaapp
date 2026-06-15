@@ -42,7 +42,7 @@
                     (if (seq pending)
                       (do
                         (log/info "Sending automated attendance reminder for pelada" (:id p) "in organization" (:name org))
-                        (notifications/send-notification! org-id :attendance-reminder {:pending-players pending} db)
+                        (notifications/send-notification! org-id :attendance-reminder {:pending-players pending :pelada-id (:id p)} db)
                         (db.reminder/insert-reminder! (:id p) "attendance" db))
                       (log/debug "No pending attendance for pelada" (:id p) "- skipping reminder")))
                   (log/trace "Not the right time or already sent for pelada" (:id p)))))))))))
