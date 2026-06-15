@@ -3,7 +3,7 @@
    [clojure.string :as str]))
 
 (def ^:private allowed-event-types
-  #{"assist" "goal" "own_goal"})
+  #{"assist" "goal" "own_goal" "drible" "chute" "falta" "furada" "defesa" "vish"})
 
 (def ^:private aliases
   {"assistencia" "assist"
