@@ -35,7 +35,7 @@
           pagination (pagination/parse-pagination-params query-params)
           users-data (controller.user/list-users db pagination)
           users-models (:data users-data)
-          users-responses (map adapter.user/model->response users-models)]
+          users-responses (map #(adapter.user/model->response % false) users-models)]
       (responses/ok users-responses (:headers users-data)))
     (catch Exception e
       (exception/api-exception-handler e))))
@@ -58,7 +58,7 @@
                        (controller.user/search-users db query pagination)
                        (controller.user/search-users-in-shared-orgs db current-user-id query pagination))
           users-models (:data users-data)
-          users-responses (map adapter.user/model->response users-models)]
+          users-responses (map #(adapter.user/model->response % (not is-global-admin?)) users-models)]
       (responses/ok users-responses (:headers users-data)))
     (catch Exception e
       (exception/api-exception-handler e))))

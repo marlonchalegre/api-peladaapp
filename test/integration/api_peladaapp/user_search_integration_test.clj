@@ -80,4 +80,36 @@
               resp (app (-> (mock/request :get "/api/users/search")
                             ((th/auth-cookie regular-user-token))
                             (assoc :query-params {"q" "Messi"})))]
-          (is (= 403 (:status resp))))))))
+          (is (= 403 (:status resp)))))
+
+      (testing "GET /api/users/search - global admin vs org admin email visibility"
+        (let [org-admin-resp (app (-> (mock/request :get "/api/users/search")
+                                      ((th/auth-cookie admin-token))
+                                      (assoc :query-params {"q" "Messi"})))
+              org-admin-body (th/decode-body org-admin-resp)
+              _ (is (= 200 (:status org-admin-resp)))
+              _ (is (= "Lionel Messi" (:name (first org-admin-body))))
+              _ (is (nil? (:email (first org-admin-body))))
+
+              ;; Promote regular admin to superadmin
+              _ (jdbc/execute! ds [(str "UPDATE \"Users\" SET is_super_admin = true WHERE id = '" admin-user-id "'")])
+              superadmin-token (let [login-req (-> (mock/request :post "/auth/login")
+                                                   (mock/json-body {:email "admin@test.com" :password "admin123"}))
+                                     login-resp (app login-req)
+                                     login-body (th/decode-body login-resp)]
+                                 (:token login-body))
+
+              superadmin-resp (app (-> (mock/request :get "/api/users/search")
+                                       ((th/auth-cookie superadmin-token))
+                                       (assoc :query-params {"q" "Messi"})))
+              superadmin-body (th/decode-body superadmin-resp)
+              _ (is (= 200 (:status superadmin-resp)))
+              _ (is (= "Lionel Messi" (:name (first superadmin-body))))
+              _ (is (= "leo@test.com" (:email (first superadmin-body))))
+
+              list-resp (app (-> (mock/request :get "/api/users")
+                                 ((th/auth-cookie superadmin-token))))
+              list-body (th/decode-body list-resp)
+              _ (is (= 200 (:status list-resp)))
+              messi-in-list (first (filter #(= "Lionel Messi" (:name %)) list-body))]
+          (is (= "leo@test.com" (:email messi-in-list))))))))
