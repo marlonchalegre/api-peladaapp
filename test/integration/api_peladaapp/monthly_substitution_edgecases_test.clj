@@ -4,6 +4,7 @@
    [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is use-fixtures]]
+   [next.jdbc :as jdbc]
    [ring.mock.request :as mock]))
 
 (use-fixtures :each th/test-system-fixture)
@@ -108,3 +109,82 @@
                                  (mock/json-body {:end_date "2026-06-07"})
                                  auth))]
           (is (= 400 (:status end-again))))))))
+
+(deftest monthly-substitutions-history-bug-test
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
+        token (th/register-and-login! app {:name "Admin" :email "admin@ex.com" :password "p"})
+        p2-token (th/register-and-login! app {:name "Player 2" :email "p2@ex.com" :password "p"})
+        auth (th/auth-cookie token)
+        p2-auth (th/auth-cookie p2-token)
+        admin-id (th/user-id-by-email ds "admin@ex.com")
+        p2-id (th/user-id-by-email ds "p2@ex.com")
+
+        org-resp (app (-> (mock/request :post "/api/organizations")
+                          (mock/json-body {:name "Sub Club History"})
+                          auth))
+        org-id (misc/as-uuid (:id (decode-body org-resp)))]
+
+    (is (= 201 (:status org-resp)))
+
+    ;; Enable features: monthly_substitutions and finance_control
+    (jdbc/execute! ds [(str "UPDATE \"OrganizationFeatureFlags\" SET monthly_substitutions = TRUE, finance_control = TRUE WHERE organization_id = '" org-id "'")])
+
+    ;; Invite and accept player 2
+    (app (-> (mock/request :post (str "/api/organizations/" org-id "/invite"))
+             (mock/json-body {:email "p2@ex.com" :name "Player 2"})
+             auth))
+    (let [invites (decode-body (app (-> (mock/request :get "/api/invitations/pending") p2-auth)))
+          token (:token (first invites))]
+      (app (-> (mock/request :post (str "/api/invitations/" token "/accept")) p2-auth)))
+
+    (let [players (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/players")) auth)))
+          admin-player (first (filter #(= (misc/as-uuid (:user_id %)) admin-id) players))
+          admin-player-id (misc/as-uuid (:id admin-player))
+          p2-player (first (filter #(= (misc/as-uuid (:user_id %)) p2-id) players))
+          p2-player-id (misc/as-uuid (:id p2-player))]
+
+      ;; Promote admin to mensalista
+      (db.player/update-player admin-player-id {:member-type "mensalista"} ds)
+      ;; Make player 2 a diarista
+      (db.player/update-player p2-player-id {:member-type "diarista"} ds)
+
+      ;; 1. Check June 2026 monthly payments before substitution: only Admin (mensalista) should be there
+      (let [resp (app (-> (mock/request :get (str "/api/organizations/" org-id "/finance/monthly-payments") {:year "2026" :month "6"}) auth))
+            payments (decode-body resp)]
+        (is (= 200 (:status resp)))
+        (is (= 1 (count payments)))
+        (is (= admin-player-id (misc/as-uuid (:player_id (first payments))))))
+
+      ;; 2. Mark June 2026 payment as paid for Admin
+      (let [pay-resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/finance/monthly-payments"))
+                              (mock/json-body {:player_id admin-player-id :year 2026 :month 6 :paid true})
+                              auth))]
+        (is (= 200 (:status pay-resp))))
+
+      ;; 3. Check June again to confirm Admin is paid
+      (let [payments (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/finance/monthly-payments") {:year "2026" :month "6"}) auth)))]
+        (is (true? (:paid (first payments)))))
+
+      ;; 4. Now, create substitution starting July 1st (Admin substituted by Player 2)
+      (let [sub-resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/substitutions"))
+                              (mock/json-body {:permanent_player_id admin-player-id
+                                               :temporary_player_id p2-player-id
+                                               :start_date "2026-07-01"})
+                              auth))]
+        (is (= 200 (:status sub-resp))))
+
+      ;; 5. Verify June (past month) monthly payments:
+      ;; It should STILL be Admin, and he should STILL be paid. Player 2 should NOT be there.
+      (let [payments (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/finance/monthly-payments") {:year "2026" :month "6"}) auth)))]
+        (is (= 1 (count payments)))
+        (is (= admin-player-id (misc/as-uuid (:player_id (first payments)))))
+        (is (true? (:paid (first payments)))))
+
+      ;; 6. Verify July (current month) monthly payments:
+      ;; It should be Player 2 (temporary mensalista), and Admin should NOT be there.
+      (let [payments (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/finance/monthly-payments") {:year "2026" :month "7"}) auth)))]
+        (is (= 1 (count payments)))
+        (is (= p2-player-id (misc/as-uuid (:player_id (first payments)))))
+        (is (false? (:paid (first payments))))))))

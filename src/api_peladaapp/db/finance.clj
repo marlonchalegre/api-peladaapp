@@ -1,6 +1,8 @@
 (ns api-peladaapp.db.finance
   (:require
    [api-peladaapp.adapters.finance :as adapter.finance]
+   [api-peladaapp.db.monthly-substitution :as db.monthly-sub]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
@@ -91,9 +93,49 @@
         result (jdbc/execute! db (hsql/format query) hsql/opts)]
     (map adapter.finance/db->transaction result)))
 
+(defn- substitution-active-in-month? [sub first-day last-day]
+  (let [start-date (str (:start_date sub))
+        end-date (some-> (:end_date sub) str)]
+    (and (<= (compare start-date last-day) 0)
+         (or (nil? (:end_date sub))
+             (>= (compare end-date first-day) 0)))))
+
+(defn- get-effective-member-type [player-id current-member-type active-subs-in-month]
+  (let [player-id (misc/as-uuid player-id)
+        temp-sub (first (filter (fn [sub] (= (misc/as-uuid (:temporary_player_id sub)) player-id))
+                                active-subs-in-month))
+        perm-sub (first (filter (fn [sub] (= (misc/as-uuid (:permanent_player_id sub)) player-id))
+                                active-subs-in-month))]
+    (cond
+      temp-sub "mensalista_temporario"
+      perm-sub "diarista_temporario"
+      :else (cond
+              (= current-member-type "mensalista_temporario") "diarista"
+              (= current-member-type "diarista_temporario") "mensalista"
+              :else current-member-type))))
+
 (s/defn get-monthly-payments
   [org-id :- s/Uuid year month db]
-  (let [query (-> (h/select :mp.id [:op.id :player_id] [:u.name :player_name] :op.member_type
+  (let [ym (java.time.YearMonth/of year month)
+        first-day (str (.atDay ym 1))
+        last-day (str (.atEndOfMonth ym))
+        subs (db.monthly-sub/list-substitutions-by-org org-id db)
+        active-subs (filter (fn [sub] (substitution-active-in-month? sub first-day last-day)) subs)
+        candidate-query (-> (h/select :op.id)
+                            (h/from [:OrganizationPlayers :op])
+                            (h/where [:and [:= :op.organization_id org-id]
+                                      [:or [:in :op.member_type [[:cast "mensalista" :member_type]
+                                                                 [:cast "mensalista_temporario" :member_type]
+                                                                 [:cast "diarista_temporario" :member_type]]]
+                                       [:exists (-> (h/select 1)
+                                                    (h/from [:MonthlyPlayerSubstitutions :ms])
+                                                    (h/where [:and [:= :ms.organization_id org-id]
+                                                              [:or [:= :ms.permanent_player_id :op.id]
+                                                               [:= :ms.temporary_player_id :op.id]]
+                                                              [:<= :ms.start_date [[:cast last-day :date]]]
+                                                              [:or [:is :ms.end_date nil]
+                                                               [:>= :ms.end_date [[:cast first-day :date]]]]]))]]]))
+        query (-> (h/select :mp.id [:op.id :player_id] [:u.name :player_name] :op.member_type
                             :mp.year :mp.month :mp.transaction_id :mp.fine_transaction_id :mp.paid
                             :t.amount :t.fine_amount
                             [:ft.amount :actual_fine_amount] [:ft.status :fine_status])
@@ -102,10 +144,20 @@
                   (h/left-join [:MonthlyPayments :mp] [:and [:= :op.id :mp.player_id] [:= :mp.year year] [:= :mp.month month]])
                   (h/left-join [:Transactions :t] [:= :mp.transaction_id :t.id])
                   (h/left-join [:Transactions :ft] [:= :mp.fine_transaction_id :ft.id])
-                  (h/where [:and [:= :op.organization_id org-id] [:in :op.member_type [[:cast "mensalista" :member_type] [:cast "mensalista_temporario" :member_type]]]])
+                  (h/where [:and [:= :op.organization_id org-id] [:in :op.id candidate-query]])
                   (h/order-by :u.name))
-        result (jdbc/execute! db (hsql/format query) hsql/opts)]
-    (map adapter.finance/db->monthly-payment result)))
+        result (jdbc/execute! db (hsql/format query) hsql/opts)
+        mapped-payments (->> result
+                             (map (fn [row]
+                                    (let [player-id (:player_id row)
+                                          current-type (:member_type row)
+                                          effective-type (get-effective-member-type player-id current-type active-subs)]
+                                      (assoc row :member_type effective-type))))
+                             (filter (fn [row]
+                                       (let [t (:member_type row)]
+                                         (or (= t "mensalista")
+                                             (= t "mensalista_temporario"))))))]
+    (map adapter.finance/db->monthly-payment mapped-payments)))
 
 (s/defn mark-monthly-payment
   [payment :- s/Any db]
