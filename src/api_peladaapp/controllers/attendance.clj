@@ -33,7 +33,7 @@
               (throw (ex-info "Player not found" {:type :not-found :message "Player not found"})))
           final-status (if (and (= status "confirmed")
                                 (not target-player-id)
-                                (not= "mensalista" (:member-type target-player)))
+                                (not (contains? #{"mensalista" "mensalista_temporario"} (:member-type target-player))))
                          "waitlist"
                          status)]
       (db.attendance/upsert-attendance pelada-id player-id final-status db))))

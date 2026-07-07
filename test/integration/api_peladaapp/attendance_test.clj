@@ -3,6 +3,7 @@
    [api-peladaapp.db.attendance :as db.attendance]
    [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.db.pelada :as db.pelada]
+   [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
@@ -261,3 +262,55 @@
     ;; p2 is a 'diarista' and has NOT responded yet (no record in PeladaAttendance)
     (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id ds)]
       (is (= 0 (count pending))))))
+
+(deftest mensalista-temporario-skip-waitlist-test
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)]
+    ;; 1. Register admin and 1 temporary mensalista user
+    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Admin" :email "admin@ex.com" :password "p"})))
+    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Temp Mensalista" :email "tempmens@ex.com" :password "p"})))
+
+    (let [admin-login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "admin@ex.com" :password "p"})))
+          admin-token (:token (decode-body admin-login))
+          admin-auth (th/auth-cookie admin-token)
+
+          temp-login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "tempmens@ex.com" :password "p"})))
+          temp-token (:token (decode-body temp-login))
+          temp-auth (th/auth-cookie temp-token)
+          temp-user-id (th/user-id-by-email ds "tempmens@ex.com")
+
+          ;; 2. Create organization
+          _ (th/grant-org-creation! ds "admin@ex.com")
+          org-resp (app (-> (mock/request :post "/api/organizations")
+                            (mock/json-body {:name "Skip Waitlist Club"})
+                            admin-auth))
+          org-id (misc/as-uuid (:id (decode-body org-resp)))
+
+          ;; 3. Create player as convidado first, then update to mensalista_temporario
+          p-resp (app (-> (mock/request :post "/api/players")
+                          (mock/json-body {:organization_id org-id :user_id temp-user-id})
+                          admin-auth))
+          p-id (misc/as-uuid (:id (decode-body p-resp)))
+          _ (db.player/update-player p-id {:member-type "mensalista_temporario"} ds)
+
+          ;; 4. Create pelada
+          pelada-resp (app (-> (mock/request :post "/api/peladas")
+                               (mock/json-body {:organization_id org-id})
+                               admin-auth))
+          pelada-id (misc/as-uuid (:id (decode-body pelada-resp)))]
+
+      ;; 5. Verify member_type is mensalista_temporario
+      (let [players-resp (app (-> (mock/request :get (str "/api/organizations/" org-id "/players")) admin-auth))
+            players (decode-body players-resp)]
+        (is (some (fn [p] (and (= (str (:id p)) (str p-id)) (= (:member_type p) "mensalista_temporario"))) players)))
+
+      ;; 6. Temp Mensalista confirms attendance
+      (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance"))
+               (mock/json-body {:status "confirmed"})
+               temp-auth))
+
+      ;; 7. Verify they went to confirmed list, NOT waitlist
+      (let [details-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) admin-auth))
+            available (:available_players (decode-body details-resp))]
+        (is (some (fn [p] (and (= (str (:id p)) (str p-id)) (= (:attendance_status p) "confirmed"))) available))))))
