@@ -3,7 +3,7 @@
    [api-peladaapp.test-helpers :as th]
    [clojure.data.json :as json]
    [clojure.string :as str]
-   [clojure.test :refer [deftest is use-fixtures]]
+   [clojure.test :refer [deftest is testing use-fixtures]]
    [next.jdbc :as jdbc]
    [ring.mock.request :as mock]))
 
@@ -78,6 +78,51 @@
         body (decode-body resp)]
     (is (= 400 (:status resp)))
     (is (= "Email already exists" (:message body)))))
+
+(deftest update-user-profile-non-conflicting-checks
+  (let [app (-> th/*test-system* :app :app-handler)
+        ds (api-peladaapp.test-helpers/get-test-datasource)
+
+        ;; Create two users
+        token1 (th/register-and-login! app {:name "User A" :username "usera" :email "usera@example.com" :password "pass"})
+        usera-id (th/user-id-by-email ds "usera@example.com")
+        token2 (th/register-and-login! app {:name "User B" :username "userb" :email "userb@example.com" :password "pass"})
+        userb-id (th/user-id-by-email ds "userb@example.com")]
+
+    (testing "Updating own phone number without changing email (case-sensitive comparison should not block)"
+      (let [resp (app (-> (mock/request :put (str "/api/user/" usera-id "/profile"))
+                          (mock/cookie "authToken" token1)
+                          (mock/json-body {:email "usera@example.com" :phone "12345"})))
+            body (decode-body resp)]
+        (is (= 200 (:status resp)))
+        (is (= "12345" (:phone body)))
+        (is (= "usera@example.com" (:email body)))))
+
+    (testing "Updating own phone number with email casing mismatch should not trigger duplication error"
+      (let [resp (app (-> (mock/request :put (str "/api/user/" usera-id "/profile"))
+                          (mock/cookie "authToken" token1)
+                          (mock/json-body {:email "USERA@example.com" :phone "54321"})))
+            body (decode-body resp)]
+        (is (= 200 (:status resp)))
+        (is (= "54321" (:phone body)))))
+
+    (testing "Updating one user's phone while sending blank email should not conflict with another user who has blank email"
+      ;; First, set User A's email to blank (which will be stored as nil)
+      (let [resp-a (app (-> (mock/request :put (str "/api/user/" usera-id "/profile"))
+                            (mock/cookie "authToken" token1)
+                            (mock/json-body {:email "" :phone "111"})))
+            body-a (decode-body resp-a)]
+        (is (= 200 (:status resp-a)))
+        (is (nil? (:email body-a))))
+
+      ;; Now try to update User B's phone while sending empty email
+      (let [resp-b (app (-> (mock/request :put (str "/api/user/" userb-id "/profile"))
+                            (mock/cookie "authToken" token2)
+                            (mock/json-body {:email "" :phone "222"})))
+            body-b (decode-body resp-b)]
+        (is (= 200 (:status resp-b)))
+        (is (= "222" (:phone body-b)))
+        (is (nil? (:email body-b)))))))
 
 (deftest reset-password-success
   (let [app (-> th/*test-system* :app :app-handler)

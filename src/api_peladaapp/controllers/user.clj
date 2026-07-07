@@ -5,6 +5,7 @@
    [api-peladaapp.helpers.pagination :as pagination]
    [api-peladaapp.logic.user :as logic.user]
    [api-peladaapp.models.user :as models.user]
+   [clojure.string :as str]
    [schema.core :as s]))
 
 (s/defn create-user :- models.user/User
@@ -110,25 +111,28 @@
       (let [;; Start with existing user
             base-user existing-user
 
-            ;; Check for username uniqueness if provided and different from existing
+            ;; Check for username uniqueness if provided and belongs to another user
             new-username (:username profile-data)
             _ (when (and new-username
-                         (not= new-username (:username base-user))
-                         (db.user/find-user-by-username new-username db))
-                (throw (ex-info "Username already exists" {:type :already-exist :message "Username already exists"})))
+                         (not (str/blank? new-username)))
+                (when-let [existing (db.user/find-user-by-username new-username db)]
+                  (when (not= (:id existing) user-id)
+                    (throw (ex-info "Username already exists" {:type :already-exist :message "Username already exists"})))))
 
-            ;; Check for email uniqueness if provided and different from existing
+            ;; Check for email uniqueness if provided and belongs to another user
             new-email (:email profile-data)
             _ (when (and new-email
-                         (not= new-email (:email base-user))
-                         (db.user/find-user-by-email new-email db))
-                (throw (ex-info "Email already exists" {:type :already-exist :message "Email already exists"})))
+                         (not (str/blank? new-email)))
+                (when-let [existing (db.user/find-user-by-email new-email db)]
+                  (when (not= (:id existing) user-id)
+                    (throw (ex-info "Email already exists" {:type :already-exist :message "Email already exists"})))))
 
             ;; Update with new data, only if provided
             updated-user (cond-> base-user
                            (contains? profile-data :name) (assoc :name (:name profile-data))
                            (contains? profile-data :username) (assoc :username (:username profile-data))
-                           (contains? profile-data :email) (assoc :email (:email profile-data))
+                           (contains? profile-data :email) (assoc :email (let [e (:email profile-data)]
+                                                                           (if (str/blank? e) nil e)))
                            (contains? profile-data :password) (assoc :password (:password profile-data))
                            (contains? profile-data :position) (assoc :position (:position profile-data))
                            (contains? profile-data :phone) (assoc :phone (:phone profile-data))

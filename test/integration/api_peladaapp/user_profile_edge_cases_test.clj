@@ -22,7 +22,7 @@
                           auth))
             body (th/decode-body resp)]
         (is (= 200 (:status resp)))
-        (is (= "" (:email body)))
+        (is (nil? (:email body)))
         (is (= "Updated Name" (:name body)))))
 
     (testing "Update profile removing email (null/missing)"

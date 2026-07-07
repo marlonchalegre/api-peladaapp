@@ -12,7 +12,7 @@
   "Find a user by email (case-insensitive)"
   [email :- (s/maybe s/Str)
    db]
-  (when email
+  (when (and email (not (str/blank? email)))
     (let [query (-> (h/select :*)
                     (h/from :Users)
                     (h/where [:= [:lower :email] (str/lower-case email)]))]
@@ -24,7 +24,7 @@
   "Find a user by email or username (case-insensitive)"
   [identifier :- (s/maybe s/Str)
    db]
-  (when identifier
+  (when (and identifier (not (str/blank? identifier)))
     (let [query (-> (h/select :*)
                     (h/from :Users)
                     (h/where [:or [:= [:lower :email] (str/lower-case identifier)]
@@ -185,9 +185,9 @@
 
 (s/defn find-user-by-username :- (s/maybe models.user/User)
   "Find a user by username (case-insensitive)"
-  [username :- s/Str
+  [username :- (s/maybe s/Str)
    db]
-  (when username
+  (when (and username (not (str/blank? username)))
     (let [query (-> (h/select :*)
                     (h/from :Users)
                     (h/where [:= [:lower :username] (str/lower-case username)]))]
