@@ -6,7 +6,8 @@
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.vote :as db.vote]
    [api-peladaapp.logic.authorization :as auth]
-   [clojure.test :refer [deftest is testing]]))
+   [clojure.test :refer [deftest is testing]]
+   [next.jdbc :as jdbc]))
 
 (deftest test-update-player-attendance
   (let [db "dummy-db"
@@ -104,15 +105,17 @@
                               (controller.attendance/close-attendance pelada-uuid user-uuid db)))))
 
     (testing "works when status is attendance"
-      (with-redefs [db.pelada/get-pelada (fn [id _] (if (= id pelada-uuid)
-                                                      {:organization-id org-uuid :status "attendance"}
-                                                      {:organization-id org-uuid :status "open"}))
-                    auth/require-organization-admin! (fn [_ _ _] true)
-                    db.pelada/update-pelada (fn [_ data _]
-                                              (is (= "open" (:status data)))
-                                              1)]
-        (let [resp (controller.attendance/close-attendance pelada-uuid user-uuid db)]
-          (is (= "open" (:status resp))))))
+      (let [pelada-state (atom {:organization-id org-uuid :status "attendance"})]
+        (with-redefs [db.pelada/get-pelada (fn [id _]
+                                             (is (= pelada-uuid id))
+                                             @pelada-state)
+                      auth/require-organization-admin! (fn [_ _ _] true)
+                      db.pelada/update-pelada (fn [id data _]
+                                                (is (= pelada-uuid id))
+                                                (swap! pelada-state merge data)
+                                                1)]
+          (let [resp (controller.attendance/close-attendance pelada-uuid user-uuid db)]
+            (is (= "open" (:status resp)))))))
 
     (testing "throws when status is not attendance"
       (with-redefs [db.pelada/get-pelada (fn [_ _] {:organization-id org-uuid :status "open"})
@@ -143,6 +146,9 @@
     (testing "when enabled is true"
       (with-redefs [db.pelada/get-pelada (fn [_ _] {:organization-id org-uuid})
                     auth/require-organization-admin! (fn [_ _ _] true)
+                    jdbc/transact (fn
+                                    ([_connectable f] (f _connectable))
+                                    ([_connectable f _opts] (f _connectable)))
                     db.attendance/update-voting-enabled (fn [_ _ enabled _tx]
                                                           (is (true? enabled))
                                                           1)]
@@ -152,6 +158,9 @@
       (let [votes-deleted (atom false)]
         (with-redefs [db.pelada/get-pelada (fn [_ _] {:organization-id org-uuid})
                       auth/require-organization-admin! (fn [_ _ _] true)
+                      jdbc/transact (fn
+                                      ([_connectable f] (f _connectable))
+                                      ([_connectable f _opts] (f _connectable)))
                       db.attendance/update-voting-enabled (fn [_ _ enabled _tx]
                                                             (is (false? enabled))
                                                             1)

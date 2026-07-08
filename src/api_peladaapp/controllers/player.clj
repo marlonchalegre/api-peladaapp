@@ -30,7 +30,7 @@
   [player-id :- s/Uuid db]
   (let [player (db.player/get-player player-id db)]
     (if (nil? player)
-      (throw (ex-info nil {:type :not-found :message "Player not found"}))
+      (throw (ex-info "Player not found" {:type :not-found :message "Player not found"}))
       player)))
 
 (s/defn update-player :- models.player/Player
@@ -39,14 +39,14 @@
   (validate-characteristics! player)
   (let [rows (db.player/update-player player-id player db)]
     (if (zero? rows)
-      (throw (ex-info nil {:type :not-found :message "Player not found"}))
+      (throw (ex-info "Player not found" {:type :not-found :message "Player not found"}))
       (db.player/get-player player-id db))))
 
 (s/defn delete-player :- s/Int
   [player-id :- s/Uuid db]
   (let [rows (db.player/delete-player player-id db)]
     (if (zero? rows)
-      (throw (ex-info nil {:type :not-found :message "Player not found"}))
+      (throw (ex-info "Player not found" {:type :not-found :message "Player not found"}))
       rows)))
 
 (s/defn list-players :- [models.player/Player]

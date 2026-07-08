@@ -18,7 +18,7 @@
   [{:keys [match-id] :as sub} db]
   (let [match (db.match/get-match match-id db)]
     (when (nil? match)
-      (throw (ex-info nil {:type :not-found :message "Match not found"})))
+      (throw (ex-info "Match not found" {:type :not-found :message "Match not found"})))
     (let [allowed (pelada-player-ids (:pelada-id match) db)]
       (substitution.logic/validate-substitution sub allowed)
       (db.substitution/insert-substitution sub db))))

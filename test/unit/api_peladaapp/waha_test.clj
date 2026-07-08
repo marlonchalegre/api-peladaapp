@@ -3,6 +3,7 @@
    [api-peladaapp.config :as config]
    [api-peladaapp.logic.waha :as waha]
    [clj-http.client :as http]
+   [clojure.data.json :as json]
    [clojure.test :refer [deftest is testing]]))
 
 (deftest healthcheck-test
@@ -89,7 +90,7 @@
                     http/post (fn [url opts]
                                 (is (= "http://waha:3000/api/sendText" url))
                                 (is (= secret-key (get-in opts [:headers "X-Api-Key"])))
-                                (let [body (clojure.data.json/read-str (:body opts) :key-fn keyword)]
+                                (let [body (json/read-str (:body opts) :key-fn keyword)]
                                   (is (= "default" (:session body)))
                                   (is (= "12345" (:chatId body)))
                                   (is (= "hello" (:text body)))
@@ -106,7 +107,7 @@
 
     (testing "Includes mentions when provided"
       (with-redefs [http/post (fn [_ opts]
-                                (let [body (clojure.data.json/read-str (:body opts) :key-fn keyword)]
+                                (let [body (json/read-str (:body opts) :key-fn keyword)]
                                   (is (= ["all"] (:mentions body))))
                                 {:status 200})]
         (waha/send-message config "hello" ["all"])))
@@ -121,7 +122,7 @@
     (testing "Sends poll successfully"
       (with-redefs [http/post (fn [url opts]
                                 (is (= "http://waha:3000/api/sendPoll" url))
-                                (let [body (clojure.data.json/read-str (:body opts) :key-fn keyword)]
+                                (let [body (json/read-str (:body opts) :key-fn keyword)]
                                   (is (= "default" (:session body)))
                                   (is (= "12345" (:chatId body)))
                                   (is (= "Question?" (get-in body [:poll :name])))
@@ -132,7 +133,7 @@
 
     (testing "Sends poll with multipleAnswers true when option is set"
       (with-redefs [http/post (fn [_ opts]
-                                (let [body (clojure.data.json/read-str (:body opts) :key-fn keyword)]
+                                (let [body (json/read-str (:body opts) :key-fn keyword)]
                                   (is (true? (get-in body [:poll :multipleAnswers]))))
                                 {:status 200})]
         (waha/send-poll config "Question?" ["Opt1" "Opt2"] true)))

@@ -11,9 +11,9 @@
   [pelada]
   (case (:status pelada)
     "open" pelada
-    "attendance" (throw (ex-info nil {:type :bad-request
+    "attendance" (throw (ex-info "Attendance list is still open. Close it before starting the pelada." {:type :bad-request
                                       :message "Attendance list is still open. Close it before starting the pelada."}))
-    (throw (ex-info nil {:type :bad-request
+    (throw (ex-info "Pelada already started or closed" {:type :bad-request
                          :message "Pelada already started or closed"}))))
 
 (defn ensure-running
@@ -37,7 +37,7 @@
   (let [team-count (count team-ids)]
     (cond
       (< team-count 2)
-      (throw (ex-info nil {:type :bad-request
+      (throw (ex-info "At least two teams are required" {:type :bad-request
                            :message "At least two teams are required"}))
 
       :else (vec team-ids))))

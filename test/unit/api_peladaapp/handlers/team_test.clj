@@ -94,7 +94,7 @@
                        :identity {:id user-uuid}}
               response (handler.team/add-player request)]
           (is (= 201 (:status response)))
-          (is (= (:team-id (:body response)) team-uuid)))))))
+          (is (= (:team_id (:body response)) team-uuid)))))))
 
 (deftest test-remove-player-handler
   (let [db "dummy-db"

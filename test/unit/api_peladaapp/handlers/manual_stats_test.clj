@@ -8,17 +8,18 @@
 (deftest test-upsert-manual-stats
   (let [db "dummy-db"
         user-uuid (random-uuid)
-        org-uuid (random-uuid)]
+        org-uuid (random-uuid)
+        player-uuid (random-uuid)]
     (testing "upsert manual stats successfully"
       (with-redefs [auth/get-user-id-from-request (fn [_] user-uuid)
                     controller.manual-stats/upsert-manual-stats (fn [u-id o-id stats _]
                                                                   (is (= user-uuid u-id))
                                                                   (is (= org-uuid o-id))
-                                                                  (is (= [{:player-id "p1" :goals 3}] stats))
+                                                                  (is (= [{:player-id player-uuid :goals 3}] stats))
                                                                   1)]
         (let [request {:database db
                        :params {:id (str org-uuid)}
-                       :body [{:player_id "p1" :goals 3}]
+                       :body [{:player_id (str player-uuid) :goals 3}]
                        :identity {:id user-uuid}}
               response (handler.manual-stats/upsert-manual-stats request)]
           (is (= 200 (:status response)))

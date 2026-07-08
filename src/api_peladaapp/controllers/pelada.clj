@@ -119,7 +119,7 @@
   [pelada-id :- s/Uuid db]
   (let [pelada (db.pelada/get-pelada pelada-id db)]
     (if (nil? pelada)
-      (throw (ex-info nil {:type :not-found :message "Pelada not found"}))
+      (throw (ex-info "Pelada not found" {:type :not-found :message "Pelada not found"}))
       pelada)))
 
 (defn- enforce-players-per-team!
@@ -144,7 +144,7 @@
     (let [old-pelada (db.pelada/get-pelada pelada-id tx)
           rows (db.pelada/update-pelada pelada-id pelada tx)]
       (when (zero? rows)
-        (throw (ex-info nil {:type :not-found :message "Pelada not found"})))
+        (throw (ex-info "Pelada not found" {:type :not-found :message "Pelada not found"})))
 
       (doseq [gk-key [:home-fixed-goalkeeper-id :away-fixed-goalkeeper-id]]
         (when (contains? pelada gk-key)
@@ -168,7 +168,7 @@
   [pelada-id :- s/Uuid db]
   (let [rows (db.pelada/delete-pelada pelada-id db)]
     (if (zero? rows)
-      (throw (ex-info nil {:type :not-found :message "Pelada not found"}))
+      (throw (ex-info "Pelada not found" {:type :not-found :message "Pelada not found"}))
       rows)))
 
 (s/defn list-peladas

@@ -104,15 +104,17 @@
         user-id (random-uuid)
         update-data {:name "Jane"}]
     (testing "updates user profile successfully"
-      (with-redefs [db.user/find-user-by-id (fn [id _]
-                                              (is (= user-id id))
-                                              {:id user-id :name "John" :email "john@e.com"})
-                    db.user/update-user (fn [id data _]
-                                          (is (= user-id id))
-                                          (is (= "Jane" (:name data)))
-                                          1)]
-        (let [resp (controller.user/update-user update-data user-id db)]
-          (is (= "Jane" (:name resp))))))
+      (let [user-state (atom {:id user-id :name "John" :email "john@e.com"})]
+        (with-redefs [db.user/find-user-by-id (fn [id _]
+                                                (is (= user-id id))
+                                                @user-state)
+                      db.user/update-user (fn [id data _]
+                                            (is (= user-id id))
+                                            (is (= "Jane" (:name data)))
+                                            (swap! user-state merge data)
+                                            1)]
+          (let [resp (controller.user/update-user update-data user-id db)]
+            (is (= "Jane" (:name resp)))))))
 
     (testing "throws not found when user does not exist"
       (with-redefs [db.user/find-user-by-id (fn [_ _] nil)]
@@ -167,7 +169,7 @@
                                          [{:id 1}])
                     db.user/count-users (fn [_] 1)]
         (let [resp (controller.user/list-users db {})]
-          (is (= "1" (get-in resp [:headers "X-Total-Count"]))))))
+          (is (= "1" (get-in resp [:headers "X-Total"]))))))
 
     (testing "search-users"
       (with-redefs [db.user/search-users (fn [_ q offset limit]
@@ -179,7 +181,7 @@
                                                    (is (= "query" q))
                                                    1)]
         (let [resp (controller.user/search-users db "query" {:page 3 :per-page 10})]
-          (is (= "1" (get-in resp [:headers "X-Total-Count"]))))))
+          (is (= "1" (get-in resp [:headers "X-Total"]))))))
 
     (testing "search-users-in-shared-orgs"
       (with-redefs [db.user/search-users-in-shared-orgs (fn [_ c-id _q _offset _limit]
@@ -187,7 +189,7 @@
                                                           [{:id 1}])
                     db.user/count-searched-users-in-shared-orgs (fn [_ _c-id _q] 1)]
         (let [resp (controller.user/search-users-in-shared-orgs db user-id "q" {})]
-          (is (= "1" (get-in resp [:headers "X-Total-Count"]))))))))
+          (is (= "1" (get-in resp [:headers "X-Total"]))))))))
 
 (deftest test-update-user-profile-controller
   (let [db "dummy-db"

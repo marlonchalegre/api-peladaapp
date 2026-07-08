@@ -11,25 +11,22 @@
 (deftest global-fixed-goalkeepers-flow-test
   (let [app (-> th/*test-system* :app :app-handler)
         db-val (-> th/*test-system* :database :database)
-        ds (if (fn? db-val) (db-val) db-val)]
+        ds (if (fn? db-val) (db-val) db-val)
+        token (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass123"})
+        auth (fn [req] (mock/cookie req "authToken" token))
 
-    ;; Register and login
-    (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass123"})
-    (let [token (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass123"})
-          auth (fn [req] (mock/cookie req "authToken" token))
+        ;; Create organization
+        org-resp (app (-> (mock/request :post "/api/organizations")
+                          (mock/json-body {"name" "Global GK Club"})
+                          auth))
+        org-id (misc/as-uuid (:id (th/decode-body org-resp)))
+        user-id (th/user-id-by-email ds "admin@test.com")
+        player-id (th/player-id-by-user-id ds user-id org-id)
 
-          ;; Create organization
-          org-resp (app (-> (mock/request :post "/api/organizations")
-                            (mock/json-body {"name" "Global GK Club"})
-                            auth))
-          org-id (misc/as-uuid (:id (th/decode-body org-resp)))
-          user-id (th/user-id-by-email ds "admin@test.com")
-          player-id (th/player-id-by-user-id ds user-id org-id)
-
-          ;; Add a second player so teams can be formed
-          _ (th/register-and-login! app {:name "Player 2" :email "p2@test.com" :password "pass123"})
-          p2-user-id (th/user-id-by-email ds "p2@test.com")
-          p2-player-id (db.player/insert-player {:user-id p2-user-id :organization-id org-id :grade 5.0 :member-type "mensalista"} ds)]
+        ;; Add a second player so teams can be formed
+        _ (th/register-and-login! app {:name "Player 2" :email "p2@test.com" :password "pass123"})
+        p2-user-id (th/user-id-by-email ds "p2@test.com")
+        p2-player-id (db.player/insert-player {:user-id p2-user-id :organization-id org-id :grade 5.0 :member-type "mensalista"} ds)]
 
       (is (= 201 (:status org-resp)))
 
@@ -115,4 +112,4 @@
                                    (mock/json-body {"player_ids" [player-id] "players_per_team" 5})))]
             (is (= 200 (:status rand-resp)))
             (let [details (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) (auth))))]
-              (is (some #(= (str player-id) (str (:id %))) (mapcat :players (:teams details)))))))))))
+              (is (some #(= (str player-id) (str (:id %))) (mapcat :players (:teams details))))))))))

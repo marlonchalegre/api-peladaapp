@@ -7,7 +7,8 @@
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.logic.waha :as waha]
-   [clojure.test :refer [deftest is testing]]))
+   [clojure.test :refer [deftest is testing]]
+   [next.jdbc :as jdbc]))
 
 (deftest test-get-organization-not-found
   (let [db "dummy-db"
@@ -57,7 +58,8 @@
         org-uuid (random-uuid)
         user-uuid (random-uuid)]
     (testing "throws when user is the last admin of organization"
-      (with-redefs [db.admin/is-user-admin-of-organization? (fn [_ _ _] true)
+      (with-redefs [jdbc/transact (fn [db f & _] (f db))
+                    db.admin/is-user-admin-of-organization? (fn [_ _ _] true)
                     db.admin/count-admins-by-organization (fn [_ _] 1)
                     db.player/get-org-player-by-user-id (fn [_ _ _] {:id 1})]
         (is (thrown-with-msg? Exception #"Cannot leave organization: you are the last administrator"
@@ -66,7 +68,8 @@
     (testing "succeeds when not the last admin"
       (let [deleted-admin (atom false)
             deleted-player (atom false)]
-        (with-redefs [db.admin/is-user-admin-of-organization? (fn [_ _ _] true)
+        (with-redefs [jdbc/transact (fn [db f & _] (f db))
+                      db.admin/is-user-admin-of-organization? (fn [_ _ _] true)
                       db.admin/count-admins-by-organization (fn [_ _] 2)
                       db.player/get-org-player-by-user-id (fn [_ _ _] {:id 456})
                       db.admin/delete-organization-admin-by-org-and-user (fn [_ _ _] (reset! deleted-admin true))

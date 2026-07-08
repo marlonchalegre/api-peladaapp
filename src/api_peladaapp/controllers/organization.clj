@@ -184,7 +184,7 @@
    db]
   (let [org (db.organization/get-organization id db)]
     (if (nil? org)
-      (throw (ex-info nil {:type :not-found :message "Organization not found"}))
+      (throw (ex-info "Organization not found" {:type :not-found :message "Organization not found"}))
       org)))
 
 (s/defn update-organization :- models.organization/Organization
@@ -193,7 +193,7 @@
    db]
   (let [rows (db.organization/update-organization id org db)]
     (if (zero? rows)
-      (throw (ex-info nil {:type :not-found :message "Organization not found"}))
+      (throw (ex-info "Organization not found" {:type :not-found :message "Organization not found"}))
       (db.organization/get-organization id db))))
 
 (s/defn test-waha-connection
@@ -202,16 +202,16 @@
     (if (and org (:waha-enabled org))
       (let [result (waha/send-message org "PeladaApp: Teste de conexão WAHA realizado com sucesso! ⚽")]
         (if (:error result)
-          (throw (ex-info "WAHA error" {:type :bad-request :message (str "Erro no WAHA: " (:error result))}))
+          (throw (ex-info (str "Erro no WAHA: " (:error result)) {:type :bad-request :message (str "Erro no WAHA: " (:error result))}))
           {:status "success" :message "Mensagem de teste enviada!"}))
-      (throw (ex-info "WAHA not enabled" {:type :bad-request :message "WAHA não está habilitado para esta organização."})))))
+      (throw (ex-info "WAHA não está habilitado para esta organização." {:type :bad-request :message "WAHA não está habilitado para esta organização."})))))
 
 (s/defn delete-organization
   [id :- s/Uuid
    db]
   (let [rows (db.organization/delete-organization id db)]
     (if (zero? rows)
-      (throw (ex-info nil {:type :not-found :message "Organization not found"}))
+      (throw (ex-info "Organization not found" {:type :not-found :message "Organization not found"}))
       rows)))
 
 (s/defn list-organizations

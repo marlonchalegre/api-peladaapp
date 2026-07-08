@@ -14,21 +14,21 @@
   [team-id :- s/Uuid db]
   (let [team (db.team/get-team team-id db)]
     (if (nil? team)
-      (throw (ex-info nil {:type :not-found :message "Team not found"}))
+      (throw (ex-info "Team not found" {:type :not-found :message "Team not found"}))
       team)))
 
 (s/defn update-team :- models.team/Team
   [team-id :- s/Uuid team :- models.team/Team db]
   (let [rows (db.team/update-team team-id team db)]
     (if (zero? rows)
-      (throw (ex-info nil {:type :not-found :message "Team not found"}))
+      (throw (ex-info "Team not found" {:type :not-found :message "Team not found"}))
       (db.team/get-team team-id db))))
 
 (s/defn delete-team :- s/Int
   [team-id :- s/Uuid db]
   (let [rows (db.team/delete-team team-id db)]
     (if (zero? rows)
-      (throw (ex-info nil {:type :not-found :message "Team not found"}))
+      (throw (ex-info "Team not found" {:type :not-found :message "Team not found"}))
       rows)))
 
 (s/defn list-teams :- [models.team/Team]

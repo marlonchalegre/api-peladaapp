@@ -21,9 +21,9 @@
         secret (config/get-key :jwt-secret)
         db-pass (:password user-db)]
     (when (nil? user-db)
-      (throw (ex-info nil {:type :invalid-credentials :message "Invalid credentials"})))
+      (throw (ex-info "Invalid credentials" {:type :invalid-credentials :message "Invalid credentials"})))
     (when (or (nil? password) (nil? db-pass) (not (hashers/check password db-pass)))
-      (throw (ex-info nil {:type :invalid-credentials :message "Invalid credentials"})))
+      (throw (ex-info "Invalid credentials" {:type :invalid-credentials :message "Invalid credentials"})))
     (let [admin-orgs (map :organization-id (db.admin/list-organizations-by-admin (:id user-db) db))
           user-with-orgs (assoc user-db :admin-orgs admin-orgs)]
       {:token (logic.user/build-token user-with-orgs secret)

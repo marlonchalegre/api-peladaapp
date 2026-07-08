@@ -21,7 +21,11 @@
   (try
     (let [db (:database request)
           organization-id (misc/as-uuid (get-in request [:params :id]))
-          year (Integer/parseInt (str (get-in request [:query-params "year"])))]
+          year-str (get-in request [:query-params "year"])
+          year (try
+                 (Integer/parseInt (str year-str))
+                 (catch NumberFormatException _
+                   (throw (ex-info "Invalid year parameter" {:type :bad-request :message "Invalid year parameter"}))))]
       (ok (controller.manual-stats/list-manual-stats organization-id year db)))
     (catch Exception e
       (exception/api-exception-handler e))))
