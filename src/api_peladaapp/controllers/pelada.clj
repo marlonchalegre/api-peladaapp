@@ -180,6 +180,15 @@
         total-count (db.pelada/count-peladas organization-id db)]
     (pagination/with-pagination-headers peladas total-count page per-page)))
 
+(s/defn list-all-peladas
+  [db pagination]
+  (let [page (or (:page pagination) 1)
+        per-page (or (:per-page pagination) 20)
+        offset (* (- page 1) per-page)
+        peladas (db.pelada/list-all-peladas per-page offset db)
+        total-count (db.pelada/count-all-peladas db)]
+    (pagination/with-pagination-headers peladas total-count page per-page)))
+
 (s/defn list-peladas-by-user
   [user-id :- s/Uuid db pagination]
   (let [page (or (:page pagination) 1)

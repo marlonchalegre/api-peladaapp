@@ -1,7 +1,9 @@
 (ns api-peladaapp.handlers.global-admin
   (:require
    [api-peladaapp.adapters.organization :as adapter.organization]
+   [api-peladaapp.adapters.pelada :as adapter.pelada]
    [api-peladaapp.controllers.organization :as controller.organization]
+   [api-peladaapp.controllers.pelada :as controller.pelada]
    [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.exception :as exception]
@@ -111,4 +113,26 @@
         (responses/not-found {:error "Organization not found"})))
     (catch Exception e
       (exception/api-exception-handler e))))
+
+(defn list-peladas [request]
+  (try
+    (let [db (:database request)
+          query-params (:query-params request)
+          pagination-params (pagination/parse-pagination-params query-params)
+          peladas-data (controller.pelada/list-all-peladas db pagination-params)
+          pelada-models (:data peladas-data)
+          pelada-responses (map adapter.pelada/model->response pelada-models)]
+      (responses/ok pelada-responses (:headers peladas-data)))
+    (catch Exception e
+      (exception/api-exception-handler e))))
+
+(defn delete-pelada [request]
+  (try
+    (let [db (:database request)
+          pelada-id (parse-uuid (get-in request [:params :id]))]
+      (controller.pelada/delete-pelada pelada-id db)
+      (responses/deleted 1))
+    (catch Exception e
+      (exception/api-exception-handler e))))
+
 

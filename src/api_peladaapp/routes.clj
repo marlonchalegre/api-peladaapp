@@ -161,7 +161,9 @@
     (PUT "/organizations/:id/feature-flags" [] handler.global-admin/update-organization-feature-flags)
     (POST "/users/:id/toggle-block" [] handler.global-admin/toggle-user-block)
     (POST "/users/:id/toggle-org-creation" [] handler.global-admin/toggle-user-org-creation)
-    (POST "/users/:id/toggle-global-admin" [] handler.global-admin/toggle-user-global-admin)))
+    (POST "/users/:id/toggle-global-admin" [] handler.global-admin/toggle-user-global-admin)
+    (GET "/peladas" [] handler.global-admin/list-peladas)
+    (DELETE "/peladas/:id" [] handler.global-admin/delete-pelada)))
 
 (defroutes gen-routes
   (not-found {:status 404 :body {:error "Backend route not found"}}))

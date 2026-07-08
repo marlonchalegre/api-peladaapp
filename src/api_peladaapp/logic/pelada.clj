@@ -12,9 +12,9 @@
   (case (:status pelada)
     "open" pelada
     "attendance" (throw (ex-info "Attendance list is still open. Close it before starting the pelada." {:type :bad-request
-                                      :message "Attendance list is still open. Close it before starting the pelada."}))
+                                                                                                        :message "Attendance list is still open. Close it before starting the pelada."}))
     (throw (ex-info "Pelada already started or closed" {:type :bad-request
-                         :message "Pelada already started or closed"}))))
+                                                        :message "Pelada already started or closed"}))))
 
 (defn ensure-running
   "Ensure pelada is currently running. Returns pelada or throws with :bad-request.
@@ -38,7 +38,7 @@
     (cond
       (< team-count 2)
       (throw (ex-info "At least two teams are required" {:type :bad-request
-                           :message "At least two teams are required"}))
+                                                         :message "At least two teams are required"}))
 
       :else (vec team-ids))))
 

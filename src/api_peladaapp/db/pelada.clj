@@ -107,6 +107,27 @@
         :count
         int)))
 
+(s/defn list-all-peladas :- [s/Any]
+  [limit :- s/Int
+   offset :- s/Int
+   db]
+  (let [query (-> (h/select :p.* [:o.name :organization_name])
+                  (h/from [:Peladas :p])
+                  (h/join [:Organizations :o] [:= :o.id :p.organization_id])
+                  (h/order-by [:p.scheduled_at :desc] [:p.id :desc])
+                  (h/limit limit)
+                  (h/offset offset))]
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
+         (map adapter.pelada/db->model))))
+
+(s/defn count-all-peladas :- s/Int
+  [db]
+  (let [query (-> (h/select [[:count :*] :count])
+                  (h/from :Peladas))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        :count
+        int)))
+
 (s/defn list-peladas-by-user :- [s/Any]
   [user-id :- s/Uuid
    limit :- s/Int
