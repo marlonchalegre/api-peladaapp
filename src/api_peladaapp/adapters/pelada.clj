@@ -60,7 +60,7 @@
          :organization_name (:organization-name model)
          :home_fixed_goalkeeper_id (:home-fixed-goalkeeper-id model)
          :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id model)
-         :timer_started_at (:timer-started-at model)
+         :timer_started_at (some-> (:timer-started-at model) helpers.time/->instant str)
          :timer_accumulated_ms (:timer-accumulated-ms model)
          :timer_status (:timer-status model)
          :user_attendance_status (:user-attendance-status model)))))

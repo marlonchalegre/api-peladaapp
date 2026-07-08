@@ -1,6 +1,8 @@
 (ns api-peladaapp.adapter-test
   (:require
    [api-peladaapp.adapters.admin :as adapter.admin]
+   [api-peladaapp.adapters.match :as adapter.match]
+   [api-peladaapp.adapters.pelada :as adapter.pelada]
    [api-peladaapp.adapters.player :as adapter.player]
    [clojure.test :refer [deftest is testing]]))
 
@@ -63,3 +65,63 @@
       (is (= "Goalkeeper" (:user_position resp)))
       (is (= "Admin User" (:user_name resp)))
       (is (= "adminuser" (:user_username resp))))))
+
+(deftest pelada-adapter-test
+  (testing "model->response formats timer-started-at as ISO UTC string"
+    (let [inst (java.time.Instant/parse "2026-07-08T13:55:00.123Z")
+          timestamp (java.sql.Timestamp/from inst)
+          model {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                 :organization-id (parse-uuid "00000000-0000-0000-0000-000000000003")
+                 :status "open"
+                 :timer-started-at timestamp
+                 :timer-accumulated-ms 30000
+                 :timer-status "running"}
+          resp (adapter.pelada/model->response model)]
+      (is (= "2026-07-08T13:55:00.123Z" (:timer_started_at resp)))
+      (is (= 30000 (:timer_accumulated_ms resp)))
+      (is (= "running" (:timer_status resp)))))
+
+  (testing "model->response doesn't crash on nil timer-started-at"
+    (let [model {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                 :organization-id (parse-uuid "00000000-0000-0000-0000-000000000003")
+                 :status "open"
+                 :timer-started-at nil
+                 :timer-accumulated-ms 30000
+                 :timer-status "paused"}
+          resp (adapter.pelada/model->response model)]
+      (is (nil? (:timer_started_at resp)))
+      (is (= 30000 (:timer_accumulated_ms resp)))
+      (is (= "paused" (:timer_status resp))))))
+
+(deftest match-adapter-test
+  (testing "model->response formats timer-started-at as ISO UTC string"
+    (let [inst (java.time.Instant/parse "2026-07-08T13:55:00.123Z")
+          timestamp (java.sql.Timestamp/from inst)
+          model {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                 :pelada-id (parse-uuid "00000000-0000-0000-0000-000000000002")
+                 :home-team-id (parse-uuid "00000000-0000-0000-0000-000000000003")
+                 :away-team-id (parse-uuid "00000000-0000-0000-0000-000000000004")
+                 :sequence 1
+                 :status "running"
+                 :timer-started-at timestamp
+                 :timer-accumulated-ms 30000
+                 :timer-status "running"}
+          resp (adapter.match/model->response model)]
+      (is (= "2026-07-08T13:55:00.123Z" (:timer_started_at resp)))
+      (is (= 30000 (:timer_accumulated_ms resp)))
+      (is (= "running" (:timer_status resp)))))
+
+  (testing "model->response doesn't crash on nil timer-started-at"
+    (let [model {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                 :pelada-id (parse-uuid "00000000-0000-0000-0000-000000000002")
+                 :home-team-id (parse-uuid "00000000-0000-0000-0000-000000000003")
+                 :away-team-id (parse-uuid "00000000-0000-0000-0000-000000000004")
+                 :sequence 1
+                 :status "paused"
+                 :timer-started-at nil
+                 :timer-accumulated-ms 30000
+                 :timer-status "paused"}
+          resp (adapter.match/model->response model)]
+      (is (nil? (:timer_started_at resp)))
+      (is (= 30000 (:timer_accumulated_ms resp)))
+      (is (= "paused" (:timer_status resp))))))

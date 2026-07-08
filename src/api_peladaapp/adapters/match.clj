@@ -1,6 +1,7 @@
 (ns api-peladaapp.adapters.match
   (:require
    [api-peladaapp.helpers.misc :as misc]
+   [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.models.match-event :as models.match-event]
    [api-peladaapp.requests.match :as requests.match]
    [api-peladaapp.responses.match :as responses.match]
@@ -58,7 +59,7 @@
     status (assoc :status status)
     (some? home-score) (assoc :home_score home-score)
     (some? away-score) (assoc :away_score away-score)
-    timer-started-at (assoc :timer_started_at timer-started-at)
+    timer-started-at (assoc :timer_started_at (some-> timer-started-at helpers.time/->instant str))
     (some? timer-accumulated-ms) (assoc :timer_accumulated_ms timer-accumulated-ms)
     timer-status (assoc :timer_status timer-status)))
 
