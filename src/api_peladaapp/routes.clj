@@ -171,12 +171,13 @@
 
 (defn internal-access [request]
   (let [remote-addr (:remote-addr request)]
-    (or (= remote-addr "127.0.0.1")
-        (= remote-addr "localhost")
-        (= remote-addr "0:0:0:0:0:0:0:1")
-        (str/starts-with? remote-addr "10.")
-        (str/starts-with? remote-addr "172.")
-        (str/starts-with? remote-addr "192.168."))))
+    (and (string? remote-addr)
+         (or (= remote-addr "127.0.0.1")
+             (= remote-addr "localhost")
+             (= remote-addr "0:0:0:0:0:0:0:1")
+             (str/starts-with? remote-addr "10.")
+             (str/starts-with? remote-addr "172.")
+             (str/starts-with? remote-addr "192.168.")))))
 
 (def access-rules [{:pattern #"^/internal/.*"
                     :handler internal-access}

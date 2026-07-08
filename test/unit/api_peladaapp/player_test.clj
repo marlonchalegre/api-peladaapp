@@ -1,5 +1,6 @@
 (ns api-peladaapp.player-test
   (:require
+   [api-peladaapp.controllers.player :as controller.player]
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.handlers.player :as handler.player]
    [api-peladaapp.logic.authorization :as auth]
@@ -87,7 +88,7 @@
               response (handler.player/update-player-score request)]
           (is (= 404 (:status response))))))
 
-    (testing "Successfully updates player characteristics"
+    (testing "Successfully updates player characteristics when feature flag is enabled"
       (let [get-calls (atom 0)
             mock-player-char {:id player-id :organization-id org-id :user-id user-id
                               :passing 2 :ball-control 3 :velocity 4 :shooting 5 :dribbling 1 :defending 0}
@@ -105,7 +106,11 @@
                                                 (is (= 2 (:dribbling update-data)))
                                                 (is (= 1 (:defending update-data)))
                                                 1)
-                      auth/require-organization-admin! (fn [_ _ _] true)]
+                      auth/require-organization-admin! (fn [_ _ _] true)
+                      auth/require-feature-flag! (fn [org-id flag _]
+                                                   (is (= org-id org-id))
+                                                   (is (= :player_characteristics flag))
+                                                   true)]
           (let [request {:database db
                          :params {:id player-id}
                          :body {:passing 4 :ball_control 4 :dribbling 2 :defending 1}
@@ -134,3 +139,78 @@
               response (handler.player/update-player-score request)]
           (is (= 400 (:status response)))
           (is (= "defending must be between 0 and 5" (:message (:body response)))))))))
+
+(deftest create-player-handler-test
+  (let [db (fn [] nil)
+        user-id (random-uuid)
+        org-id (random-uuid)
+        new-player {:id (random-uuid) :organization-id org-id :user-id user-id}]
+    (testing "create player successfully"
+      (with-redefs [auth/get-user-id-from-request (fn [_] user-id)
+                    auth/require-organization-admin! (fn [u-id o-id _]
+                                                       (is (= user-id u-id))
+                                                       (is (= org-id o-id))
+                                                       true)
+                    auth/check-member-limit! (fn [o-id _]
+                                               (is (= org-id o-id))
+                                               true)
+                    controller.player/create-player (fn [player _]
+                                                      (is (= org-id (:organization-id player)))
+                                                      new-player)]
+        (let [request {:database db
+                       :body {:organization_id org-id :user_id user-id}
+                       :identity {:id user-id}}
+              response (handler.player/create request)]
+          (is (= 201 (:status response)))
+          (is (= (:id new-player) (get-in response [:body :id]))))))
+
+    (testing "create player failure catches exception"
+      (with-redefs [auth/get-user-id-from-request (fn [_] (throw (Exception. "Unexpected error")))]
+        (let [response (handler.player/create {:database db})]
+          (is (= 500 (:status response))))))))
+
+(deftest delete-player-handler-test
+  (let [db (fn [] nil)
+        player-uuid (random-uuid)
+        org-uuid (random-uuid)
+        admin-uuid (random-uuid)
+        dummy-player {:id player-uuid :organization-id org-uuid}]
+    (testing "delete player successfully"
+      (with-redefs [auth/get-user-id-from-request (fn [_] admin-uuid)
+                    controller.player/get-player (fn [id _]
+                                                   (is (= player-uuid id))
+                                                   dummy-player)
+                    auth/require-organization-admin! (fn [u-id o-id _]
+                                                       (is (= admin-uuid u-id))
+                                                       (is (= org-uuid o-id))
+                                                       true)
+                    controller.player/delete-player (fn [id _]
+                                                      (is (= player-uuid id))
+                                                      1)]
+        (let [request {:database db
+                       :params {:id player-uuid}
+                       :identity {:id admin-uuid}}
+              response (handler.player/delete request)]
+          (is (= 200 (:status response))))))))
+
+(deftest list-by-org-player-handler-test
+  (let [db (fn [] nil)
+        org-uuid (random-uuid)
+        user-uuid (random-uuid)
+        players [{:id (random-uuid) :organization-id org-uuid :user-id (random-uuid)}]]
+    (testing "list players by organization successfully"
+      (with-redefs [auth/get-user-id-from-request (fn [_] user-uuid)
+                    auth/require-organization-member! (fn [u-id o-id _]
+                                                        (is (= user-uuid u-id))
+                                                        (is (= org-uuid o-id))
+                                                        true)
+                    controller.player/list-players (fn [o-id _]
+                                                     (is (= org-uuid o-id))
+                                                     players)]
+        (let [request {:database db
+                       :params {:organization_id org-uuid}
+                       :identity {:id user-uuid}}
+              response (handler.player/list-by-org request)]
+          (is (= 200 (:status response)))
+          (is (= 1 (count (:body response)))))))))
+
