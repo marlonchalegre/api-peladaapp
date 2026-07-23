@@ -77,6 +77,17 @@
         results (jdbc/execute! db (hsql/format query) hsql/opts)]
     (map (fn [r] {:player-id (:player_id r) :player-name (:player_name r) :phone (:phone r)}) results)))
 
+(s/defn list-confirmed-players-by-pelada [pelada-id :- s/Uuid db]
+  (let [query (-> (h/select [:op.id :player_id] [:u.name :player_name] :u.phone)
+                  (h/from [:Attendance :pa])
+                  (h/join [:OrganizationPlayers :op] [:= :pa.player_id :op.id])
+                  (h/join [:Users :u] [:= :op.user_id :u.id])
+                  (h/where [:and
+                            [:= :pa.pelada_id pelada-id]
+                            [:= :pa.status [:cast "confirmed" :attendance_status]]]))
+        results (jdbc/execute! db (hsql/format query) hsql/opts)]
+    (map (fn [r] {:player-id (:player_id r) :player-name (:player_name r) :phone (:phone r)}) results)))
+
 (s/defn delete-attendance :- s/Int
   [pelada-id :- s/Uuid
    player-id :- s/Uuid

@@ -1,5 +1,6 @@
 (ns api-peladaapp.notification-integration-test
   (:require
+   [api-peladaapp.controllers.organization :as controller.organization]
    [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.logic.notifications :as notifications]
@@ -171,3 +172,45 @@
             (is (re-find #"/peladas/00000000-0000-0000-0000-000000000001" message))
             (is (re-find #"Nenhum jogador confirmado ainda." message))
             (is (= #{"all"} (set mentions)))))))))
+
+(deftest manual-notification-send-test
+  (let [db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
+        org-id (db.organization/insert-organization {:name "Manual Notification Org"} ds)]
+
+    (db.organization/insert-default-feature-flags org-id ds)
+
+    ;; Setup WAHA config enabled for this org
+    (jdbc/execute! ds (hsql/format (-> (h/insert-into :OrganizationWahaConfigs)
+                                       (h/values [{:organization_id org-id
+                                                   :enabled true
+                                                   :api_url "http://waha:3000"
+                                                   :instance "default"
+                                                   :group_id "group123"
+                                                   :attendance_reminder_enabled true
+                                                   :use_all_mention false}]))))
+
+    (testing "Send custom message successfully"
+      (let [sent-msg (atom nil)]
+        (with-redefs [waha/send-message (fn [_ msg mentions] (reset! sent-msg {:msg msg :mentions mentions}))]
+          (let [res (controller.organization/send-custom-message org-id "Hello Pelada!" ds)]
+            (is (= "success" (:status res)))
+            (is (= "Hello Pelada!" (:msg @sent-msg)))))))
+
+    (testing "Resend notification"
+      (let [pelada-id (parse-uuid "00000000-0000-0000-0000-000000000002")
+            sent-notification (atom nil)]
+        ;; Insert a dummy pelada
+        (jdbc/execute! ds (hsql/format (-> (h/insert-into :Peladas)
+                                           (h/values [{:id pelada-id
+                                                       :organization_id org-id
+                                                       :status [:cast "attendance" :pelada_status]
+                                                       :scheduled_at (java.sql.Timestamp. (System/currentTimeMillis))}]))))
+
+        (with-redefs [notifications/send-notification! (fn [oid type data _]
+                                                         (reset! sent-notification {:oid oid :type type :data data}))]
+          (let [res (controller.organization/resend-notification org-id "attendance-reminder" pelada-id ds)]
+            (is (= "success" (:status res)))
+            (is (= :attendance-reminder (:type @sent-notification)))
+            (is (= pelada-id (get-in @sent-notification [:data :pelada-id])))
+            (is (true? (get-in @sent-notification [:data :force?])))))))))

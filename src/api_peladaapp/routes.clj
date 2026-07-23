@@ -121,6 +121,7 @@
     (POST "/organizations/:id/invite" [] handler.organization/invite)
     (POST "/organizations/:id/invite-link/reset" [] handler.organization/reset-invite-link)
     (POST "/organizations/:id/waha/test" [] handler.organization/test-waha)
+    (POST "/organizations/:id/notifications/send" [] handler.organization/send-notification)
     (GET "/organizations/:id/invite-link" [] handler.organization/get-invite-link)
     (GET "/organizations/:id/invitations" [] handler.organization/list-invitations)
     (DELETE "/organizations/:id/invitations/:invitation_id" [] handler.organization/revoke-invitation)

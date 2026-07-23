@@ -257,7 +257,7 @@
                           :vote-ended :waha-vote-ended-msg-enabled
                           :attendance-reminder :waha-attendance-reminder-enabled
                           :vote-reminder :waha-vote-reminder-enabled)
-            should-send? (get org enabled-key)]
+            should-send? (or (:force? data) (get org enabled-key))]
         (when should-send?
           (let [message (case type
                           :new-pelada (generate-new-pelada-message (:pelada-id data) (:scheduled-at data) (:confirmed-players data))

@@ -1,12 +1,20 @@
 (ns api-peladaapp.controllers.organization
   (:require
    [api-peladaapp.db.admin :as db.admin]
+   [api-peladaapp.db.attendance :as db.attendance]
+   [api-peladaapp.db.match :as db.match]
+   [api-peladaapp.db.match-event :as db.match-event]
+   [api-peladaapp.db.match-lineup :as db.match-lineup]
    [api-peladaapp.db.monthly-substitution :as db.monthly-sub]
    [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.db.organization-invitation :as db.invitation]
+   [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.db.team :as db.team]
    [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.db.vote :as db.vote]
    [api-peladaapp.helpers.pagination :as pagination]
+   [api-peladaapp.logic.notifications :as notifications]
    [api-peladaapp.logic.waha :as waha]
    [api-peladaapp.models.organization :as models.organization]
    [clojure.string :as str]
@@ -282,3 +290,71 @@
 (s/defn list-monthly-substitutions
   [org-id :- s/Uuid db]
   (db.monthly-sub/list-substitutions-by-org org-id db))
+
+(s/defn send-custom-message
+  [org-id :- s/Uuid message :- s/Str db]
+  (let [org (db.organization/get-organization org-id db)]
+    (if (and org (:waha-enabled org))
+      (let [result (waha/send-message org message nil)]
+        (if (:error result)
+          (throw (ex-info (str "Erro no WAHA: " (:error result)) {:type :bad-request :message (str "Erro no WAHA: " (:error result))}))
+          {:status "success" :message "Mensagem personalizada enviada!"}))
+      (throw (ex-info "WAHA não está habilitado para esta organização." {:type :bad-request :message "WAHA não está habilitado para esta organização."})))))
+
+(s/defn resend-notification
+  [org-id :- s/Uuid notification-type-str :- s/Str pelada-id :- s/Uuid db]
+  (let [org (db.organization/get-organization org-id db)
+        pelada (db.pelada/get-pelada pelada-id db)]
+    (when-not org
+      (throw (ex-info "Organização não encontrada" {:type :not-found :message "Organização não encontrada"})))
+    (when-not pelada
+      (throw (ex-info "Pelada não encontrada" {:type :not-found :message "Pelada não encontrada"})))
+    (when-not (= (:organization-id pelada) org-id)
+      (throw (ex-info "Pelada não pertence a esta organização" {:type :bad-request :message "Pelada não pertence a esta organização"})))
+    (if (and org (:waha-enabled org))
+      (let [notification-type (keyword notification-type-str)]
+        (case notification-type
+          :new-pelada
+          (let [confirmed-players (db.attendance/list-confirmed-players-by-pelada pelada-id db)]
+            (notifications/send-notification! org-id :new-pelada {:pelada-id pelada-id :scheduled-at (:scheduled-at pelada) :confirmed-players confirmed-players :force? true} db))
+
+          :start
+          (let [teams (db.team/list-pelada-teams pelada-id db)
+                team-players (db.team/list-team-players-with-names-by-pelada pelada-id db)]
+            (notifications/send-notification! org-id :start {:teams teams :team-players team-players :force? true} db))
+
+          :end
+          (let [matches (db.match/list-matches-by-pelada pelada-id db)
+                teams (db.team/list-pelada-teams pelada-id db)
+                events (db.match-event/list-events-by-pelada pelada-id db)
+                lineups (db.match-lineup/list-match-lineups-by-pelada pelada-id db)
+                team-players (db.team/list-team-players-with-names-by-pelada pelada-id db)
+                org-players (db.player/list-players-by-organization org-id db)
+                all-players (distinct (concat team-players (map (fn [p] {:player_id (:id p) :player_name (:user-name p)}) org-players)))]
+            (notifications/send-notification! org-id :end
+                                              {:pelada pelada
+                                               :matches matches
+                                               :teams teams
+                                               :events events
+                                               :lineups lineups
+                                               :team-players all-players
+                                               :force? true}
+                                              db))
+
+          :vote-ended
+          (let [ranking (db.vote/list-ranking-by-pelada pelada-id db)]
+            (notifications/send-notification! org-id :vote-ended {:ranking ranking :pelada-id pelada-id :force? true} db))
+
+          :attendance-reminder
+          (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id db)]
+            (notifications/send-notification! org-id :attendance-reminder {:pending-players pending :pelada-id pelada-id :force? true} db))
+
+          :vote-reminder
+          (let [pending (db.vote/list-pending-voters-by-pelada pelada-id db)]
+            (notifications/send-notification! org-id :vote-reminder {:pending-voters pending :pelada-id pelada-id :force? true} db))
+
+          ;; default case
+          (throw (ex-info (str "Tipo de notificação inválido: " notification-type-str)
+                          {:type :bad-request :message (str "Tipo de notificação inválido: " notification-type-str)})))
+        {:status "success" :message "Notificação reenviada com sucesso!"})
+      (throw (ex-info "WAHA não está habilitado para esta organização." {:type :bad-request :message "WAHA não está habilitado para esta organização."})))))

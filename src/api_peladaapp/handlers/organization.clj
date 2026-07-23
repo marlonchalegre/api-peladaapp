@@ -215,5 +215,27 @@
                (ok (dissoc (db.organization/get-organization-feature-flags id db) :created_at :updated_at))))))
        (catch Exception e (exception/api-exception-handler e))))
 
+(defn send-notification [request]
+  (try (let [db (:database request)
+             id (misc/as-uuid (get-in request [:params :id]))
+             user-id (auth/get-user-id-from-request request)
+             body (:body request)
+             action (:action body)]
+         (auth/require-organization-admin! user-id id db)
+         (auth/require-feature-flag! id :waha_communications db)
+         (if (= action "custom")
+           (let [message (:message body)]
+             (when (str/blank? message)
+               (throw (ex-info "A mensagem não pode estar vazia" {:type :bad-request :message "A mensagem não pode estar vazia"})))
+             (ok (controller.organization/send-custom-message id message db)))
+           (let [notification-type (:notification_type body)
+                 pelada-id (misc/as-uuid (:pelada_id body))]
+             (when (str/blank? notification-type)
+               (throw (ex-info "O tipo de notificação não pode estar vazio" {:type :bad-request :message "O tipo de notificação não pode estar vazio"})))
+             (when (nil? pelada-id)
+               (throw (ex-info "O ID da pelada é obrigatório para reenvio" {:type :bad-request :message "O ID da pelada é obrigatório para reenvio"})))
+             (ok (controller.organization/resend-notification id notification-type pelada-id db)))))
+       (catch Exception e (exception/api-exception-handler e))))
+
 
 
