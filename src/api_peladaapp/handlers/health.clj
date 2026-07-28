@@ -1,11 +1,28 @@
 (ns api-peladaapp.handlers.health
   (:require
    [api-peladaapp.logic.waha :as waha]
+   [clojure.java.io :as io]
+   [clojure.string :as str]
    [ring.util.response :as response]))
 
+(defn- read-version []
+  (try
+    (if-let [res (io/resource "version.txt")]
+      (str/trim (slurp res))
+      "development")
+    (catch Exception _
+      "development")))
+
+(defn- get-env-version []
+  (System/getenv "APP_VERSION"))
+
 (defn check [_]
-  (response/response {:status "OK"
-                      :version (or (System/getenv "APP_VERSION") "development")}))
+  (let [env-version (get-env-version)
+        version (if (or (nil? env-version) (= env-version "latest") (= env-version "development"))
+                  (read-version)
+                  env-version)]
+    (response/response {:status "OK"
+                        :version version})))
 
 (defn waha-healthcheck [_]
   (let [result (waha/healthcheck)]

@@ -14,6 +14,9 @@ RUN --mount=type=cache,target=/root/.m2 \
 # Copy the rest of the source
 COPY . .
 
+# Generate version.txt with build timestamp
+RUN mkdir -p resources && date +%Y%m%d-%H%M > resources/version.txt
+
 # Build an uberjar
 # Using the cache for .m2 again during uberjar build
 RUN --mount=type=cache,target=/root/.m2 \

@@ -43,3 +43,25 @@
       (let [response (health/waha-restart {})]
         (is (= 500 (:status response)))
         (is (= "error" (get-in response [:body :status])))))))
+
+(deftest check-handler-test
+  (testing "Returns specified APP_VERSION environment variable"
+    (with-redefs [health/get-env-version (fn [] "1.2.3")]
+      (let [response (health/check {})]
+        (is (= 200 (:status response)))
+        (is (= "1.2.3" (get-in response [:body :version]))))))
+
+  (testing "Falls back to resource version.txt when APP_VERSION is unset, 'latest', or 'development'"
+    (with-redefs [health/get-env-version (fn [] "latest")
+                  clojure.java.io/resource (fn [path] (if (= path "version.txt") (java.net.URL. "file:///tmp/dummy-version.txt") nil))
+                  slurp (fn [_] "20260728-1900\n")]
+      (let [response (health/check {})]
+        (is (= 200 (:status response)))
+        (is (= "20260728-1900" (get-in response [:body :version]))))))
+
+  (testing "Returns 'development' when no version file exists and APP_VERSION is unset"
+    (with-redefs [health/get-env-version (fn [] nil)
+                  clojure.java.io/resource (fn [_] nil)]
+      (let [response (health/check {})]
+        (is (= 200 (:status response)))
+        (is (= "development" (get-in response [:body :version])))))))
