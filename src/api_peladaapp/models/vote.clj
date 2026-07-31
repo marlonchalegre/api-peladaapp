@@ -61,6 +61,7 @@
   {:can-vote s/Bool
    :has-voted s/Bool
    :eligible-players [EligiblePlayer]
+   (s/optional-key :is-admin) s/Bool
    (s/optional-key :current-votes) [Vote]
    (s/optional-key :voter-player-id) (s/maybe s/Uuid)
    (s/optional-key :message) s/Str})

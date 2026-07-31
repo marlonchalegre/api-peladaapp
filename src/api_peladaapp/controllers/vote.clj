@@ -113,6 +113,7 @@
                                 [])]
             {:can-vote (and participated voter-voting-enabled?)
              :has-voted has-voted
+             :is-admin is-admin
              :eligible-players eligible-players
              :current-votes current-votes
              :voter-player-id voter-player-id})))

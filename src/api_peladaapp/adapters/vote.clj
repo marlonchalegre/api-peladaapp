@@ -47,6 +47,7 @@
       :has_voted (:has-voted model)
       :eligible_players eligible-players
       :current_votes current-votes}
+     :is_admin (:is-admin model)
      :voter_player_id (:voter-player-id model)
      :message (:message model))))
 

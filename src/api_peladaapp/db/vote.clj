@@ -1,6 +1,7 @@
 (ns api-peladaapp.db.vote
   (:require
    [api-peladaapp.adapters.vote :as adapter.vote]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.logic.grade :as logic.grade]
    [api-peladaapp.logic.vote :as vote.logic]
@@ -160,9 +161,10 @@
                   (h/where where-clause))
         results (jdbc/execute! db (hsql/format query) hsql/opts)]
     (mapv (fn [r]
-            (let [gk-ids (set (keep identity [(:home_fixed_goalkeeper_id r) (:away_fixed_goalkeeper_id r)]))]
-              (assoc r :voting_enabled
-                     (vote.logic/player-voting-enabled? (:player_id r) (:pa_voting_enabled r) gk-ids))))
+            (let [up (misc/unamespace r)
+                  gk-ids (set (keep identity [(:home_fixed_goalkeeper_id up) (:away_fixed_goalkeeper_id up)]))]
+              (assoc up :voting_enabled
+                     (vote.logic/player-voting-enabled? (:player_id up) (:pa_voting_enabled up) gk-ids))))
           results)))
 
 (s/defn list-pelada-participants
@@ -194,7 +196,8 @@
                                                      [:is-not :sub_p2.away_fixed_goalkeeper_id nil]))]]))
         results (jdbc/execute! db (hsql/format query) hsql/opts)]
     (mapv (fn [r]
-            (let [gk-ids (set (keep identity [(:home_fixed_goalkeeper_id r) (:away_fixed_goalkeeper_id r)]))]
-              (assoc r :voting_enabled
-                     (vote.logic/player-voting-enabled? (:player_id r) (:pa_voting_enabled r) gk-ids))))
+            (let [up (misc/unamespace r)
+                  gk-ids (set (keep identity [(:home_fixed_goalkeeper_id up) (:away_fixed_goalkeeper_id up)]))]
+              (assoc up :voting_enabled
+                     (vote.logic/player-voting-enabled? (:player_id up) (:pa_voting_enabled up) gk-ids))))
           results)))
