@@ -225,7 +225,7 @@
                          (str/join "\n"))]
     (str title players-str "\n\nAcesse o app e deixe seu voto!\n" (generate-voting-link pelada-id))))
 
-(defn generate-matches-results-message [{:keys [matches teams]}]
+(defn generate-matches-results-message [{:keys [matches teams lineups team-players]}]
   (let [title "⚽ *RESULTADOS DAS PARTIDAS*\n\n"
         team-map (into {} (map (juxt :id :name) teams))
         max-name-len (->> teams
@@ -240,8 +240,31 @@
                                   (str (pad-start home-name max-name-len)
                                        "  " home-score " x " away-score "  "
                                        (pad-end away-name max-name-len)))))
-                         (str/join "\n"))]
-    (str title "```\n" matches-str "\n```")))
+                         (str/join "\n"))
+        player-names (into {} (map (juxt :player_id :player_name) team-players))
+        goals-conceded (reduce (fn [acc m]
+                                 (let [lu (filter #(= (:match_id m) (:match_id %)) (or lineups []))]
+                                   (reduce (fn [inner-acc l]
+                                             (if (not= 0 (:is_goalkeeper l))
+                                               (let [conceded (if (= (:team_id l) (:home-team-id m))
+                                                                (or (:away-score m) 0)
+                                                                (or (:home-score m) 0))]
+                                                 (update inner-acc (:player_id l) (fnil + 0) conceded))
+                                               inner-acc))
+                                           acc lu)))
+                               {} matches)
+        max-p-name-len (->> team-players
+                            (map #(count (:player_name %)))
+                            (reduce max 0))
+        name-width (+ (max 15 (min 30 max-p-name-len)) 2)
+        top-gk (->> goals-conceded
+                    (sort-by (fn [[pid c]] [c (get player-names pid "")]))
+                    (map (fn [[pid c]] (str (pad-end (get player-names pid "Unknown") name-width) " " c)))
+                    (str/join "\n"))
+        gk-str (if (seq top-gk)
+                 (str "\nGols sofridos:\n" top-gk)
+                 "")]
+    (str title "```\n" matches-str (if (seq gk-str) (str "\n" gk-str) "") "\n```")))
 
 (defn send-notification!
   "Sends a notification if enabled for the organization."

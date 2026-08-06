@@ -85,6 +85,31 @@
       (is (re-find #"⚽ \*RESULTADOS DAS PARTIDAS\*" msg))
       (is (re-find #"           Short  3 x 2  VeryLongTeamName" msg))
       (is (re-find #"VeryLongTeamName  0 x 0  Short           " msg))
-      (is (re-find #"```" msg)))))
+      (is (re-find #"```" msg))))
+
+  (testing "generates match results message with goalkeeper stats when lineups and team-players are provided"
+    (let [p1 (parse-uuid "00000000-0000-0000-0000-000000000101")
+          p2 (parse-uuid "00000000-0000-0000-0000-000000000102")
+          t1 (parse-uuid "00000000-0000-0000-0000-000000000001")
+          t2 (parse-uuid "00000000-0000-0000-0000-000000000002")
+          m1 (parse-uuid "00000000-0000-0000-0000-000000000201")
+          data {:teams [{:id t1 :name "Time A"}
+                        {:id t2 :name "Time B"}]
+                :matches [{:id m1 :match_id m1
+                           :home-team-id t1 :away-team-id t2
+                           :home-score 2 :away-score 3}]
+                :team-players [{:player_id p1 :player_name "Goleiro Um"}
+                               {:player_id p2 :player_name "Goleiro Dois"}]
+                :lineups [{:match_id m1 :team_id t1 :player_id p1 :is_goalkeeper 1}
+                          {:match_id m1 :team_id t2 :player_id p2 :is_goalkeeper 1}]}
+          msg (notifications/generate-matches-results-message data)]
+      (is (re-find #"⚽ \*RESULTADOS DAS PARTIDAS\*" msg))
+      (is (re-find #"Time A  2 x 3  Time B" msg))
+      (is (re-find #"Gols sofridos:" msg))
+      ;; Goleiro Dois is in team B, which conceded 2 goals (from team A)
+      ;; Goleiro Um is in team A, which conceded 3 goals (from team B)
+      ;; Since it's sorted by goals conceded ascending, Goleiro Dois (2 goals) should be first, then Goleiro Um (3 goals)
+      (is (re-find #"Goleiro Dois" msg))
+      (is (re-find #"Goleiro Um" msg)))))
 
 
