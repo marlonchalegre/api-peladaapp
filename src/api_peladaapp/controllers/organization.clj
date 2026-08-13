@@ -180,6 +180,7 @@
   (jdbc/with-transaction [tx db]
     (let [org-with-owner (if user-id (assoc org :owner-id user-id) org)
           id (db.organization/insert-organization org-with-owner tx)]
+      (db.organization/update-organization id org-with-owner tx)
       (db.organization/insert-default-feature-flags id tx)
       ;; Add creator as admin and player (if user-id is provided)
       (when user-id
@@ -349,11 +350,14 @@
           (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id db)]
             (notifications/send-notification! org-id :attendance-reminder {:pending-players pending :pelada-id pelada-id :force? true} db))
 
+          :priority-ending
+          (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id db)]
+            (notifications/send-notification! org-id :priority-ending {:pending-players pending :pelada-id pelada-id :force? true} db))
+
           :vote-reminder
           (let [pending (db.vote/list-pending-voters-by-pelada pelada-id db)]
             (notifications/send-notification! org-id :vote-reminder {:pending-voters pending :pelada-id pelada-id :force? true} db))
 
-          ;; default case
           (throw (ex-info (str "Tipo de notificação inválido: " notification-type-str)
                           {:type :bad-request :message (str "Tipo de notificação inválido: " notification-type-str)})))
         {:status "success" :message "Notificação reenviada com sucesso!"})

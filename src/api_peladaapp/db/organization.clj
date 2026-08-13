@@ -9,10 +9,14 @@
    [schema.core :as s]))
 
 (s/defn insert-organization :- s/Uuid
-  [{:keys [name owner-id]} :- {:name s/Str :owner-id (s/maybe s/Uuid)}
+  [organization
    db]
-  (let [query (-> (h/insert-into :Organizations)
-                  (h/values [{:name name :owner_id owner-id}])
+  (let [row (medley.core/assoc-some {}
+                                    :name (:name organization)
+                                    :owner_id (:owner-id organization)
+                                    :priority_confirmation_limit_hours (:priority-confirmation-limit-hours organization))
+        query (-> (h/insert-into :Organizations)
+                  (h/values [row])
                   (h/returning :id))]
     (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
@@ -23,7 +27,8 @@
   (jdbc/with-transaction [tx db]
     (let [org-row (medley.core/assoc-some {}
                                           :name (:name organization)
-                                          :owner_id (:owner-id organization))
+                                          :owner_id (:owner-id organization)
+                                          :priority_confirmation_limit_hours (:priority-confirmation-limit-hours organization))
           _ (when (seq org-row)
               (jdbc/execute! tx (hsql/format (-> (h/update :Organizations)
                                                  (h/set org-row)
@@ -59,20 +64,23 @@
     (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         hsql/affected-rows-count)))
 
+(def ^:private waha-config-select-fields
+  [:o.*
+   [:owc.api_url :waha_api_url]
+   [:owc.instance :waha_instance]
+   [:owc.group_id :waha_group_id]
+   [:owc.enabled :waha_enabled]
+   [:owc.start_msg_enabled :waha_start_msg_enabled]
+   [:owc.end_msg_enabled :waha_end_msg_enabled]
+   [:owc.attendance_reminder_enabled :waha_attendance_reminder_enabled]
+   [:owc.vote_reminder_enabled :waha_vote_reminder_enabled]
+   [:owc.vote_ended_msg_enabled :waha_vote_ended_msg_enabled]
+   [:owc.use_all_mention :waha_use_all_mention]])
+
 (s/defn get-organization :- s/Any
   [id :- s/Uuid
    db]
-  (let [query (-> (h/select :o.*
-                            [:owc.api_url :waha_api_url]
-                            [:owc.instance :waha_instance]
-                            [:owc.group_id :waha_group_id]
-                            [:owc.enabled :waha_enabled]
-                            [:owc.start_msg_enabled :waha_start_msg_enabled]
-                            [:owc.end_msg_enabled :waha_end_msg_enabled]
-                            [:owc.attendance_reminder_enabled :waha_attendance_reminder_enabled]
-                            [:owc.vote_reminder_enabled :waha_vote_reminder_enabled]
-                            [:owc.vote_ended_msg_enabled :waha_vote_ended_msg_enabled]
-                            [:owc.use_all_mention :waha_use_all_mention])
+  (let [query (-> (apply h/select waha-config-select-fields)
                   (h/from [:Organizations :o])
                   (h/left-join [:OrganizationWahaConfigs :owc] [:= :owc.organization_id :o.id])
                   (h/where [:= :o.id id]))]
@@ -82,17 +90,7 @@
 (s/defn list-organizations :- [s/Any]
   ([db] (list-organizations db 1000 0))
   ([db limit offset]
-   (let [query (-> (h/select :o.*
-                             [:owc.api_url :waha_api_url]
-                             [:owc.instance :waha_instance]
-                             [:owc.group_id :waha_group_id]
-                             [:owc.enabled :waha_enabled]
-                             [:owc.start_msg_enabled :waha_start_msg_enabled]
-                             [:owc.end_msg_enabled :waha_end_msg_enabled]
-                             [:owc.attendance_reminder_enabled :waha_attendance_reminder_enabled]
-                             [:owc.vote_reminder_enabled :waha_vote_reminder_enabled]
-                             [:owc.vote_ended_msg_enabled :waha_vote_ended_msg_enabled]
-                             [:owc.use_all_mention :waha_use_all_mention])
+   (let [query (-> (apply h/select waha-config-select-fields)
                    (h/from [:Organizations :o])
                    (h/left-join [:OrganizationWahaConfigs :owc] [:= :owc.organization_id :o.id])
                    (h/order-by [:o.id :desc])
@@ -217,17 +215,7 @@
 (s/defn search-organizations :- [s/Any]
   [db query limit offset]
   (let [lower-pattern (str "%" (str/lower-case query) "%")
-        hsql-query (-> (h/select :o.*
-                                 [:owc.api_url :waha_api_url]
-                                 [:owc.instance :waha_instance]
-                                 [:owc.group_id :waha_group_id]
-                                 [:owc.enabled :waha_enabled]
-                                 [:owc.start_msg_enabled :waha_start_msg_enabled]
-                                 [:owc.end_msg_enabled :waha_end_msg_enabled]
-                                 [:owc.attendance_reminder_enabled :waha_attendance_reminder_enabled]
-                                 [:owc.vote_reminder_enabled :waha_vote_reminder_enabled]
-                                 [:owc.vote_ended_msg_enabled :waha_vote_ended_msg_enabled]
-                                 [:owc.use_all_mention :waha_use_all_mention])
+        hsql-query (-> (apply h/select waha-config-select-fields)
                        (h/from [:Organizations :o])
                        (h/left-join [:OrganizationWahaConfigs :owc] [:= :owc.organization_id :o.id])
                        (h/where [[:like [:lower :o.name] lower-pattern]])

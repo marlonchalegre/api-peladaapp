@@ -146,11 +146,37 @@
         (let [before-count (:count (jdbc/execute-one! db (hsql/format (-> (h/select [[:count :*] :count])
                                                                           (h/from :PeladaReminders)
                                                                           (h/where [:= :pelada_id (misc/as-uuid pelada-id)] [:= :type [:cast "vote_12h" :reminder_type]])))
-                                                      hsql/opts))]
+                                                     hsql/opts))]
           (scheduler/execute-tasks! db)
           (let [after-count (:count (jdbc/execute-one! db (hsql/format (-> (h/select [[:count :*] :count])
                                                                            (h/from :PeladaReminders)
                                                                            (h/where [:= :pelada_id (misc/as-uuid pelada-id)] [:= :type [:cast "vote_12h" :reminder_type]])))
                                                        hsql/opts))]
             (is (= before-count after-count) "Should not record duplicate reminders")))))))
+
+(deftest test-priority-ending-reminder
+  (let [db-val (-> th/*test-system* :database :database)
+        db (if (fn? db-val) (db-val) db-val)]
+    (testing "execute-tasks! sends priority ending reminder when limit threshold is reached"
+      (let [org-id (db.organization/insert-organization {:name "Org Priority Ending" :owner-id nil} db)
+            _ (db.organization/update-organization
+               org-id
+               {:priority-confirmation-limit-hours 24
+                :waha-enabled true
+                :waha-attendance-reminder-enabled true}
+               db)
+            now (java.time.OffsetDateTime/now)
+            scheduled-at (.plus now (java.time.Duration/ofHours 25))
+            pelada-id (db.pelada/insert-pelada {:organization-id org-id :status "attendance"} db)]
+
+        (jdbc/execute! db (hsql/format (-> (h/update :Peladas)
+                                           (h/set {:status [:cast "attendance" :pelada_status] :scheduled_at [[:cast scheduled-at :timestamp]]})
+                                           (h/where [:= :id (misc/as-uuid pelada-id)]))))
+
+        (is (nil? (db.reminder/get-last-reminder-at pelada-id "priority_ending" db)))
+
+        (scheduler/execute-tasks! db)
+
+        (is (some? (db.reminder/get-last-reminder-at pelada-id "priority_ending" db))
+            "PeladaReminder 'priority_ending' should have been inserted")))))
 

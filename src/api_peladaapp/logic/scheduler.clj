@@ -53,8 +53,36 @@
     :vote_12h "vote_12h"
     :vote_23h "vote_23h"
     :attendance "attendance"
+    :priority_ending "priority_ending"
     :vote_ended "vote_ended"
     (name type)))
+
+(defn- run-priority-ending-reminders! [db ^ZonedDateTime now]
+  (let [orgs (db.organization/list-organizations db)]
+    (doseq [org orgs]
+      (let [org-id (:id org)
+            limit-hours (:priority-confirmation-limit-hours org)]
+        (when (and (number? limit-hours) (pos? limit-hours) (:waha-attendance-reminder-enabled org))
+          (let [active-peladas (filter #(= "attendance" (:status %)) (db.pelada/list-peladas org-id 10 0 db))]
+            (doseq [p active-peladas]
+              (when-let [scheduled-at (:scheduled-at p)]
+                (let [last-sent (db.reminder/get-last-reminder-at (:id p) "priority_ending" db)]
+                  (when (nil? last-sent)
+                    (let [now-inst (.toInstant now)
+                          sched-inst (helpers.time/->instant scheduled-at)
+                          remaining-seconds (.toSeconds (Duration/between now-inst sched-inst))
+                          limit-seconds (* limit-hours 3600)
+                          notice-threshold-seconds (+ limit-seconds (* 2 3600))]
+                      (when (and (<= remaining-seconds notice-threshold-seconds)
+                                 (> remaining-seconds 0))
+                        (let [pending (db.attendance/list-pending-mensalistas-by-pelada (:id p) db)]
+                          (log/info "Sending priority ending reminder for pelada" (:id p) "in organization" (:name org))
+                          (notifications/send-notification! org-id :priority-ending
+                                                             {:pending-players pending
+                                                              :pelada-id (:id p)
+                                                              :limit-hours limit-hours}
+                                                             db)
+                          (db.reminder/insert-reminder! (:id p) "priority_ending" db))))))))))))))
 
 (defn- check-vote-ended! [db]
   ;; 1. Check for Ended Voting (24h)
@@ -110,6 +138,7 @@
     (log/info (str "Scheduler tasks execution started at " now))
     (try
       (run-attendance-reminders! db now)
+      (run-priority-ending-reminders! db now)
       (check-vote-ended! db)
       (log/info "Scheduler tasks execution finished successfully.")
       (catch Exception e

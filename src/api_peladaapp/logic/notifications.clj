@@ -14,6 +14,9 @@
    "midfielder" 2
    "striker" 3})
 
+(def ^:private all-mention-types
+  #{:new-pelada :attendance-reminder :priority-ending :vote-reminder})
+
 (defn- sort-players [players]
   (sort-by (fn [p]
              [(if (:is_goalkeeper p) 0 1)
@@ -40,15 +43,16 @@
 (defn- generate-results-link [pelada-id]
   (str (get-base-url) "/peladas/" pelada-id "/results"))
 
+(defn- calculate-name-width [players]
+  (let [max-len (if (seq players)
+                  (reduce max 0 (map #(count (:player_name %)) players))
+                  0)]
+    (+ (max 15 (min 30 max-len)) 2)))
+
 (defn generate-start-message [teams team-players]
   (let [title "*ESCALAÇÃO DA PELADA*\n\n"
         teams-grouped (group-by :team_id team-players)
-
-        ;; Calculate max name length for alignment (min 15, max 30) + 2
-        max-name-len (->> team-players
-                          (map #(count (:player_name %)))
-                          (reduce max 0))
-        name-width (+ (max 15 (min 30 max-name-len)) 2)
+        name-width (calculate-name-width team-players)
 
         pos-map {"goalkeeper" "G"
                  "defender" "Z"
@@ -218,6 +222,18 @@
                          (str/join "\n"))]
     (str title players-str "\n\nPor favor, confirmem no app o quanto antes!\n" (generate-pelada-link pelada-id))))
 
+(defn generate-priority-ending-reminder [pelada-id limit-hours pending-players]
+  (let [title "⚠️ *Aviso de Encerramento de Prioridade!* ⚠️\n\nA prioridade de confirmação para os mensalistas está prestes a encerrar!\n\n"
+        players-str (if (seq pending-players)
+                      (str "Mensalistas ainda pendentes:\n"
+                           (->> pending-players
+                                (map #(str "• " (format-mention %)))
+                                (str/join "\n"))
+                           "\n\n")
+                      "")
+        footer (str "Faltam " (or limit-hours "") "h para a pelada. Após esse prazo, novas confirmações de mensalistas irão para a lista de espera como diaristas.\nConfirmem no app o quanto antes!\n" (generate-pelada-link pelada-id))]
+    (str title players-str footer)))
+
 (defn generate-vote-reminder [pelada-id pending-voters]
   (let [title "🗳️ *Lembrete de Votação!* 🗳️\n\nAinda faltam alguns jogadores votarem nos melhores da pelada:\n\n"
         players-str (->> pending-voters
@@ -282,6 +298,7 @@
                           :end :waha-end-msg-enabled
                           :vote-ended :waha-vote-ended-msg-enabled
                           :attendance-reminder :waha-attendance-reminder-enabled
+                          :priority-ending :waha-attendance-reminder-enabled
                           :vote-reminder :waha-vote-reminder-enabled)
             should-send? (or (:force? data) (get org enabled-key))]
         (when should-send?
@@ -291,22 +308,26 @@
                           :end (generate-end-message data)
                           :vote-ended (generate-vote-ended-message (:pelada-id data))
                           :attendance-reminder (generate-attendance-reminder (:pelada-id data) (:pending-players data))
+                          :priority-ending (generate-priority-ending-reminder (:pelada-id data) (:limit-hours data) (:pending-players data))
                           :vote-reminder (generate-vote-reminder (:pelada-id data) (:pending-voters data)))
                 mentions (case type
                            :attendance-reminder (->> (:pending-players data)
                                                      (keep #(some-> (:phone %) waha/normalize-phone))
                                                      vec)
+                           :priority-ending (->> (:pending-players data)
+                                                 (keep #(some-> (:phone %) waha/normalize-phone))
+                                                 vec)
                            :vote-reminder (->> (:pending-voters data)
                                                (keep #(some-> (:phone %) waha/normalize-phone))
                                                vec)
                            nil)
                 use-all? (:waha-use-all-mention org)
-                final-mentions (if (and (contains? #{:new-pelada :attendance-reminder :vote-reminder} type)
-                                        use-all?)
+                all-mention? (and (contains? all-mention-types type)
+                                  use-all?)
+                final-mentions (if all-mention?
                                  (conj mentions "all")
                                  mentions)
-                final-message (if (and (contains? #{:new-pelada :attendance-reminder :vote-reminder} type)
-                                       use-all?)
+                final-message (if all-mention?
                                 (str/replace message #"!\*" "! @all*")
                                 message)]
             (waha/send-message org final-message final-mentions)

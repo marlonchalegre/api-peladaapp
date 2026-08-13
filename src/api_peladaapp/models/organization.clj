@@ -6,6 +6,7 @@
   {:id s/Uuid
    :name s/Str
    (s/optional-key :owner-id) (s/maybe s/Uuid)
+   (s/optional-key :priority-confirmation-limit-hours) (s/maybe s/Int)
    (s/optional-key :waha-api-url) (s/maybe s/Str)
    (s/optional-key :waha-instance) (s/maybe s/Str)
    (s/optional-key :waha-group-id) (s/maybe s/Str)

@@ -314,3 +314,59 @@
       (let [details-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) admin-auth))
             available (:available_players (decode-body details-resp))]
         (is (some (fn [p] (and (= (str (:id p)) (str p-id)) (= (:attendance_status p) "confirmed"))) available))))))
+
+(deftest priority-confirmation-limit-attendance-test
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)]
+    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Mensalista User" :email "mens@ex.com" :password "p"})))
+    (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "mens@ex.com" :password "p"})))
+          token (:token (decode-body login))
+          user-auth (th/auth-cookie token)
+          user-id (th/user-id-by-email ds "mens@ex.com")
+          _ (th/grant-org-creation! ds "mens@ex.com")
+
+          ;; Create org with 24 hours priority confirmation limit
+          org-resp (app (-> (mock/request :post "/api/organizations")
+                            (mock/json-body {:name "Priority Limit Org" :priority_confirmation_limit_hours 24})
+                            user-auth))
+          org-id (misc/as-uuid (:id (decode-body org-resp)))
+
+          ;; Update user to mensalista
+          players (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/players")) user-auth)))
+          player-id (misc/as-uuid (:id (first (filter #(= (misc/as-uuid (:user_id %)) user-id) players))))
+          _ (db.player/update-player player-id {:member-type "mensalista"} ds)
+
+          now (java.time.Instant/now)
+          future-scheduled (str (.plus now (java.time.Duration/ofHours 48))) ;; 48h from now (before limit)
+          past-limit-scheduled (str (.plus now (java.time.Duration/ofHours 10))) ;; 10h from now (after 24h limit)
+
+          ;; Pelada 1: Scheduled in 48 hours -> Priority active
+          pelada1-resp (app (-> (mock/request :post "/api/peladas")
+                                (mock/json-body {:organization_id org-id :scheduled_at future-scheduled})
+                                user-auth))
+          pelada1-id (misc/as-uuid (:id (decode-body pelada1-resp)))
+
+          ;; Pelada 2: Scheduled in 10 hours -> Priority expired (limit reached)
+          pelada2-resp (app (-> (mock/request :post "/api/peladas")
+                                (mock/json-body {:organization_id org-id :scheduled_at past-limit-scheduled})
+                                user-auth))
+          pelada2-id (misc/as-uuid (:id (decode-body pelada2-resp)))]
+
+      ;; Self-confirm for Pelada 1 (Priority Active)
+      (app (-> (mock/request :post (str "/api/peladas/" pelada1-id "/attendance"))
+               (mock/json-body {:status "confirmed"})
+               user-auth))
+
+      ;; Self-confirm for Pelada 2 (Priority Expired)
+      (app (-> (mock/request :post (str "/api/peladas/" pelada2-id "/attendance"))
+               (mock/json-body {:status "confirmed"})
+               user-auth))
+
+      ;; Verify Pelada 1 attendance is 'confirmed'
+      (let [att1 (first (db.attendance/list-attendance-by-pelada pelada1-id ds))]
+        (is (= "confirmed" (:status att1))))
+
+      ;; Verify Pelada 2 attendance is 'waitlist' (treated as daily player)
+      (let [att2 (first (db.attendance/list-attendance-by-pelada pelada2-id ds))]
+        (is (= "waitlist" (:status att2)))))))
