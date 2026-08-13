@@ -111,7 +111,8 @@
       (try
         (let [org-id (:organization-id result)
               pelada-id (:id result)]
-          (notifications/send-notification! org-id :new-pelada {:pelada-id pelada-id :scheduled-at (:scheduled-at result) :confirmed-players []} db))
+          (notifications/send-notification! org-id :new-pelada {:pelada-id pelada-id :scheduled-at (:scheduled-at result) :confirmed-players [] :notify-casual-players (:notify-casual-players result)} db))
+
         (catch Exception e (log/error e "Error sending new pelada notification:"))))
     result))
 

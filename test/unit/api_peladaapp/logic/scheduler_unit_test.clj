@@ -181,6 +181,7 @@
           db nil]
       (with-redefs [scheduler/br-now (fn [] (ZonedDateTime/now (ZoneId/of "America/Sao_Paulo")))
                     scheduler/run-attendance-reminders! (fn [_ _] (reset! run-called true))
+                    scheduler/run-priority-ending-reminders! (fn [_ _] nil)
                     scheduler/check-vote-ended! (fn [_] (reset! ended-called true))]
         (scheduler/execute-tasks! db)
         (is (true? @run-called))

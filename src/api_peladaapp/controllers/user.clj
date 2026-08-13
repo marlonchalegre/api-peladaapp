@@ -53,17 +53,21 @@
         (do (db.user/update-user user-id $ db)
             (db.user/find-user-by-id user-id db))))))
 
+(defn- enrich-user
+  [user user-id db]
+  (let [admin-orgs (map :organization-id (db.admin/list-organizations-by-admin user-id db))
+        stats (db.user/get-user-stats user-id db)]
+    (assoc user
+           :admin-orgs admin-orgs
+           :stats stats)))
+
 (s/defn get-user :- models.user/User
   [user-id :- s/Uuid
    db]
   (let [user (db.user/find-user-by-id user-id db)]
     (if (nil? user)
       (throw (ex-info "User not found" {:type :not-found :message "User not found"}))
-      (let [admin-orgs (map :organization-id (db.admin/list-organizations-by-admin user-id db))
-            stats (db.user/get-user-stats user-id db)]
-        (assoc user
-               :admin-orgs admin-orgs
-               :stats stats)))))
+      (enrich-user user user-id db))))
 
 (s/defn delete-user
   [user-id :- s/Uuid
@@ -108,10 +112,7 @@
   (let [existing-user (db.user/find-user-by-id user-id db)]
     (if (nil? existing-user)
       (throw (ex-info "User not found" {:type :not-found :message "User not found"}))
-      (let [;; Start with existing user
-            base-user existing-user
-
-            ;; Check for username uniqueness if provided and belongs to another user
+      (let [base-user existing-user
             new-username (:username profile-data)
             _ (when (and new-username
                          (not (str/blank? new-username)))
@@ -119,7 +120,6 @@
                   (when (not= (:id existing) user-id)
                     (throw (ex-info "Username already exists" {:type :already-exist :message "Username already exists"})))))
 
-            ;; Check for email uniqueness if provided and belongs to another user
             new-email (:email profile-data)
             _ (when (and new-email
                          (not (str/blank? new-email)))
@@ -127,7 +127,6 @@
                   (when (not= (:id existing) user-id)
                     (throw (ex-info "Email already exists" {:type :already-exist :message "Email already exists"})))))
 
-            ;; Update with new data, only if provided
             updated-user (cond-> base-user
                            (contains? profile-data :name) (assoc :name (:name profile-data))
                            (contains? profile-data :username) (assoc :username (:username profile-data))
@@ -136,15 +135,13 @@
                            (contains? profile-data :password) (assoc :password (:password profile-data))
                            (contains? profile-data :position) (assoc :position (:position profile-data))
                            (contains? profile-data :phone) (assoc :phone (:phone profile-data))
+                           (contains? profile-data :receive-non-mensalista-updates) (assoc :receive-non-mensalista-updates (:receive-non-mensalista-updates profile-data))
                            (contains? profile-data :avatar-filename) (assoc :avatar-filename (:avatar-filename profile-data)))
-            ;; Encrypt password if it was updated
+
             final-user (if (:password profile-data)
                          (logic.user/encrypt-password updated-user)
                          updated-user)]
         (db.user/update-user-profile user-id final-user db)
-        (let [admin-orgs (map :organization-id (db.admin/list-organizations-by-admin user-id db))
-              stats (db.user/get-user-stats user-id db)]
-          (assoc (db.user/find-user-by-id user-id db)
-                 :admin-orgs admin-orgs
-                 :stats stats))))))
+        (enrich-user final-user user-id db)))))
+
 

@@ -8,7 +8,8 @@
    (s/optional-key :email) s/Str
    :password s/Str
    (s/optional-key :phone) s/Str
-   (s/optional-key :position) s/Str})
+   (s/optional-key :position) s/Str
+   (s/optional-key :receive_non_mensalista_updates) s/Bool})
 
 (s/defschema UpdateUserRequest
   {(s/optional-key :name) s/Str
@@ -17,7 +18,8 @@
    (s/optional-key :password) s/Str
    (s/optional-key :phone) s/Str
    (s/optional-key :avatar_filename) (s/maybe s/Str)
-   (s/optional-key :position) s/Str})
+   (s/optional-key :position) s/Str
+   (s/optional-key :receive_non_mensalista_updates) s/Bool})
 
 (s/defschema UpdateProfileRequest
   {(s/optional-key :name) s/Str
@@ -26,4 +28,6 @@
    (s/optional-key :password) s/Str
    (s/optional-key :phone) s/Str
    (s/optional-key :avatar_filename) (s/maybe s/Str)
-   (s/optional-key :position) s/Str})
+   (s/optional-key :position) s/Str
+   (s/optional-key :receive_non_mensalista_updates) s/Bool})
+

@@ -57,7 +57,6 @@
                   (h/returning :id))]
     (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
-
 (s/defn insert-partial-user :- s/Uuid
   "Insert a user with only some fields (e.g. name or email) and return its generated id"
   [fields :- {s/Keyword s/Any}
@@ -138,7 +137,6 @@
                            [:!= :u.phone nil]
                            [:!= :u.phone ""]))]
     (map adapter.user/db->model (jdbc/execute! db (hsql/format query) hsql/opts))))
-
 
 (s/defn get-users-by-ids :- [models.user/User]
   "Get users by a list of ids"

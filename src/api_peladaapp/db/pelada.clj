@@ -17,22 +17,25 @@
            (java.time.temporal ChronoUnit)))
 
 (s/defn insert-pelada :- s/Uuid
-  [{:keys [organization-id scheduled-at num-teams players-per-team fixed-goalkeepers
-           home-fixed-goalkeeper-id away-fixed-goalkeeper-id]} :- {:organization-id s/Uuid
-                                                                   (s/optional-key :scheduled-at) (s/maybe s/Str)
-                                                                   (s/optional-key :num-teams) (s/maybe s/Int)
-                                                                   (s/optional-key :players-per-team) (s/maybe s/Int)
-                                                                   (s/optional-key :fixed-goalkeepers) (s/maybe s/Bool)
-                                                                   (s/optional-key :home-fixed-goalkeeper-id) (s/maybe s/Uuid)
-                                                                   (s/optional-key :away-fixed-goalkeeper-id) (s/maybe s/Uuid)}
+  [pelada :- {:organization-id s/Uuid
+              (s/optional-key :scheduled-at) (s/maybe s/Str)
+              (s/optional-key :num-teams) (s/maybe s/Int)
+              (s/optional-key :players-per-team) (s/maybe s/Int)
+              (s/optional-key :fixed-goalkeepers) (s/maybe s/Bool)
+              (s/optional-key :home-fixed-goalkeeper-id) (s/maybe s/Uuid)
+              (s/optional-key :away-fixed-goalkeeper-id) (s/maybe s/Uuid)
+              (s/optional-key :notify-casual-players) (s/maybe s/Bool)}
    db]
-  (let [row (cond-> {:organization_id organization-id :status [:cast "attendance" :pelada_status]}
+  (let [{:keys [organization-id scheduled-at num-teams players-per-team fixed-goalkeepers
+                home-fixed-goalkeeper-id away-fixed-goalkeeper-id notify-casual-players]} pelada
+        row (cond-> {:organization_id organization-id :status [:cast "attendance" :pelada_status]}
               scheduled-at (assoc :scheduled_at [[:cast (helpers.time/to-utc-timestamp-str scheduled-at) :timestamp]])
               num-teams (assoc :num_teams num-teams)
               players-per-team (assoc :players_per_team players-per-team)
               (some? fixed-goalkeepers) (assoc :fixed_goalkeepers (boolean fixed-goalkeepers))
               home-fixed-goalkeeper-id (assoc :home_fixed_goalkeeper_id home-fixed-goalkeeper-id)
-              away-fixed-goalkeeper-id (assoc :away_fixed_goalkeeper_id away-fixed-goalkeeper-id))
+              away-fixed-goalkeeper-id (assoc :away_fixed_goalkeeper_id away-fixed-goalkeeper-id)
+              (some? notify-casual-players) (assoc :notify_casual_players (boolean notify-casual-players)))
         query (-> (h/insert-into :Peladas)
                   (h/values [row])
                   (h/returning :id))]
@@ -65,7 +68,8 @@
                                                :timer_accumulated_ms (:timer-accumulated-ms pelada)
                                                :timer_status (when (:timer-status pelada) [[:cast (:timer-status pelada) :timer_status]]))
                  (contains? pelada :home-fixed-goalkeeper-id) (assoc :home_fixed_goalkeeper_id (:home-fixed-goalkeeper-id pelada))
-                 (contains? pelada :away-fixed-goalkeeper-id) (assoc :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id pelada)))]
+                 (contains? pelada :away-fixed-goalkeeper-id) (assoc :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id pelada))
+                 (contains? pelada :notify-casual-players) (assoc :notify_casual_players (boolean (:notify-casual-players pelada))))]
     (if (empty? db-row)
       1
       (let [query (-> (h/update :Peladas)

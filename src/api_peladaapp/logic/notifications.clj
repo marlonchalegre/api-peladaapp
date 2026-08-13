@@ -10,7 +10,6 @@
    [java.time ZoneId]
    [java.time.format DateTimeFormatter]))
 
-
 (def position-order
   {"goalkeeper" 0
    "defender" 1
@@ -91,25 +90,26 @@
         (and (number? val) (not= val 0)))))
 
 (defn- calculate-goalkeeper-goals-conceded [matches lineups]
-  (reduce (fn [acc m]
-            (let [m-id (or (:id m) (:match_id m) (:match-id m))
-                  home-team-id (or (:home-team-id m) (:home_team_id m))
-                  home-score (or (:home-score m) (:home_score m) 0)
-                  away-score (or (:away-score m) (:away_score m) 0)
-                  lu (filter #(= (str m-id) (str (or (:match_id %) (:match-id %) (:id %)))) (or lineups []))]
-              (reduce (fn [inner-acc l]
-                        (if (is-goalkeeper-lineup? l)
-                          (let [team-id (or (:team_id l) (:team-id l))
-                                player-id (or (:player_id l) (:player-id l))
-                                conceded (if (= (str team-id) (str home-team-id))
-                                           away-score
-                                           home-score)]
-                            (update inner-acc player-id (fnil + 0) conceded))
-                          inner-acc))
-                      acc
-                      lu)))
-          {}
-          matches))
+  (let [lineups-by-match (group-by #(str (or (:match_id %) (:match-id %) (:id %))) (or lineups []))]
+    (reduce (fn [acc m]
+              (let [m-id (str (or (:id m) (:match_id m) (:match-id m)))
+                    home-team-id (or (:home-team-id m) (:home_team_id m))
+                    home-score (or (:home-score m) (:home_score m) 0)
+                    away-score (or (:away-score m) (:away_score m) 0)
+                    lu (get lineups-by-match m-id [])]
+                (reduce (fn [inner-acc l]
+                          (if (is-goalkeeper-lineup? l)
+                            (let [team-id (or (:team_id l) (:team-id l))
+                                  player-id (or (:player_id l) (:player-id l))
+                                  conceded (if (= (str team-id) (str home-team-id))
+                                             away-score
+                                             home-score)]
+                              (update inner-acc player-id (fnil + 0) conceded))
+                            inner-acc))
+                        acc
+                        lu)))
+            {}
+            matches)))
 
 (defn generate-end-message [{:keys [matches teams lineups team-players pelada-id]}]
   (let [title "🏁 *PELADA ENCERRADA!* 🏁\n\nConfira os resultados das partidas:\n\n"
@@ -272,7 +272,6 @@
                   (waha/send-message (assoc org :waha-group-id jid) msg nil))))))))
     (catch Exception e
       (log/error e "Failed to send private notifications to casual players:"))))
-
 
 (defn send-notification!
   "Sends a notification if enabled for the organization."

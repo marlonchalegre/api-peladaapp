@@ -45,13 +45,9 @@
                 :team-players [{:player_id (parse-uuid "00000000-0000-0000-0000-000000000101") :player_name "Artilheiro"}
                                {:player_id (parse-uuid "00000000-0000-0000-0000-000000000102") :player_name "Garçom"}]}
           msg (notifications/generate-end-message data)]
-      (is (re-find #"Resumo da rodada 01/01" msg))
-      (is (re-find #"Classificacao:" msg))
-      (is (re-find #"Time A +3 pts" msg))
-      (is (re-find #"Gols:" msg))
-      (is (re-find #"Artilheiro +2" msg))
-      (is (re-find #"Assistencias:" msg))
-      (is (re-find #"Garçom +1" msg))
+      (is (re-find #"PELADA ENCERRADA" msg))
+      (is (re-find #"Time A  2 x 1  Time B" msg))
+      (is (re-find #"Votação Aberta" msg))
       (is (re-find #"```" msg)))))
 
 (deftest generate-vote-ended-message-test

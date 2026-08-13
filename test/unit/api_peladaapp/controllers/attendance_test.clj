@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.controllers.attendance :as controller.attendance]
    [api-peladaapp.db.attendance :as db.attendance]
+   [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.vote :as db.vote]
@@ -59,6 +60,7 @@
 
       (testing "keeps status confirmed for mensalista"
         (with-redefs [db.pelada/get-pelada (fn [_ _] {:organization-id org-uuid})
+                      db.organization/get-organization (fn [_ _] {:priority-confirmation-limit-hours nil})
                       db.player/get-org-player-by-user-id (fn [_ _ _] {:id player-uuid :member-type "mensalista"})
                       db.attendance/upsert-attendance (fn [_pelada _player status _]
                                                         (is (= "confirmed" status))

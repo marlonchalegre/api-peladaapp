@@ -11,6 +11,7 @@
    (s/optional-key :fixed_goalkeepers) s/Bool
    (s/optional-key :home_fixed_goalkeeper_id) s/Uuid
    (s/optional-key :away_fixed_goalkeeper_id) s/Uuid
+   (s/optional-key :notify_casual_players) s/Bool
    (s/optional-key :status) s/Str})
 
 (s/defschema UpdatePeladaRequest
@@ -22,6 +23,7 @@
    (s/optional-key :fixed_goalkeepers) s/Bool
    (s/optional-key :home_fixed_goalkeeper_id) (s/maybe s/Uuid)
    (s/optional-key :away_fixed_goalkeeper_id) (s/maybe s/Uuid)
+   (s/optional-key :notify_casual_players) s/Bool
    (s/optional-key :status) s/Str
    (s/optional-key :timer_started_at) (s/maybe s/Any)
    (s/optional-key :timer_accumulated_ms) (s/maybe s/Int)

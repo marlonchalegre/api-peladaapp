@@ -2,10 +2,12 @@
   (:require
    [api-peladaapp.controllers.organization :as controller.organization]
    [api-peladaapp.db.organization :as db.organization]
+   [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.logic.notifications :as notifications]
    [api-peladaapp.logic.waha :as waha]
    [api-peladaapp.test-helpers :as th]
+   [clojure.string :as str]
    [clojure.test :refer [deftest is testing use-fixtures]]
    [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]))
@@ -101,11 +103,11 @@
           (is (= 2 (count @sent-messages)))
           (let [[msg1 msg2] @sent-messages]
             ;; First message check
-            (is (re-find #"Resumo da rodada 01/01" (:message msg1)))
-            (is (re-find #"Time A +3 pts" (:message msg1)))
+            (is (re-find #"PELADA ENCERRADA" (:message msg1)))
+            (is (re-find #"Time A  2 x 1  Time B" (:message msg1)))
             ;; Second message check
-            (is (re-find #"⚽ \*RESULTADOS DAS PARTIDAS\*" (:message msg2)))
-            (is (re-find #"    Time A  2 x 1  Time B" (:message msg2)))))))))
+            (is (re-find #"RESULTADOS DAS PARTIDAS" (:message msg2)))
+            (is (re-find #"Time A  2 x 1  Time B" (:message msg2)))))))))
 
 (deftest send-notification-waha-feature-flag-test
   (let [db-val (-> th/*test-system* :database :database)
@@ -214,3 +216,55 @@
             (is (= :attendance-reminder (:type @sent-notification)))
             (is (= pelada-id (get-in @sent-notification [:data :pelada-id])))
             (is (true? (get-in @sent-notification [:data :force?])))))))))
+
+(deftest send-private-casual-player-notification-test
+  (let [db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
+        org-id (db.organization/insert-organization {:name "Private Notification Org"} ds)
+        pelada-id (parse-uuid "00000000-0000-0000-0000-000000000003")]
+
+    ;; Setup WAHA config enabled for this org
+    (jdbc/execute! ds (hsql/format (-> (h/insert-into :OrganizationWahaConfigs)
+                                       (h/values [{:organization_id org-id
+                                                   :enabled true
+                                                   :api_url "http://waha:3000"
+                                                   :instance "default"
+                                                   :group_id "group123"
+                                                   :attendance_reminder_enabled true
+                                                   :use_all_mention false}]))))
+
+    ;; Create 3 users:
+    ;; U1: diarista, opted in
+    ;; U2: convidado, opted out
+    ;; U3: mensalista, opted in
+    (let [u1-id (db.user/insert-user {:name "OptedIn Diarista" :username "optin_diarista" :phone "5511988888888" :receive-non-mensalista-updates true} ds)
+          u2-id (db.user/insert-user {:name "OptedOut Convidado" :username "optout_convidado" :phone "5511977777777" :receive-non-mensalista-updates false} ds)
+          u3-id (db.user/insert-user {:name "OptedIn Mensalista" :username "optin_mensalista" :phone "5511966666666" :receive-non-mensalista-updates true} ds)]
+
+;; Add to OrganizationPlayers
+      (jdbc/execute! ds (hsql/format (-> (h/insert-into :OrganizationPlayers)
+                                         (h/values [{:organization_id org-id :user_id u1-id :member_type [:cast "diarista" :member_type]}
+                                                    {:organization_id org-id :user_id u2-id :member_type [:cast "convidado" :member_type]}
+                                                    {:organization_id org-id :user_id u3-id :member_type [:cast "mensalista" :member_type]}]))))
+
+      (testing "Private notification sent only to opted-in non-mensalista users"
+        (let [sent-calls (atom [])]
+          (with-redefs [waha/send-message (fn [config msg mentions]
+                                            (swap! sent-calls conj {:config config :msg msg :mentions mentions}))]
+            (notifications/send-notification! org-id :new-pelada {:pelada-id pelada-id :scheduled-at "2026-08-20T10:00:00Z" :notify-casual-players true} ds)
+
+            ;; Should have 2 calls: 1 to group, 1 private to u1
+            (is (= 2 (count @sent-calls)))
+            (let [private-call (second @sent-calls)]
+              (is (= "5511988888888@c.us" (get-in private-call [:config :waha-group-id])))
+              (is (str/includes? (:msg private-call) "Lista de Presença Aberta!"))))))
+
+      (testing "Private notification suppressed when notify-casual-players is false"
+        (let [sent-calls (atom [])]
+          (with-redefs [waha/send-message (fn [config msg mentions]
+                                            (swap! sent-calls conj {:config config :msg msg :mentions mentions}))]
+            (notifications/send-notification! org-id :new-pelada {:pelada-id pelada-id :scheduled-at "2026-08-20T10:00:00Z" :notify-casual-players false} ds)
+
+            ;; Should have only 1 call (the group message)
+            (is (= 1 (count @sent-calls)))))))))
+

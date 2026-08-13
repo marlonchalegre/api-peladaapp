@@ -78,10 +78,10 @@
                         (let [pending (db.attendance/list-pending-mensalistas-by-pelada (:id p) db)]
                           (log/info "Sending priority ending reminder for pelada" (:id p) "in organization" (:name org))
                           (notifications/send-notification! org-id :priority-ending
-                                                             {:pending-players pending
-                                                              :pelada-id (:id p)
-                                                              :limit-hours limit-hours}
-                                                             db)
+                                                            {:pending-players pending
+                                                             :pelada-id (:id p)
+                                                             :limit-hours limit-hours}
+                                                            db)
                           (db.reminder/insert-reminder! (:id p) "priority_ending" db))))))))))))))
 
 (defn- check-vote-ended! [db]

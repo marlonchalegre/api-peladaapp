@@ -146,7 +146,7 @@
         (let [before-count (:count (jdbc/execute-one! db (hsql/format (-> (h/select [[:count :*] :count])
                                                                           (h/from :PeladaReminders)
                                                                           (h/where [:= :pelada_id (misc/as-uuid pelada-id)] [:= :type [:cast "vote_12h" :reminder_type]])))
-                                                     hsql/opts))]
+                                                      hsql/opts))]
           (scheduler/execute-tasks! db)
           (let [after-count (:count (jdbc/execute-one! db (hsql/format (-> (h/select [[:count :*] :count])
                                                                            (h/from :PeladaReminders)

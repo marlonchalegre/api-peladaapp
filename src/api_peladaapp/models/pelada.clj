@@ -13,7 +13,9 @@
    :home-fixed-goalkeeper-id (s/maybe s/Uuid)
    :away-fixed-goalkeeper-id (s/maybe s/Uuid)
    :closed-at (s/maybe s/Any)
+   (s/optional-key :notify-casual-players) (s/maybe s/Bool)
    (s/optional-key :timer-started-at) (s/maybe s/Any)
    (s/optional-key :timer-accumulated-ms) (s/maybe s/Int)
    (s/optional-key :timer-status) (s/maybe s/Str)
    (s/optional-key :user-attendance-status) (s/maybe s/Str)})
+

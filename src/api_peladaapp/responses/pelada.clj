@@ -12,6 +12,7 @@
    (s/optional-key :fixed_goalkeepers) (s/maybe s/Bool)
    (s/optional-key :home_fixed_goalkeeper_id) (s/maybe s/Uuid)
    (s/optional-key :away_fixed_goalkeeper_id) (s/maybe s/Uuid)
+   (s/optional-key :notify_casual_players) (s/maybe s/Bool)
    (s/optional-key :status) (s/maybe s/Str)
    (s/optional-key :closed_at) (s/maybe s/Any)
    (s/optional-key :is_admin) s/Bool

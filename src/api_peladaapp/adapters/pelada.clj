@@ -25,7 +25,8 @@
                                     :fixed-goalkeepers (:fixed_goalkeepers request)
                                     :status (:status request))
       (contains? request :home_fixed_goalkeeper_id) (assoc :home-fixed-goalkeeper-id (misc/as-uuid (:home_fixed_goalkeeper_id request)))
-      (contains? request :away_fixed_goalkeeper_id) (assoc :away-fixed-goalkeeper-id (misc/as-uuid (:away_fixed_goalkeeper_id request))))))
+      (contains? request :away_fixed_goalkeeper_id) (assoc :away-fixed-goalkeeper-id (misc/as-uuid (:away_fixed_goalkeeper_id request)))
+      (contains? request :notify_casual_players) (assoc :notify-casual-players (boolean (:notify_casual_players request))))))
 
 (s/defn update-request->model :- models.pelada/Pelada
   [request :- requests.pelada/UpdatePeladaRequest]
@@ -41,7 +42,8 @@
                                     :timer-accumulated-ms (:timer_accumulated_ms request)
                                     :timer-status (:timer_status request))
       (contains? request :home_fixed_goalkeeper_id) (assoc :home-fixed-goalkeeper-id (misc/as-uuid (:home_fixed_goalkeeper_id request)))
-      (contains? request :away_fixed_goalkeeper_id) (assoc :away-fixed-goalkeeper-id (misc/as-uuid (:away_fixed_goalkeeper_id request))))))
+      (contains? request :away_fixed_goalkeeper_id) (assoc :away-fixed-goalkeeper-id (misc/as-uuid (:away_fixed_goalkeeper_id request)))
+      (contains? request :notify_casual_players) (assoc :notify-casual-players (boolean (:notify_casual_players request))))))
 
 (s/defn model->response :- responses.pelada/PeladaResponse
   [model :- models.pelada/Pelada]
@@ -60,6 +62,7 @@
          :organization_name (:organization-name model)
          :home_fixed_goalkeeper_id (:home-fixed-goalkeeper-id model)
          :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id model)
+         :notify_casual_players (if (nil? (:notify-casual-players model)) true (boolean (:notify-casual-players model)))
          :timer_started_at (some-> (:timer-started-at model) helpers.time/->instant str)
          :timer_accumulated_ms (:timer-accumulated-ms model)
          :timer_status (:timer-status model)
@@ -68,7 +71,13 @@
 (defn begin-model->response [model]
   {:matches_created (:matches-created model)})
 
-(s/defn db->model :- models.pelada/Pelada
+(defn- db-bool
+  [val default-val]
+  (if (nil? val)
+    default-val
+    (if (boolean? val) val (= 1 val))))
+
+(s/defn db->model :- (s/maybe models.pelada/Pelada)
   [pelada]
   (when-let [p (some-> pelada misc/unamespace)]
     (medley.core/assoc-some {}
@@ -78,11 +87,10 @@
                             :scheduled-at (:scheduled_at p)
                             :num-teams (:num_teams p)
                             :players-per-team (:players_per_team p)
-                            :fixed-goalkeepers (if (contains? p :fixed_goalkeepers)
-                                                 (if (boolean? (:fixed_goalkeepers p)) (:fixed_goalkeepers p) (= 1 (:fixed_goalkeepers p)))
-                                                 false)
+                            :fixed-goalkeepers (db-bool (:fixed_goalkeepers p) false)
                             :home-fixed-goalkeeper-id (:home_fixed_goalkeeper_id p)
                             :away-fixed-goalkeeper-id (:away_fixed_goalkeeper_id p)
+                            :notify-casual-players (db-bool (:notify_casual_players p) true)
                             :status (:status p)
                             :closed-at (:closed_at p)
                             :timer-started-at (:timer_started_at p)

@@ -1,0 +1,3 @@
+ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS receive_non_mensalista_updates BOOLEAN DEFAULT FALSE;
+--;;
+ALTER TABLE "Peladas" ADD COLUMN IF NOT EXISTS notify_casual_players BOOLEAN DEFAULT TRUE;

@@ -14,6 +14,7 @@
    (s/optional-key :is_super_admin) s/Bool
    (s/optional-key :is_blocked) s/Bool
    (s/optional-key :allow_org_creation) s/Bool
+   (s/optional-key :receive_non_mensalista_updates) s/Bool
    (s/optional-key :stats) (s/maybe {:goals s/Int
                                      :assists s/Int
                                      :matches s/Int})})
@@ -27,6 +28,8 @@
    (s/optional-key :avatar_filename) (s/maybe s/Str)
    (s/optional-key :is_super_admin) s/Bool
    (s/optional-key :is_blocked) s/Bool
-   (s/optional-key :allow_org_creation) s/Bool})
+   (s/optional-key :allow_org_creation) s/Bool
+   (s/optional-key :receive_non_mensalista_updates) s/Bool})
+
 
 
