@@ -16,6 +16,7 @@
           auth (th/auth-cookie token)
           user-id (th/user-id-by-email ds "admin@test.com")
 
+
           ;; Create organization
           create-org-resp (app (-> (mock/request :post "/api/organizations")
                                    (mock/json-body {:name "Test Org"})

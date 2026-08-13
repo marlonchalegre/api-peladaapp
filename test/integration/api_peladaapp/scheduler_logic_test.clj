@@ -159,6 +159,7 @@
         db (if (fn? db-val) (db-val) db-val)]
     (testing "execute-tasks! sends priority ending reminder when limit threshold is reached"
       (let [org-id (db.organization/insert-organization {:name "Org Priority Ending" :owner-id nil} db)
+            _ (db.organization/insert-default-feature-flags org-id db)
             _ (db.organization/update-organization
                org-id
                {:priority-confirmation-limit-hours 24

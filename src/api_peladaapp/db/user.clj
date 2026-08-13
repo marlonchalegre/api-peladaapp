@@ -46,14 +46,17 @@
 
 (s/defn insert-user :- s/Uuid
   "Insert a user and return its generated id"
-  [{:keys [name username email password position phone]} :- models.user/NewUser
+  [user :- models.user/NewUser
    db]
-  (let [row (cond-> {:name name :username username :email email :password password :phone phone}
-              position (assoc :position [:cast position :player_position]))
+  (let [{:keys [name username email password position phone]} user
+        row (cond-> {:name name :username username :email email :password password :phone phone}
+              position (assoc :position [:cast position :player_position])
+              (contains? user :receive-non-mensalista-updates) (assoc :receive_non_mensalista_updates (boolean (:receive-non-mensalista-updates user))))
         query (-> (h/insert-into :Users)
                   (h/values [row])
                   (h/returning :id))]
     (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
+
 
 (s/defn insert-partial-user :- s/Uuid
   "Insert a user with only some fields (e.g. name or email) and return its generated id"
@@ -84,7 +87,8 @@
                      :email (:email user)
                      :password (:password user)
                      :phone (:phone user)}
-              (:position user) (assoc :position [:cast (:position user) :player_position]))
+              (:position user) (assoc :position [:cast (:position user) :player_position])
+              (contains? user :receive-non-mensalista-updates) (assoc :receive_non_mensalista_updates (boolean (:receive-non-mensalista-updates user))))
         query (-> (h/update :Users)
                   (h/set row)
                   (h/where [:= :id id]))]
@@ -112,12 +116,29 @@
                      :email (:email user)
                      :phone (:phone user)
                      :avatar_filename (:avatar-filename user)}
-              (:position user) (assoc :position [:cast (:position user) :player_position]))
+              (:position user) (assoc :position [:cast (:position user) :player_position])
+              (contains? user :receive-non-mensalista-updates) (assoc :receive_non_mensalista_updates (boolean (:receive-non-mensalista-updates user))))
         query (-> (h/update :Users)
                   (h/set row)
                   (h/where [:= :id id]))]
     (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         hsql/affected-rows-count)))
+
+(s/defn list-opted-in-non-mensalista-users-by-org :- [models.user/User]
+  "List users in an organization with member_type diarista or convidado who opted in to non-mensalista updates"
+  [org-id :- s/Uuid db]
+  (let [query (-> (h/select-distinct :u.*)
+                  (h/from [:Users :u])
+                  (h/join [:OrganizationPlayers :op] [:= :op.user_id :u.id])
+                  (h/where [:= :op.organization_id org-id]
+                           [:in :op.member_type [[:cast "diarista" :member_type]
+                                                 [:cast "convidado" :member_type]
+                                                 [:cast "diarista_temporario" :member_type]]]
+                           [:= :u.receive_non_mensalista_updates true]
+                           [:!= :u.phone nil]
+                           [:!= :u.phone ""]))]
+    (map adapter.user/db->model (jdbc/execute! db (hsql/format query) hsql/opts))))
+
 
 (s/defn get-users-by-ids :- [models.user/User]
   "Get users by a list of ids"

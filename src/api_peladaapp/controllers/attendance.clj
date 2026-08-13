@@ -34,7 +34,7 @@
                           current-player)
           _ (when (nil? target-player)
               (throw (ex-info "Player not found" {:type :not-found :message "Player not found"})))
-          is-mensalista? (contains? #{"mensalista" "mensalista_temporario"} (:member-type target-player))
+          is-mensalista? (contains? #{"mensalista" "mensalista_temporario"} (some-> (or (:member-type target-player) (:member_type target-player)) str))
           final-status (if (and (= status "confirmed") (not target-player-id))
                          (if-not is-mensalista?
                            "waitlist"

@@ -1,12 +1,15 @@
 (ns api-peladaapp.logic.notifications
   (:require
    [api-peladaapp.db.organization :as db.organization]
+   [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.waha :as waha]
-   [clojure.string :as str])
+   [clojure.string :as str]
+   [clojure.tools.logging :as log])
   (:import
    [java.time ZoneId]
    [java.time.format DateTimeFormatter]))
+
 
 (def position-order
   {"goalkeeper" 0
@@ -103,100 +106,43 @@
                                            home-score)]
                             (update inner-acc player-id (fnil + 0) conceded))
                           inner-acc))
-                      acc lu)))
-          {} (or matches [])))
+                      acc
+                      lu)))
+          {}
+          matches))
 
-(defn generate-end-message [{:keys [pelada matches teams events lineups team-players]}]
-  (let [date-str (format-date (:scheduled-at pelada))
-        title (str "Resumo da rodada " date-str "\n\nClassificacao:\n")
-
-        ;; Name width calculation
-        max-name-len (->> team-players
-                          (map #(count (:player_name %)))
-                          (reduce max 0))
-        name-width (+ (max 15 (min 30 max-name-len)) 2)
-
-        ;; Standings
-        standings (-> (reduce (fn [acc t]
-                                (assoc acc (:id t) {:wins 0 :draws 0 :losses 0 :goals-for 0 :goals-against 0 :name (:name t)}))
-                              {} teams)
-                      (as-> table
-                            (reduce (fn [acc m]
-                                      (let [hs (or (:home-score m) 0)
-                                            as (or (:away-score m) 0)
-                                            hid (:home-team-id m)
-                                            aid (:away-team-id m)]
-                                        (if (and (contains? acc hid) (contains? acc aid))
-                                          (let [acc (-> acc
-                                                        (update-in [hid :goals-for] + hs)
-                                                        (update-in [hid :goals-against] + as)
-                                                        (update-in [aid :goals-for] + as)
-                                                        (update-in [aid :goals-against] + hs))]
-                                            (cond
-                                              (= hs as) (-> acc (update-in [hid :draws] inc) (update-in [aid :draws] inc))
-                                              (> hs as) (-> acc (update-in [hid :wins] inc) (update-in [aid :losses] inc))
-                                              :else (-> acc (update-in [hid :losses] inc) (update-in [aid :wins] inc))))
-                                          acc)))
-                                    table matches)))
-
-        sorted-standings (sort-by (fn [[_ s]]
-                                    [(- (+ (* (:wins s) 3) (:draws s)))
-                                     (- (- (:goals-for s) (:goals-against s)))
-                                     (- (:goals-for s))
-                                     (:name s)])
-                                  standings)
-
-        standings-str (->> sorted-standings
-                           (map (fn [[_ s]]
-                                  (let [pts (+ (* (:wins s) 3) (:draws s))
-                                        sg (- (:goals-for s) (:goals-against s))
-                                        sg-prefix (if (pos? sg) "+" "")
-                                        name-str (pad-end (:name s) name-width)]
-                                    (str name-str " " pts " pts (" (:wins s) "V " (:draws s) "E " (:losses s) "D) GP:" (:goals-for s) " SG:" sg-prefix sg))))
-                           (str/join "\n"))
-
-        ;; Player Stats
-        player-names (into {} (map (juxt :player_id :player_name) team-players))
-
-        stats (reduce (fn [acc e]
-                        (let [pid (:player-id e)
-                              type (:event-type e)]
-                          (update acc pid (fn [current]
-                                            (case type
-                                              "goal" (update current :goals (fnil inc 0))
-                                              "assist" (update current :assists (fnil inc 0))
-                                              "own_goal" (update current :own-goals (fnil inc 0))
-                                              current)))))
-                      {} events)
-
-        goals-conceded (calculate-goalkeeper-goals-conceded matches lineups)
-
-        top-scorers (->> stats
-                         (filter (fn [[_ s]] (pos? (or (:goals s) 0))))
-                         (sort-by (fn [[pid s]] [(- (or (:goals s) 0)) (get player-names pid "")]))
-                         (map (fn [[pid s]] (str (pad-end (get player-names pid "Unknown") name-width) " " (:goals s))))
+(defn generate-end-message [{:keys [matches teams lineups team-players pelada-id]}]
+  (let [title "🏁 *PELADA ENCERRADA!* 🏁\n\nConfira os resultados das partidas:\n\n"
+        team-map (into {} (map (juxt :id :name) teams))
+        max-name-len (->> teams
+                          (map #(count (:name %)))
+                          (reduce max 10))
+        matches-str (->> matches
+                         (map (fn [m]
+                                (let [home-name (get team-map (:home-team-id m) "Unknown")
+                                      away-name (get team-map (:away-team-id m) "Unknown")
+                                      home-score (or (:home-score m) 0)
+                                      away-score (or (:away-score m) 0)]
+                                  (str (pad-start home-name max-name-len)
+                                       "  " home-score " x " away-score "  "
+                                       (pad-end away-name max-name-len)))))
                          (str/join "\n"))
-
-        top-assisters (->> stats
-                           (filter (fn [[_ s]] (pos? (or (:assists s) 0))))
-                           (sort-by (fn [[pid s]] [(- (or (:assists s) 0)) (get player-names pid "")]))
-                           (map (fn [[pid s]] (str (pad-end (get player-names pid "Unknown") name-width) " " (:assists s))))
-                           (str/join "\n"))
-
+        player-names (into {} (map (juxt :player_id :player_name) team-players))
+        goals-conceded (calculate-goalkeeper-goals-conceded matches lineups)
+        max-p-name-len (->> team-players
+                            (map #(count (:player_name %)))
+                            (reduce max 0))
+        name-width (+ (max 15 (min 30 max-p-name-len)) 2)
         top-gk (->> goals-conceded
                     (sort-by (fn [[pid c]] [c (get player-names pid "")]))
                     (map (fn [[pid c]] (str (pad-end (get player-names pid "Unknown") name-width) " " c)))
                     (str/join "\n"))
-
-        footer (str "\n\nNão esqueçam de votar nos melhores da pelada no app!\n"
-                    (generate-voting-link (:id pelada)))]
-    (str "```\n"
-         title standings-str "\n"
-         (if (seq top-scorers) (str "\nGols:\n" top-scorers "\n") "")
-         (if (seq top-assisters) (str "\nAssistencias:\n" top-assisters "\n") "")
-         (if (seq top-gk) (str "\nGols sofridos:\n" top-gk "\n") "")
-         footer
-         "\n```")))
+        gk-str (if (seq top-gk)
+                 (str "\nGols sofridos:\n" top-gk)
+                 "")
+        voting-link (generate-voting-link pelada-id)
+        footer (str "\n\n🗳️ *Votação Aberta!*\nAcesse o link para votar nos melhores da pelada:\n" voting-link)]
+    (str title "```\n" matches-str (if (seq gk-str) (str "\n" gk-str) "") "\n```" footer)))
 
 (defn generate-vote-ended-message [pelada-id]
   (let [title "🏆 *Ranking da Pelada!* 🏆\n\nA votação encerrou. Os resultados já estão disponíveis!\n\n"
@@ -241,6 +187,25 @@
                          (str/join "\n"))]
     (str title players-str "\n\nAcesse o app e deixe seu voto!\n" (generate-voting-link pelada-id))))
 
+(defn generate-casual-player-open-message [pelada-id scheduled-at]
+  (let [date-str (format-date scheduled-at)
+        title (str "⚽ *Lista de Presença Aberta!* ⚽\n\n"
+                   (if (seq date-str) (str "A lista de presença para a pelada do dia " date-str " está aberta!\n") "A lista de presença para a próxima pelada está aberta!\n")
+                   "Acesse o app para confirmar sua participação:\n"
+                   (generate-pelada-link pelada-id))]
+    title))
+
+(defn generate-casual-player-priority-ended-message [pelada-id scheduled-at limit-hours]
+  (let [date-str (format-date scheduled-at)
+        limit-info (if limit-hours (str "Prazo de " limit-hours "h atingido. ") "")
+        title (str "⚠️ *Prioridade de Mensalistas Encerrada!* ⚠️\n\n"
+                   (if (seq date-str) (str "A prioridade para mensalistas da pelada do dia " date-str " encerrou. ") "A prioridade para mensalistas encerrou. ")
+                   limit-info
+                   "A lista de presença está agora liberada para diaristas e convidados!\n"
+                   "Acesse o app para garantir sua vaga:\n"
+                   (generate-pelada-link pelada-id))]
+    title))
+
 (defn generate-matches-results-message [{:keys [matches teams lineups team-players]}]
   (let [title "⚽ *RESULTADOS DAS PARTIDAS*\n\n"
         team-map (into {} (map (juxt :id :name) teams))
@@ -284,6 +249,30 @@
                                  (str/join "\n"))
                             "Nenhum jogador confirmado ainda.")]
     (str title confirmations-title confirmations-str)))
+
+(defn- send-private-casual-player-notifications!
+  [org type data db]
+  (try
+    (let [org-id (:id org)
+          notify-casual? (if (contains? data :notify-casual-players)
+                           (boolean (:notify-casual-players data))
+                           true)]
+      (when (case type
+              :new-pelada notify-casual?
+              :priority-ending true
+              false)
+        (let [opted-in-users (db.user/list-opted-in-non-mensalista-users-by-org org-id db)]
+          (doseq [u opted-in-users]
+            (when-let [jid (some-> (:phone u) waha/normalize-phone)]
+              (let [msg (case type
+                          :new-pelada (generate-casual-player-open-message (:pelada-id data) (:scheduled-at data))
+                          :priority-ending (generate-casual-player-priority-ended-message (:pelada-id data) (:scheduled-at data) (:limit-hours data))
+                          nil)]
+                (when msg
+                  (waha/send-message (assoc org :waha-group-id jid) msg nil))))))))
+    (catch Exception e
+      (log/error e "Failed to send private notifications to casual players:"))))
+
 
 (defn send-notification!
   "Sends a notification if enabled for the organization."
@@ -336,4 +325,5 @@
                 (waha/send-poll org "Quem será o campeão?" team-names false)))
             (when (= type :end)
               (let [results-message (generate-matches-results-message data)]
-                (waha/send-message org results-message nil)))))))))
+                (waha/send-message org results-message nil))))
+          (send-private-casual-player-notifications! org type data db))))))
