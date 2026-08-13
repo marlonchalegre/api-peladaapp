@@ -78,6 +78,30 @@
       (.format formatter instant))
     (catch Exception _ "")))
 
+(defn- is-goalkeeper-lineup? [l]
+  (let [val (:is_goalkeeper l (get l :is-goalkeeper))]
+    (or (= val true)
+        (and (number? val) (not= val 0)))))
+
+(defn- calculate-goalkeeper-goals-conceded [matches lineups]
+  (reduce (fn [acc m]
+            (let [m-id (or (:id m) (:match_id m) (:match-id m))
+                  home-team-id (or (:home-team-id m) (:home_team_id m))
+                  home-score (or (:home-score m) (:home_score m) 0)
+                  away-score (or (:away-score m) (:away_score m) 0)
+                  lu (filter #(= (str m-id) (str (or (:match_id %) (:match-id %) (:id %)))) (or lineups []))]
+              (reduce (fn [inner-acc l]
+                        (if (is-goalkeeper-lineup? l)
+                          (let [team-id (or (:team_id l) (:team-id l))
+                                player-id (or (:player_id l) (:player-id l))
+                                conceded (if (= (str team-id) (str home-team-id))
+                                           away-score
+                                           home-score)]
+                            (update inner-acc player-id (fnil + 0) conceded))
+                          inner-acc))
+                      acc lu)))
+          {} (or matches [])))
+
 (defn generate-end-message [{:keys [pelada matches teams events lineups team-players]}]
   (let [date-str (format-date (:scheduled-at pelada))
         title (str "Resumo da rodada " date-str "\n\nClassificacao:\n")
@@ -141,18 +165,7 @@
                                               current)))))
                       {} events)
 
-        ;; Goals Conceded (Goalkeepers)
-        goals-conceded (reduce (fn [acc m]
-                                 (let [lu (filter #(= (:match_id m) (:match_id %)) lineups)]
-                                   (reduce (fn [inner-acc l]
-                                             (if (not= 0 (:is_goalkeeper l))
-                                               (let [conceded (if (= (:team_id l) (:home-team-id m))
-                                                                (or (:away-score m) 0)
-                                                                (or (:home-score m) 0))]
-                                                 (update inner-acc (:player_id l) (fnil + 0) conceded))
-                                               inner-acc))
-                                           acc lu)))
-                               {} matches)
+        goals-conceded (calculate-goalkeeper-goals-conceded matches lineups)
 
         top-scorers (->> stats
                          (filter (fn [[_ s]] (pos? (or (:goals s) 0))))
@@ -205,19 +218,6 @@
                          (str/join "\n"))]
     (str title players-str "\n\nPor favor, confirmem no app o quanto antes!\n" (generate-pelada-link pelada-id))))
 
-(defn generate-new-pelada-message [pelada-id scheduled-at confirmed-players]
-  (let [date-str (format-date scheduled-at)
-        title (str "⚽ *Nova Pelada Confirmada!* ⚽\n\nUma nova pelada foi agendada para o dia " date-str ".\n\n"
-                   "A lista de presença está aberta! Acesse o app para confirmar ou recusar sua participação:\n"
-                   (generate-pelada-link pelada-id) "\n\n")
-        confirmations-title "*Confirmados:*\n"
-        confirmations-str (if (seq confirmed-players)
-                            (->> confirmed-players
-                                 (map #(str "• " (format-mention %)))
-                                 (str/join "\n"))
-                            "Nenhum jogador confirmado ainda.")]
-    (str title confirmations-title confirmations-str)))
-
 (defn generate-vote-reminder [pelada-id pending-voters]
   (let [title "🗳️ *Lembrete de Votação!* 🗳️\n\nAinda faltam alguns jogadores votarem nos melhores da pelada:\n\n"
         players-str (->> pending-voters
@@ -242,17 +242,7 @@
                                        (pad-end away-name max-name-len)))))
                          (str/join "\n"))
         player-names (into {} (map (juxt :player_id :player_name) team-players))
-        goals-conceded (reduce (fn [acc m]
-                                 (let [lu (filter #(= (:match_id m) (:match_id %)) (or lineups []))]
-                                   (reduce (fn [inner-acc l]
-                                             (if (not= 0 (:is_goalkeeper l))
-                                               (let [conceded (if (= (:team_id l) (:home-team-id m))
-                                                                (or (:away-score m) 0)
-                                                                (or (:home-score m) 0))]
-                                                 (update inner-acc (:player_id l) (fnil + 0) conceded))
-                                               inner-acc))
-                                           acc lu)))
-                               {} matches)
+        goals-conceded (calculate-goalkeeper-goals-conceded matches lineups)
         max-p-name-len (->> team-players
                             (map #(count (:player_name %)))
                             (reduce max 0))
@@ -265,6 +255,19 @@
                  (str "\nGols sofridos:\n" top-gk)
                  "")]
     (str title "```\n" matches-str (if (seq gk-str) (str "\n" gk-str) "") "\n```")))
+
+(defn generate-new-pelada-message [pelada-id scheduled-at confirmed-players]
+  (let [date-str (format-date scheduled-at)
+        title (str "⚽ *Nova Pelada Confirmada!* ⚽\n\nUma nova pelada foi agendada para o dia " date-str ".\n\n"
+                   "A lista de presença está aberta! Acesse o app para confirmar ou recusar sua participação:\n"
+                   (generate-pelada-link pelada-id) "\n\n")
+        confirmations-title "*Confirmados:*\n"
+        confirmations-str (if (seq confirmed-players)
+                            (->> confirmed-players
+                                 (map #(str "• " (format-mention %)))
+                                 (str/join "\n"))
+                            "Nenhum jogador confirmado ainda.")]
+    (str title confirmations-title confirmations-str)))
 
 (defn send-notification!
   "Sends a notification if enabled for the organization."

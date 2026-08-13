@@ -110,6 +110,39 @@
       ;; Goleiro Um is in team A, which conceded 3 goals (from team B)
       ;; Since it's sorted by goals conceded ascending, Goleiro Dois (2 goals) should be first, then Goleiro Um (3 goals)
       (is (re-find #"Goleiro Dois" msg))
-      (is (re-find #"Goleiro Um" msg)))))
+      (is (re-find #"Goleiro Um" msg)))
+
+    (testing "reproduces bug: generates goalkeeper goals conceded using real DB data format (matches with :id only, lineups with boolean :is_goalkeeper)"
+      (let [p1 (parse-uuid "00000000-0000-0000-0000-000000000101")
+            p2 (parse-uuid "00000000-0000-0000-0000-000000000102")
+            p3 (parse-uuid "00000000-0000-0000-0000-000000000103")
+            t1 (parse-uuid "00000000-0000-0000-0000-000000000001")
+            t2 (parse-uuid "00000000-0000-0000-0000-000000000002")
+            m1 (parse-uuid "00000000-0000-0000-0000-000000000201")
+          ;; Real match map returned by adapter.match/db->model ONLY has :id (not :match_id)
+            data {:teams [{:id t1 :name "Time A"}
+                          {:id t2 :name "Time B"}]
+                  :matches [{:id m1
+                             :home-team-id t1 :away-team-id t2
+                             :home-score 2 :away-score 3}]
+                  :team-players [{:player_id p1 :player_name "Goleiro Um"}
+                                 {:player_id p2 :player_name "Goleiro Dois"}
+                                 {:player_id p3 :player_name "Linha Tres"}]
+                ;; Real lineups from DB have boolean :is_goalkeeper true/false
+                  :lineups [{:match_id m1 :team_id t1 :player_id p1 :is_goalkeeper true}
+                            {:match_id m1 :team_id t2 :player_id p2 :is_goalkeeper true}
+                            {:match_id m1 :team_id t1 :player_id p3 :is_goalkeeper false}]}
+            msg (notifications/generate-matches-results-message data)
+            end-msg (notifications/generate-end-message (assoc data :pelada {:scheduled-at "2023-01-01T10:00:00Z"} :events []))]
+        (is (re-find #"Gols sofridos:" msg))
+        (is (re-find #"Goleiro Dois" msg))
+        (is (re-find #"Goleiro Um" msg))
+        (is (not (re-find #"Linha Tres" msg)))
+        (is (re-find #"Gols sofridos:" end-msg))
+        (is (re-find #"Goleiro Dois" end-msg))
+        (is (re-find #"Goleiro Um" end-msg))
+        (is (not (re-find #"Linha Tres" end-msg)))))))
+
+
 
 
