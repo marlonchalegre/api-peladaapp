@@ -1,0 +1,1 @@
+ALTER TABLE "Peladas" ADD COLUMN IF NOT EXISTS max_players INTEGER;

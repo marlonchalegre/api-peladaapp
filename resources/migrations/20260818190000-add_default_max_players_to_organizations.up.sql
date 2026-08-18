@@ -1,0 +1,1 @@
+ALTER TABLE "Organizations" ADD COLUMN IF NOT EXISTS default_max_players INTEGER DEFAULT NULL;

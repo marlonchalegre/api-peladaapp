@@ -22,6 +22,7 @@
                                     :scheduled-at scheduled-at
                                     :num-teams (:num_teams request)
                                     :players-per-team (:players_per_team request)
+                                    :max-players (:max_players request)
                                     :fixed-goalkeepers (:fixed_goalkeepers request)
                                     :status (:status request))
       (contains? request :home_fixed_goalkeeper_id) (assoc :home-fixed-goalkeeper-id (misc/as-uuid (:home_fixed_goalkeeper_id request)))
@@ -36,6 +37,7 @@
                                     :scheduled-at scheduled-at
                                     :num-teams (:num_teams request)
                                     :players-per-team (:players_per_team request)
+                                    :max-players (:max_players request)
                                     :fixed-goalkeepers (:fixed_goalkeepers request)
                                     :status (:status request)
                                     :timer-started-at (:timer_started_at request)
@@ -60,6 +62,7 @@
          :closed_at (:closed-at model)}
         (medley.core/assoc-some
          :organization_name (:organization-name model)
+         :max_players (:max-players model)
          :home_fixed_goalkeeper_id (:home-fixed-goalkeeper-id model)
          :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id model)
          :notify_casual_players (if (nil? (:notify-casual-players model)) true (boolean (:notify-casual-players model)))
@@ -71,12 +74,6 @@
 (defn begin-model->response [model]
   {:matches_created (:matches-created model)})
 
-(defn- db-bool
-  [val default-val]
-  (if (nil? val)
-    default-val
-    (if (boolean? val) val (= 1 val))))
-
 (s/defn db->model :- (s/maybe models.pelada/Pelada)
   [pelada]
   (when-let [p (some-> pelada misc/unamespace)]
@@ -87,10 +84,11 @@
                             :scheduled-at (:scheduled_at p)
                             :num-teams (:num_teams p)
                             :players-per-team (:players_per_team p)
-                            :fixed-goalkeepers (db-bool (:fixed_goalkeepers p) false)
+                            :max-players (:max_players p)
+                            :fixed-goalkeepers (misc/to-bool (:fixed_goalkeepers p) false)
                             :home-fixed-goalkeeper-id (:home_fixed_goalkeeper_id p)
                             :away-fixed-goalkeeper-id (:away_fixed_goalkeeper_id p)
-                            :notify-casual-players (db-bool (:notify_casual_players p) true)
+                            :notify-casual-players (misc/to-bool (:notify_casual_players p) true)
                             :status (:status p)
                             :closed-at (:closed_at p)
                             :timer-started-at (:timer_started_at p)

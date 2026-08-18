@@ -2,6 +2,7 @@
   (:require
    [api-peladaapp.handlers.health :as health]
    [api-peladaapp.logic.waha :as waha]
+   [clojure.java.io :as io]
    [clojure.test :refer [deftest is testing]]))
 
 (deftest waha-healthcheck-handler-test

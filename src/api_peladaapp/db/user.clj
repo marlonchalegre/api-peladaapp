@@ -138,6 +138,29 @@
                            [:!= :u.phone ""]))]
     (map adapter.user/db->model (jdbc/execute! db (hsql/format query) hsql/opts))))
 
+(s/defn list-opted-in-casual-users-to-notify-for-pelada :- [models.user/User]
+  "List opted-in casual users in an organization for a pelada, excluding those who already have an Attendance record with status waitlist, confirmed, or declined."
+  [org-id :- s/Uuid pelada-id :- s/Uuid db]
+  (let [query (-> (h/select-distinct :u.*)
+                  (h/from [:Users :u])
+                  (h/join [:OrganizationPlayers :op] [:= :op.user_id :u.id])
+                  (h/where [:= :op.organization_id org-id]
+                           [:in :op.member_type [[:cast "diarista" :member_type]
+                                                 [:cast "convidado" :member_type]
+                                                 [:cast "diarista_temporario" :member_type]]]
+                           [:= :u.receive_non_mensalista_updates true]
+                           [:!= :u.phone nil]
+                           [:!= :u.phone ""]
+                           [:not-exists (-> (h/select 1)
+                                            (h/from [:Attendance :pa])
+                                            (h/where [:and
+                                                      [:= :pa.pelada_id pelada-id]
+                                                      [:= :pa.player_id :op.id]
+                                                      [:in :pa.status [[:cast "waitlist" :attendance_status]
+                                                                       [:cast "confirmed" :attendance_status]
+                                                                       [:cast "declined" :attendance_status]]]]))]))]
+    (map adapter.user/db->model (jdbc/execute! db (hsql/format query) hsql/opts))))
+
 (s/defn get-users-by-ids :- [models.user/User]
   "Get users by a list of ids"
   [db ids :- [s/Uuid]]

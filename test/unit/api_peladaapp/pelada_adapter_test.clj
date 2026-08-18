@@ -53,3 +53,25 @@
                  :scheduled-at ts}
           response (adapter.pelada/model->response model)]
       (is (str/ends-with? (:scheduled_at response) "Z")))))
+
+(deftest test-max-players-pelada-adapter-mapping
+  (testing "db->model maps max_players"
+    (let [db-row {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                  :organization_id (parse-uuid "00000000-0000-0000-0000-000000000010")
+                  :max_players 14}
+          model (adapter.pelada/db->model db-row)]
+      (is (= 14 (:max-players model)))))
+
+  (testing "create-request->model maps max_players"
+    (let [req {:organization_id "00000000-0000-0000-0000-000000000010"
+               :when "2026-06-03T19:00:00Z"
+               :max_players 20}
+          model (adapter.pelada/create-request->model req)]
+      (is (= 20 (:max-players model)))))
+
+  (testing "model->response maps max-players"
+    (let [model {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                 :organization-id (parse-uuid "00000000-0000-0000-0000-000000000010")
+                 :max-players 16}
+          resp (adapter.pelada/model->response model)]
+      (is (= 16 (:max_players resp))))))

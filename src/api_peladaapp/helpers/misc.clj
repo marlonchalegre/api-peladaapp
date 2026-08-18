@@ -24,3 +24,10 @@
     (instance? java.util.UUID x) x
     (string? x) (parse-uuid x)
     :else nil))
+
+(defn to-bool
+  "Coerce a value (boolean, 1/0 integer, or nil) to boolean with default fallback."
+  [v default-val]
+  (if (nil? v)
+    default-val
+    (if (boolean? v) v (= 1 v))))

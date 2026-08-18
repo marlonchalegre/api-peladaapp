@@ -354,6 +354,10 @@
           (let [pending (db.attendance/list-pending-mensalistas-by-pelada pelada-id db)]
             (notifications/send-notification! org-id :priority-ending {:pending-players pending :pelada-id pelada-id :force? true} db))
 
+          :casual-priority-ended
+          (let [pelada (db.pelada/get-pelada pelada-id db)]
+            (notifications/send-notification! org-id :casual-priority-ended {:pelada-id pelada-id :scheduled-at (:scheduled-at pelada) :limit-hours (:priority-confirmation-limit-hours org) :force? true} db))
+
           :vote-reminder
           (let [pending (db.vote/list-pending-voters-by-pelada pelada-id db)]
             (notifications/send-notification! org-id :vote-reminder {:pending-voters pending :pelada-id pelada-id :force? true} db))

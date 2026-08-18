@@ -8,6 +8,7 @@
    (s/optional-key :when) s/Str
    (s/optional-key :num_teams) s/Int
    (s/optional-key :players_per_team) s/Int
+   (s/optional-key :max_players) s/Int
    (s/optional-key :fixed_goalkeepers) s/Bool
    (s/optional-key :home_fixed_goalkeeper_id) s/Uuid
    (s/optional-key :away_fixed_goalkeeper_id) s/Uuid
@@ -20,6 +21,7 @@
    (s/optional-key :when) s/Str
    (s/optional-key :num_teams) s/Int
    (s/optional-key :players_per_team) s/Int
+   (s/optional-key :max_players) s/Int
    (s/optional-key :fixed_goalkeepers) s/Bool
    (s/optional-key :home_fixed_goalkeeper_id) (s/maybe s/Uuid)
    (s/optional-key :away_fixed_goalkeeper_id) (s/maybe s/Uuid)

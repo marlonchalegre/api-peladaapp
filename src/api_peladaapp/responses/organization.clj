@@ -8,6 +8,7 @@
    (s/optional-key :owner_id) (s/maybe s/Uuid)
    (s/optional-key :role) (s/maybe s/Str)
    (s/optional-key :priority_confirmation_limit_hours) (s/maybe s/Int)
+   (s/optional-key :default_max_players) (s/maybe s/Int)
    (s/optional-key :waha_api_url) (s/maybe s/Str)
    (s/optional-key :waha_instance) (s/maybe s/Str)
    (s/optional-key :waha_group_id) (s/maybe s/Str)

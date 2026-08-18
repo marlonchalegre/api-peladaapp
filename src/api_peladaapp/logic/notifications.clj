@@ -1,6 +1,8 @@
 (ns api-peladaapp.logic.notifications
   (:require
+   [api-peladaapp.db.attendance :as db.attendance]
    [api-peladaapp.db.organization :as db.organization]
+   [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.waha :as waha]
@@ -177,7 +179,7 @@
                                 (str/join "\n"))
                            "\n\n")
                       "")
-        footer (str "Faltam " (or limit-hours "") "h para a pelada. Após esse prazo, novas confirmações de mensalistas irão para a lista de espera como diaristas.\nConfirmem no app o quanto antes!\n" (generate-pelada-link pelada-id))]
+        footer (str "A prioridade de confirmação para mensalistas encerra em breve (prazo de " (or limit-hours "") "h antes da pelada). Após esse prazo, novas confirmações de mensalistas irão para a lista de espera como diaristas.\nConfirmem no app o quanto antes!\n" (generate-pelada-link pelada-id))]
     (str title players-str footer)))
 
 (defn generate-vote-reminder [pelada-id pending-voters]
@@ -250,26 +252,43 @@
                             "Nenhum jogador confirmado ainda.")]
     (str title confirmations-title confirmations-str)))
 
+(defn- pelada-full? [pelada-id db]
+  (when-let [pelada (db.pelada/get-pelada pelada-id db)]
+    (let [max-p (or (:max-players pelada) (get pelada :max_players))
+          num-teams (:num-teams pelada (get pelada :num_teams))
+          players-per-team (:players-per-team pelada (get pelada :players_per_team))
+          max-cap (or (when (and (number? max-p) (pos? max-p)) max-p)
+                      (when (and (number? num-teams) (pos? num-teams)
+                                 (number? players-per-team) (pos? players-per-team))
+                        (* num-teams players-per-team)))]
+      (if (and (number? max-cap) (pos? max-cap))
+        (let [confirmed-count (count (db.attendance/list-confirmed-players-by-pelada pelada-id db))]
+          (>= confirmed-count max-cap))
+        false))))
+
 (defn- send-private-casual-player-notifications!
   [org type data db]
   (try
     (let [org-id (:id org)
+          pelada-id (:pelada-id data)
           notify-casual? (if (contains? data :notify-casual-players)
                            (boolean (:notify-casual-players data))
                            true)]
-      (when (case type
-              :new-pelada notify-casual?
-              :priority-ending true
-              false)
-        (let [opted-in-users (db.user/list-opted-in-non-mensalista-users-by-org org-id db)]
-          (doseq [u opted-in-users]
-            (when-let [jid (some-> (:phone u) waha/normalize-phone)]
-              (let [msg (case type
-                          :new-pelada (generate-casual-player-open-message (:pelada-id data) (:scheduled-at data))
-                          :priority-ending (generate-casual-player-priority-ended-message (:pelada-id data) (:scheduled-at data) (:limit-hours data))
-                          nil)]
-                (when msg
-                  (waha/send-message (assoc org :waha-group-id jid) msg nil))))))))
+      (when (and pelada-id
+                 (case type
+                   :new-pelada notify-casual?
+                   :casual-priority-ended true
+                   false))
+        (when-not (pelada-full? pelada-id db)
+          (let [opted-in-users (db.user/list-opted-in-casual-users-to-notify-for-pelada org-id pelada-id db)]
+            (doseq [u opted-in-users]
+              (when-let [jid (some-> (:phone u) waha/normalize-phone)]
+                (let [msg (case type
+                            :new-pelada (generate-casual-player-open-message pelada-id (:scheduled-at data))
+                            :casual-priority-ended (generate-casual-player-priority-ended-message pelada-id (:scheduled-at data) (:limit-hours data))
+                            nil)]
+                  (when msg
+                    (waha/send-message (assoc org :waha-group-id jid) msg nil)))))))))
     (catch Exception e
       (log/error e "Failed to send private notifications to casual players:"))))
 
@@ -287,42 +306,44 @@
                           :vote-ended :waha-vote-ended-msg-enabled
                           :attendance-reminder :waha-attendance-reminder-enabled
                           :priority-ending :waha-attendance-reminder-enabled
+                          :casual-priority-ended :waha-attendance-reminder-enabled
                           :vote-reminder :waha-vote-reminder-enabled)
             should-send? (or (:force? data) (get org enabled-key))]
         (when should-send?
-          (let [message (case type
-                          :new-pelada (generate-new-pelada-message (:pelada-id data) (:scheduled-at data) (:confirmed-players data))
-                          :start (generate-start-message (:teams data) (:team-players data))
-                          :end (generate-end-message data)
-                          :vote-ended (generate-vote-ended-message (:pelada-id data))
-                          :attendance-reminder (generate-attendance-reminder (:pelada-id data) (:pending-players data))
-                          :priority-ending (generate-priority-ending-reminder (:pelada-id data) (:limit-hours data) (:pending-players data))
-                          :vote-reminder (generate-vote-reminder (:pelada-id data) (:pending-voters data)))
-                mentions (case type
-                           :attendance-reminder (->> (:pending-players data)
-                                                     (keep #(some-> (:phone %) waha/normalize-phone))
-                                                     vec)
-                           :priority-ending (->> (:pending-players data)
+          (when-not (= type :casual-priority-ended)
+            (let [message (case type
+                            :new-pelada (generate-new-pelada-message (:pelada-id data) (:scheduled-at data) (:confirmed-players data))
+                            :start (generate-start-message (:teams data) (:team-players data))
+                            :end (generate-end-message data)
+                            :vote-ended (generate-vote-ended-message (:pelada-id data))
+                            :attendance-reminder (generate-attendance-reminder (:pelada-id data) (:pending-players data))
+                            :priority-ending (generate-priority-ending-reminder (:pelada-id data) (:limit-hours data) (:pending-players data))
+                            :vote-reminder (generate-vote-reminder (:pelada-id data) (:pending-voters data)))
+                  mentions (case type
+                             :attendance-reminder (->> (:pending-players data)
+                                                       (keep #(some-> (:phone %) waha/normalize-phone))
+                                                       vec)
+                             :priority-ending (->> (:pending-players data)
+                                                   (keep #(some-> (:phone %) waha/normalize-phone))
+                                                   vec)
+                             :vote-reminder (->> (:pending-voters data)
                                                  (keep #(some-> (:phone %) waha/normalize-phone))
                                                  vec)
-                           :vote-reminder (->> (:pending-voters data)
-                                               (keep #(some-> (:phone %) waha/normalize-phone))
-                                               vec)
-                           nil)
-                use-all? (:waha-use-all-mention org)
-                all-mention? (and (contains? all-mention-types type)
-                                  use-all?)
-                final-mentions (if all-mention?
-                                 (conj mentions "all")
-                                 mentions)
-                final-message (if all-mention?
-                                (str/replace message #"!\*" "! @all*")
-                                message)]
-            (waha/send-message org final-message final-mentions)
-            (when (= type :start)
-              (let [team-names (map :name (:teams data))]
-                (waha/send-poll org "Quem será o campeão?" team-names false)))
-            (when (= type :end)
-              (let [results-message (generate-matches-results-message data)]
-                (waha/send-message org results-message nil))))
+                             nil)
+                  use-all? (:waha-use-all-mention org)
+                  all-mention? (and (contains? all-mention-types type)
+                                    use-all?)
+                  final-mentions (if all-mention?
+                                   (conj mentions "all")
+                                   mentions)
+                  final-message (if all-mention?
+                                  (str/replace message #"!\*" "! @all*")
+                                  message)]
+              (waha/send-message org final-message final-mentions)
+              (when (= type :start)
+                (let [team-names (map :name (:teams data))]
+                  (waha/send-poll org "Quem será o campeão?" team-names false)))
+              (when (= type :end)
+                (let [results-message (generate-matches-results-message data)]
+                  (waha/send-message org results-message nil)))))
           (send-private-casual-player-notifications! org type data db))))))

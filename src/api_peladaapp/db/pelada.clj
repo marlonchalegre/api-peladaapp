@@ -21,17 +21,19 @@
               (s/optional-key :scheduled-at) (s/maybe s/Str)
               (s/optional-key :num-teams) (s/maybe s/Int)
               (s/optional-key :players-per-team) (s/maybe s/Int)
+              (s/optional-key :max-players) (s/maybe s/Int)
               (s/optional-key :fixed-goalkeepers) (s/maybe s/Bool)
               (s/optional-key :home-fixed-goalkeeper-id) (s/maybe s/Uuid)
               (s/optional-key :away-fixed-goalkeeper-id) (s/maybe s/Uuid)
               (s/optional-key :notify-casual-players) (s/maybe s/Bool)}
    db]
-  (let [{:keys [organization-id scheduled-at num-teams players-per-team fixed-goalkeepers
+  (let [{:keys [organization-id scheduled-at num-teams players-per-team max-players fixed-goalkeepers
                 home-fixed-goalkeeper-id away-fixed-goalkeeper-id notify-casual-players]} pelada
         row (cond-> {:organization_id organization-id :status [:cast "attendance" :pelada_status]}
               scheduled-at (assoc :scheduled_at [[:cast (helpers.time/to-utc-timestamp-str scheduled-at) :timestamp]])
               num-teams (assoc :num_teams num-teams)
               players-per-team (assoc :players_per_team players-per-team)
+              max-players (assoc :max_players max-players)
               (some? fixed-goalkeepers) (assoc :fixed_goalkeepers (boolean fixed-goalkeepers))
               home-fixed-goalkeeper-id (assoc :home_fixed_goalkeeper_id home-fixed-goalkeeper-id)
               away-fixed-goalkeeper-id (assoc :away_fixed_goalkeeper_id away-fixed-goalkeeper-id)
@@ -60,6 +62,7 @@
                                                :scheduled_at (when (:scheduled-at pelada) [[:cast (helpers.time/to-utc-timestamp-str (:scheduled-at pelada)) :timestamp]])
                                                :num_teams (:num-teams pelada)
                                                :players_per_team (:players-per-team pelada)
+                                               :max_players (:max-players pelada)
                                                :fixed_goalkeepers (when (some? (:fixed-goalkeepers pelada))
                                                                     (boolean (:fixed-goalkeepers pelada)))
                                                :status (when (:status pelada) [[:cast (:status pelada) :pelada_status]])

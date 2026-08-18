@@ -14,7 +14,8 @@
   (let [row (medley.core/assoc-some {}
                                     :name (:name organization)
                                     :owner_id (:owner-id organization)
-                                    :priority_confirmation_limit_hours (:priority-confirmation-limit-hours organization))
+                                    :priority_confirmation_limit_hours (:priority-confirmation-limit-hours organization)
+                                    :default_max_players (:default-max-players organization))
         query (-> (h/insert-into :Organizations)
                   (h/values [row])
                   (h/returning :id))]
@@ -28,7 +29,8 @@
     (let [org-row (medley.core/assoc-some {}
                                           :name (:name organization)
                                           :owner_id (:owner-id organization)
-                                          :priority_confirmation_limit_hours (:priority-confirmation-limit-hours organization))
+                                          :priority_confirmation_limit_hours (:priority-confirmation-limit-hours organization)
+                                          :default_max_players (:default-max-players organization))
           _ (when (seq org-row)
               (jdbc/execute! tx (hsql/format (-> (h/update :Organizations)
                                                  (h/set org-row)
@@ -45,15 +47,10 @@
                                            :vote_ended_msg_enabled (:waha-vote-ended-msg-enabled organization)
                                            :use_all_mention (:waha-use-all-mention organization))]
       (when (seq waha-row)
-        (let [exists? (jdbc/execute-one! tx (hsql/format (-> (h/select 1)
-                                                             (h/from :OrganizationWahaConfigs)
-                                                             (h/where [:= :organization_id id]))))]
-          (if exists?
-            (jdbc/execute! tx (hsql/format (-> (h/update :OrganizationWahaConfigs)
-                                               (h/set waha-row)
-                                               (h/where [:= :organization_id id]))))
-            (jdbc/execute! tx (hsql/format (-> (h/insert-into :OrganizationWahaConfigs)
-                                               (h/values [(assoc waha-row :organization_id id)])))))))
+        (jdbc/execute! tx (hsql/format (-> (h/insert-into :OrganizationWahaConfigs)
+                                           (h/values [(assoc waha-row :organization_id id)])
+                                           (h/on-conflict :organization_id)
+                                           (h/do-update-set waha-row)))))
       1)))
 
 (s/defn delete-organization :- s/Int

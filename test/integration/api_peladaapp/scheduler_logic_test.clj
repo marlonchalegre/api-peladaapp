@@ -8,7 +8,9 @@
    [api-peladaapp.db.vote :as db.vote]
    [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
+   [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.scheduler :as scheduler]
+   [api-peladaapp.logic.waha :as waha]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
    [honey.sql.helpers :as h]
@@ -136,7 +138,8 @@
         (is (nil? (db.reminder/get-last-reminder-at pelada-id "vote_12h" db)))
 
         ;; 5. Run scheduler
-        (scheduler/execute-tasks! db)
+        (with-redefs [api-peladaapp.logic.waha/send-message (fn [& _] nil)]
+          (scheduler/execute-tasks! db))
 
         ;; 6. Verify reminder was successfully recorded in the database
         (is (some? (db.reminder/get-last-reminder-at pelada-id "vote_12h" db))
@@ -147,7 +150,8 @@
                                                                           (h/from :PeladaReminders)
                                                                           (h/where [:= :pelada_id (misc/as-uuid pelada-id)] [:= :type [:cast "vote_12h" :reminder_type]])))
                                                       hsql/opts))]
-          (scheduler/execute-tasks! db)
+          (with-redefs [api-peladaapp.logic.waha/send-message (fn [& _] nil)]
+            (scheduler/execute-tasks! db))
           (let [after-count (:count (jdbc/execute-one! db (hsql/format (-> (h/select [[:count :*] :count])
                                                                            (h/from :PeladaReminders)
                                                                            (h/where [:= :pelada_id (misc/as-uuid pelada-id)] [:= :type [:cast "vote_12h" :reminder_type]])))
@@ -167,7 +171,7 @@
                 :waha-attendance-reminder-enabled true}
                db)
             now (java.time.OffsetDateTime/now)
-            scheduled-at (.plus now (java.time.Duration/ofHours 25))
+            scheduled-at (api-peladaapp.helpers.time/to-utc-timestamp-str (.plus now (java.time.Duration/ofHours 25)))
             pelada-id (db.pelada/insert-pelada {:organization-id org-id :status "attendance"} db)]
 
         (jdbc/execute! db (hsql/format (-> (h/update :Peladas)
@@ -176,8 +180,60 @@
 
         (is (nil? (db.reminder/get-last-reminder-at pelada-id "priority_ending" db)))
 
-        (scheduler/execute-tasks! db)
+        (with-redefs [api-peladaapp.logic.waha/send-message (fn [& _] nil)]
+          (scheduler/execute-tasks! db))
 
         (is (some? (db.reminder/get-last-reminder-at pelada-id "priority_ending" db))
             "PeladaReminder 'priority_ending' should have been inserted")))))
+
+(deftest test-casual-priority-ended-reminder
+  (let [db-val (-> th/*test-system* :database :database)
+        db (if (fn? db-val) (db-val) db-val)]
+    (testing "execute-tasks! sends casual_priority_ended reminder when limit cutoff is reached (e.g. <= 24h)"
+      (let [org-id (db.organization/insert-organization {:name "Org Casual Priority Ended" :owner-id nil} db)
+            _ (db.organization/insert-default-feature-flags org-id db)
+            _ (db.organization/update-organization
+               org-id
+               {:priority-confirmation-limit-hours 24
+                :waha-enabled true
+                :waha-attendance-reminder-enabled true}
+               db)
+            now (java.time.OffsetDateTime/now)
+            scheduled-at (api-peladaapp.helpers.time/to-utc-timestamp-str (.plus now (java.time.Duration/ofHours 23)))
+            pelada-id (db.pelada/insert-pelada {:organization-id org-id :status "attendance"} db)]
+
+        (jdbc/execute! db (hsql/format (-> (h/update :Peladas)
+                                           (h/set {:status [:cast "attendance" :pelada_status] :scheduled_at [[:cast scheduled-at :timestamp]]})
+                                           (h/where [:= :id (misc/as-uuid pelada-id)]))))
+
+        (is (nil? (db.reminder/get-last-reminder-at pelada-id "casual_priority_ended" db)))
+
+        (with-redefs [api-peladaapp.logic.waha/send-message (fn [& _] nil)]
+          (scheduler/execute-tasks! db))
+
+        (is (some? (db.reminder/get-last-reminder-at pelada-id "casual_priority_ended" db))
+            "PeladaReminder 'casual_priority_ended' should have been inserted")))))
+
+(deftest test-casual-player-notification-filtering
+  (let [db-val (-> th/*test-system* :database :database)
+        db (if (fn? db-val) (db-val) db-val)]
+    (testing "Requirement 3: Opted-in user already in waitlist is not returned by list-opted-in-casual-users-to-notify-for-pelada"
+      (let [org-id (db.organization/insert-organization {:name "Org Filtering Test" :owner-id nil} db)
+            u1-id (db.user/insert-user {:email "casual1@test.com" :password "pwd" :name "Casual 1" :username "casual1" :phone "+5511999999999" :receive-non-mensalista-updates true} db)
+            u2-id (db.user/insert-user {:email "casual2@test.com" :password "pwd" :name "Casual 2" :username "casual2" :phone "+5511888888888" :receive-non-mensalista-updates true} db)
+            p1-id (db.player/insert-player {:organization-id org-id :user-id u1-id :member-type "diarista"} db)
+            _p2-id (db.player/insert-player {:organization-id org-id :user-id u2-id :member-type "diarista"} db)
+            pelada-id (db.pelada/insert-pelada {:organization-id org-id :status "attendance" :num-teams 2 :players-per-team 5} db)]
+
+        ;; Put p1 on waitlist
+        (jdbc/execute! db (hsql/format (-> (h/insert-into :Attendance)
+                                           (h/values [{:pelada_id (misc/as-uuid pelada-id)
+                                                       :player_id (misc/as-uuid p1-id)
+                                                       :status [:cast "waitlist" :attendance_status]}]))))
+
+        (let [users-to-notify (db.user/list-opted-in-casual-users-to-notify-for-pelada org-id pelada-id db)
+              user-ids (set (map :id users-to-notify))]
+          (is (not (contains? user-ids u1-id)) "Waitlisted casual player u1 should NOT be notified")
+          (is (contains? user-ids u2-id) "Pending casual player u2 SHOULD be notified"))))))
+
 

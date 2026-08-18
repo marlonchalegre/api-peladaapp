@@ -9,6 +9,7 @@
    :status (s/maybe s/Str)
    :num-teams (s/maybe s/Int)
    :players-per-team (s/maybe s/Int)
+   (s/optional-key :max-players) (s/maybe s/Int)
    :fixed-goalkeepers (s/maybe s/Bool)
    :home-fixed-goalkeeper-id (s/maybe s/Uuid)
    :away-fixed-goalkeeper-id (s/maybe s/Uuid)

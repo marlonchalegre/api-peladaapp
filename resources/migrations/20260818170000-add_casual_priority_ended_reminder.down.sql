@@ -1,0 +1,1 @@
+-- Postgres enums do not easily support removing enum values

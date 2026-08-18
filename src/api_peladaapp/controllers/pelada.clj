@@ -5,6 +5,7 @@
    [api-peladaapp.db.match :as db.match]
    [api-peladaapp.db.match-event :as db.match-event]
    [api-peladaapp.db.match-lineup :as db.match-lineup]
+   [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.db.schedule :as db.schedule]
@@ -101,9 +102,13 @@
   "Create pelada and optionally seed default teams. Returns pelada model."
   [pelada :- models.pelada/Pelada
    db]
-  (let [result (jdbc/with-transaction [tx db]
-                 (let [pelada-id (db.pelada/insert-pelada pelada tx)]
-                   (when-let [team-count (:num-teams pelada)]
+  (let [org (db.organization/get-organization (:organization-id pelada) db)
+        max-players (or (:max-players pelada) (:default-max-players org))
+        pelada-to-insert (cond-> pelada
+                           max-players (assoc :max-players max-players))
+        result (jdbc/with-transaction [tx db]
+                 (let [pelada-id (db.pelada/insert-pelada pelada-to-insert tx)]
+                   (when-let [team-count (:num-teams pelada-to-insert)]
                      (auto-create-teams! pelada-id team-count tx))
                    (db.pelada/get-pelada pelada-id tx)))]
     ;; WAHA Notification - Async outside transaction
@@ -238,9 +243,10 @@
   (let [pelada (db.pelada/get-pelada pelada-id db)]
     (if (= "running" (:timer-status pelada))
       pelada
-      (let [now (str (java.time.Instant/now))]
-        (db.pelada/update-pelada pelada-id {:timer-status "running" :timer-started-at now} db)
-        (db.pelada/get-pelada pelada-id db)))))
+      (let [now (str (java.time.Instant/now))
+            updates {:timer-status "running" :timer-started-at now}]
+        (db.pelada/update-pelada pelada-id updates db)
+        (merge pelada updates)))))
 
 (s/defn pause-pelada-timer :- models.pelada/Pelada
   [pelada-id :- s/Uuid db]
@@ -250,18 +256,21 @@
       (let [now (java.time.Instant/now)
             started-at (helpers.time/->instant (:timer-started-at pelada))
             elapsed (.toMillis (java.time.Duration/between started-at now))
-            new-accumulated (+ (or (:timer-accumulated-ms pelada) 0) elapsed)]
-        (db.pelada/update-pelada pelada-id {:timer-status "paused"
-                                            :timer-started-at nil
-                                            :timer-accumulated-ms new-accumulated} db)
-        (db.pelada/get-pelada pelada-id db)))))
+            new-accumulated (+ (or (:timer-accumulated-ms pelada) 0) elapsed)
+            updates {:timer-status "paused"
+                     :timer-started-at nil
+                     :timer-accumulated-ms new-accumulated}]
+        (db.pelada/update-pelada pelada-id updates db)
+        (merge pelada updates)))))
 
 (s/defn reset-pelada-timer :- models.pelada/Pelada
   [pelada-id :- s/Uuid db]
-  (db.pelada/update-pelada pelada-id {:timer-status "stopped"
-                                      :timer-started-at nil
-                                      :timer-accumulated-ms 0} db)
-  (db.pelada/get-pelada pelada-id db))
+  (let [pelada (db.pelada/get-pelada pelada-id db)
+        updates {:timer-status "stopped"
+                 :timer-started-at nil
+                 :timer-accumulated-ms 0}]
+    (db.pelada/update-pelada pelada-id updates db)
+    (merge pelada updates)))
 
 (s/defn close-pelada :- models.pelada/Pelada
   [pelada-id :- s/Uuid db]

@@ -9,6 +9,7 @@
    (s/optional-key :scheduled_at) (s/maybe s/Any)
    (s/optional-key :num_teams) (s/maybe s/Int)
    (s/optional-key :players_per_team) (s/maybe s/Int)
+   (s/optional-key :max_players) (s/maybe s/Int)
    (s/optional-key :fixed_goalkeepers) (s/maybe s/Bool)
    (s/optional-key :home_fixed_goalkeeper_id) (s/maybe s/Uuid)
    (s/optional-key :away_fixed_goalkeeper_id) (s/maybe s/Uuid)

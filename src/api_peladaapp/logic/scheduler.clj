@@ -54,6 +54,7 @@
     :vote_23h "vote_23h"
     :attendance "attendance"
     :priority_ending "priority_ending"
+    :casual_priority_ended "casual_priority_ended"
     :vote_ended "vote_ended"
     (name type)))
 
@@ -83,6 +84,31 @@
                                                              :limit-hours limit-hours}
                                                             db)
                           (db.reminder/insert-reminder! (:id p) "priority_ending" db))))))))))))))
+
+(defn- run-casual-priority-ended-reminders! [db ^ZonedDateTime now]
+  (let [orgs (db.organization/list-organizations db)]
+    (doseq [org orgs]
+      (let [org-id (:id org)
+            limit-hours (:priority-confirmation-limit-hours org)]
+        (when (and (number? limit-hours) (pos? limit-hours) (:waha-attendance-reminder-enabled org))
+          (let [active-peladas (filter #(= "attendance" (:status %)) (db.pelada/list-peladas org-id 10 0 db))]
+            (doseq [p active-peladas]
+              (when-let [scheduled-at (:scheduled-at p)]
+                (let [last-sent (db.reminder/get-last-reminder-at (:id p) "casual_priority_ended" db)]
+                  (when (nil? last-sent)
+                    (let [now-inst (.toInstant now)
+                          sched-inst (helpers.time/->instant scheduled-at)
+                          remaining-seconds (.toSeconds (Duration/between now-inst sched-inst))
+                          limit-seconds (* limit-hours 3600)]
+                      (when (and (<= remaining-seconds limit-seconds)
+                                 (> remaining-seconds 0))
+                        (log/info "Sending casual player priority ended reminder for pelada" (:id p) "in organization" (:name org))
+                        (notifications/send-notification! org-id :casual-priority-ended
+                                                          {:pelada-id (:id p)
+                                                           :scheduled-at scheduled-at
+                                                           :limit-hours limit-hours}
+                                                          db)
+                        (db.reminder/insert-reminder! (:id p) "casual_priority_ended" db)))))))))))))
 
 (defn- check-vote-ended! [db]
   ;; 1. Check for Ended Voting (24h)
@@ -133,12 +159,14 @@
         (db.reminder/insert-reminder! (:id pelada)
                                       (reminder-type->db-type type)
                                       db)))))
+
 (defn execute-tasks! [db]
   (let [now (br-now)]
     (log/info (str "Scheduler tasks execution started at " now))
     (try
       (run-attendance-reminders! db now)
       (run-priority-ending-reminders! db now)
+      (run-casual-priority-ended-reminders! db now)
       (check-vote-ended! db)
       (log/info "Scheduler tasks execution finished successfully.")
       (catch Exception e

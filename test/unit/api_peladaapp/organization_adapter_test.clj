@@ -41,3 +41,24 @@
       (is (= "2026-05-01" (:start-date model))) ;; db->substitution already converts to str
       (is (= "2026-05-01" (:start_date response)))
       (is (true? (:active model))))))
+
+(deftest test-default-max-players-adapter-mapping
+  (testing "db->model maps default_max_players"
+    (let [db-row {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                  :name "Test Org"
+                  :default_max_players 16}
+          model (adapter.organization/db->model db-row)]
+      (is (= 16 (:default-max-players model)))))
+
+  (testing "update-request->model maps default_max_players"
+    (let [req {:name "Updated Org"
+               :default_max_players 14}
+          model (adapter.organization/update-request->model req)]
+      (is (= 14 (:default-max-players model)))))
+
+  (testing "model->response maps default-max-players"
+    (let [model {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                 :name "Test Org"
+                 :default-max-players 18}
+          resp (adapter.organization/model->response model)]
+      (is (= 18 (:default_max_players resp))))))
