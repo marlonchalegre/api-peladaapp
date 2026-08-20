@@ -50,8 +50,7 @@
 
 (s/defn get-schedule-preview
   [pelada-id :- s/Uuid matches-per-team :- s/Int db]
-  (let [teams (db.team/list-pelada-teams pelada-id db)
-        team-ids (mapv :id teams)
+  (let [team-ids (fetch-team-ids pelada-id db)
         team-count (count team-ids)]
     (if (< team-count 2)
       {:matches [] :is_from_format false}
@@ -64,11 +63,9 @@
 (s/defn save-schedule-plan
   [pelada-id :- s/Uuid matches db]
   (jdbc/with-transaction [tx db]
-    (let [teams (db.team/list-pelada-teams pelada-id tx)
-          team-ids (mapv :id teams)
+    (let [team-ids (fetch-team-ids pelada-id tx)
           team-set (set team-ids)]
 
-      ;; Validate that all teams in matches belong to this pelada
       (doseq [match matches]
         (when-not (and (contains? team-set (:home match))
                        (contains? team-set (:away match)))
@@ -76,10 +73,8 @@
                           {:type :bad-request
                            :message "Invalid teams in schedule plan. Please refresh and try again."}))))
 
-      ;; Delete old plan
       (db.schedule/delete-match-plans-by-pelada pelada-id tx)
 
-      ;; Insert new plan
       (doseq [[idx match] (map-indexed vector matches)]
         (db.schedule/insert-match-plan {:pelada-id pelada-id
                                         :home-team-id (:home match)
@@ -297,6 +292,7 @@
               all-players (distinct (concat team-players (map (fn [p] {:player_id (:id p) :player_name (:user-name p)}) org-players)))]
           (notifications/send-notification! (:organization-id pelada) :end
                                             {:pelada pelada
+                                             :pelada-id pelada-id
                                              :matches matches
                                              :teams teams
                                              :events events

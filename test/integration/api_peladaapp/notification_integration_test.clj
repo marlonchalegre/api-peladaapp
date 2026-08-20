@@ -102,10 +102,11 @@
 
           (is (= 2 (count @sent-messages)))
           (let [[msg1 msg2] @sent-messages]
-            ;; First message check
-            (is (re-find #"PELADA ENCERRADA" (:message msg1)))
-            (is (re-find #"Time A  2 x 1  Time B" (:message msg1)))
-            ;; Second message check
+            ;; First message check (Round Summary)
+            (is (re-find #"Resumo da rodada" (:message msg1)))
+            (is (re-find #"Classificacao:" (:message msg1)))
+            (is (re-find #"Time A" (:message msg1)))
+            ;; Second message check (Matches Results)
             (is (re-find #"RESULTADOS DAS PARTIDAS" (:message msg2)))
             (is (re-find #"Time A  2 x 1  Time B" (:message msg2)))))))))
 
