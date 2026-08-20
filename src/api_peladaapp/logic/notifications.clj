@@ -4,6 +4,7 @@
    [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.user :as db.user]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.waha :as waha]
    [clojure.string :as str]
@@ -11,6 +12,9 @@
   (:import
    [java.time ZoneId]
    [java.time.format DateTimeFormatter]))
+
+(def ^:private goalkeeper-positions
+  #{"goalkeeper" "goleiro" "goleira" "gk" "g"})
 
 (def position-order
   {"goalkeeper" 0
@@ -21,11 +25,18 @@
 (def ^:private all-mention-types
   #{:new-pelada :attendance-reminder :priority-ending :vote-reminder})
 
+(defn- get-position-rank [pos-str]
+  (let [p (some-> pos-str name str/lower-case)]
+    (if (contains? goalkeeper-positions p)
+      0
+      (get position-order p 4))))
+
 (defn- sort-players [players]
   (sort-by (fn [p]
-             [(if (:is_goalkeeper p) 0 1)
-              (get position-order (some-> (:position p) str/lower-case) 4)
-              (:player_name p)])
+             (let [u (misc/unamespace p)]
+               [(if (misc/to-bool (or (:is_goalkeeper u) (:is-goalkeeper u)) false) 0 1)
+                (get-position-rank (:position u))
+                (or (:player_name u) (:player-name u) "")]))
            players))
 
 (defn- pad-end [s length]
@@ -105,54 +116,84 @@
 (defn- is-goalkeeper-entry? [x]
   (let [gk-flag (or (:is_goalkeeper x) (:is-goalkeeper x))
         pos (some-> (or (:position x) "") name str/lower-case)]
-    (or (= gk-flag true)
+    (or (true? gk-flag)
         (and (number? gk-flag) (not= gk-flag 0))
-        (= pos "goalkeeper"))))
+        (contains? goalkeeper-positions pos))))
 
-(defn- calculate-goalkeeper-goals-conceded [matches lineups team-players]
-  (let [lineups-by-match (group-by #(str (or (:match_id %) (:match-id %) (:id %))) (or lineups []))
-        lineup-gk-stats
-        (reduce (fn [acc m]
-                  (let [m-id (str (or (:id m) (:match_id m) (:match-id m)))
-                        home-team-id (str (or (:home-team-id m) (:home_team_id m)))
-                        home-score (or (:home-score m) (:home_score m) 0)
-                        away-score (or (:away-score m) (:away_score m) 0)
-                        lu (get lineups-by-match m-id [])]
-                    (reduce (fn [inner-acc l]
-                              (if (is-goalkeeper-entry? l)
-                                (let [team-id (str (or (:team_id l) (:team-id l)))
-                                      player-id (or (:player_id l) (:player-id l))
-                                      conceded (if (= team-id home-team-id)
-                                                 away-score
-                                                 home-score)]
-                                  (update inner-acc player-id (fnil + 0) conceded))
-                                inner-acc))
-                            acc
-                            lu)))
-                {}
-                matches)]
-    (if (seq lineup-gk-stats)
-      lineup-gk-stats
-      (let [gk-players (filter is-goalkeeper-entry? (or team-players []))]
-        (reduce (fn [acc p]
-                  (let [p-id (or (:player_id p) (:player-id p) (:id p))
-                        p-team-id (str (or (:team_id p) (:team-id p)))
-                        total-conceded (reduce (fn [c m]
-                                                 (let [home-team-id (str (or (:home-team-id m) (:home_team_id m)))
-                                                       away-team-id (str (or (:away-team-id m) (:away_team_id m)))
-                                                       home-score (or (:home-score m) (:home_score m) 0)
-                                                       away-score (or (:away-score m) (:away_score m) 0)]
-                                                   (cond
-                                                     (= p-team-id home-team-id) (+ c away-score)
-                                                     (= p-team-id away-team-id) (+ c home-score)
-                                                     :else c)))
-                                               0
-                                               matches)]
-                    (if p-id
-                      (assoc acc p-id total-conceded)
-                      acc)))
-                {}
-                gk-players)))))
+(defn- calculate-goalkeeper-goals-conceded
+  ([matches lineups team-players]
+   (calculate-goalkeeper-goals-conceded matches lineups team-players nil))
+  ([matches lineups team-players pelada]
+   (let [norm-matches (map (fn [m]
+                             (let [u (misc/unamespace m)]
+                               {:id (str (or (:id u) (:match_id u) (:match-id u)))
+                                :home-team-id (str (or (:home-team-id u) (:home_team_id u)))
+                                :away-team-id (str (or (:away-team-id u) (:away_team_id u)))
+                                :home-score (or (:home-score u) (:home_score u) 0)
+                                :away-score (or (:away-score u) (:away_score u) 0)}))
+                           (or matches []))
+         norm-lineups (map (fn [l]
+                             (let [u (misc/unamespace l)]
+                               {:match-id (str (or (:match_id u) (:match-id u) (:id u)))
+                                :team-id (str (or (:team_id u) (:team-id u)))
+                                :player-id (or (:player_id u) (:player-id u) (:id u))
+                                :is-goalkeeper (or (:is_goalkeeper u) (:is-goalkeeper u))
+                                :position (:position u)}))
+                           (or lineups []))
+         lineups-by-match (group-by :match-id norm-lineups)
+         lineup-gk-stats
+         (reduce (fn [acc m]
+                   (let [m-id (:id m)
+                         home-team-id (:home-team-id m)
+                         home-score (:home-score m)
+                         away-score (:away-score m)
+                         lu (get lineups-by-match m-id [])]
+                     (reduce (fn [inner-acc l]
+                               (if (is-goalkeeper-entry? l)
+                                 (let [team-id (:team-id l)
+                                       player-id (:player-id l)
+                                       conceded (if (= team-id home-team-id)
+                                                  away-score
+                                                  home-score)]
+                                   (if player-id
+                                     (update inner-acc player-id (fnil + 0) conceded)
+                                     inner-acc))
+                                 inner-acc))
+                             acc
+                             lu)))
+                 {}
+                 norm-matches)]
+     (if (seq lineup-gk-stats)
+       lineup-gk-stats
+       (let [team-gk-players (filter is-goalkeeper-entry? (or team-players []))
+             pelada-u (when pelada (misc/unamespace pelada))
+             home-fixed-gk (or (:home-fixed-goalkeeper-id pelada-u) (:home_fixed_goalkeeper_id pelada-u))
+             away-fixed-gk (or (:away-fixed-goalkeeper-id pelada-u) (:away_fixed_goalkeeper_id pelada-u))
+             gk-team-map (merge
+                          (into {} (for [p team-gk-players
+                                         :let [u (misc/unamespace p)
+                                               pid (or (:player_id u) (:player-id u) (:id u))
+                                               tid (str (or (:team_id u) (:team-id u)))]
+                                         :when (and pid (seq tid))]
+                                     [pid tid]))
+                          (when (and (seq norm-matches) (or home-fixed-gk away-fixed-gk))
+                            (let [first-match (first norm-matches)
+                                  h-tid (:home-team-id first-match)
+                                  a-tid (:away-team-id first-match)]
+                              (cond-> {}
+                                home-fixed-gk (assoc home-fixed-gk h-tid)
+                                away-fixed-gk (assoc away-fixed-gk a-tid)))))]
+         (if (seq gk-team-map)
+           (let [team-conceded (reduce (fn [acc m]
+                                         (-> acc
+                                             (update (:home-team-id m) (fnil + 0) (:away-score m))
+                                             (update (:away-team-id m) (fnil + 0) (:home-score m))))
+                                       {}
+                                       norm-matches)]
+             (into {} (map (fn [[pid tid]]
+                             [pid (get team-conceded tid 0)])
+                           gk-team-map)))
+           {}))))))
 
 (defn- update-team-match [acc t-id pts v e d gp gc]
   (-> acc
@@ -307,7 +348,7 @@
                    (generate-pelada-link pelada-id))]
     title))
 
-(defn generate-matches-results-message [{:keys [matches teams lineups team-players]}]
+(defn generate-matches-results-message [{:keys [matches teams lineups team-players pelada] :as data}]
   (let [title "⚽ *RESULTADOS DAS PARTIDAS*\n\n"
         team-map (into {} (map (juxt :id :name) teams))
         max-name-len (->> teams
@@ -324,7 +365,7 @@
                                        (pad-end away-name max-name-len)))))
                          (str/join "\n"))
         player-names (build-player-name-map team-players)
-        goals-conceded (calculate-goalkeeper-goals-conceded matches lineups team-players)
+        goals-conceded (calculate-goalkeeper-goals-conceded matches lineups team-players (or pelada (:pelada data)))
         top-gk (->> goals-conceded
                     (sort-by (fn [[pid c]] [c (str/lower-case (or (get player-names pid) ""))]))
                     (map (fn [[pid c]] (str (get player-names pid "Unknown") " " c)))

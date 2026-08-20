@@ -192,3 +192,39 @@
           msg (notifications/generate-matches-results-message data)]
       (is (re-find #"Gols sofridos:" msg))
       (is (re-find #"Goleiro Time A 4" msg)))))
+
+(testing "detects goalkeeper with Portuguese position 'Goleiro' in lineups even if is_goalkeeper is false"
+  (let [p1 (parse-uuid "00000000-0000-0000-0000-000000000101")
+        p2 (parse-uuid "00000000-0000-0000-0000-000000000102")
+        t1 (parse-uuid "00000000-0000-0000-0000-000000000001")
+        t2 (parse-uuid "00000000-0000-0000-0000-000000000002")
+        m1 (parse-uuid "00000000-0000-0000-0000-000000000201")
+        data {:teams [{:id t1 :name "Time A"}
+                      {:id t2 :name "Time B"}]
+              :matches [{:id m1 :home-team-id t1 :away-team-id t2 :home-score 1 :away-score 3}]
+              :lineups [{:match_id m1 :team_id t1 :player_id p1 :is_goalkeeper false :position "Goleiro"}
+                        {:match_id m1 :team_id t2 :player_id p2 :is_goalkeeper false :position "Goleiro"}]
+              :team-players [{:player_id p1 :player_name "Goleiro PT 1"}
+                             {:player_id p2 :player_name "Goleiro PT 2"}]}
+        msg (notifications/generate-matches-results-message data)]
+    (is (re-find #"Gols sofridos:" msg))
+    (is (re-find #"Goleiro PT 1 3" msg))
+    (is (re-find #"Goleiro PT 2 1" msg)))
+
+  (testing "detects fixed goalkeepers set on pelada object"
+    (let [p1 (parse-uuid "00000000-0000-0000-0000-000000000101")
+          p2 (parse-uuid "00000000-0000-0000-0000-000000000102")
+          t1 (parse-uuid "00000000-0000-0000-0000-000000000001")
+          t2 (parse-uuid "00000000-0000-0000-0000-000000000002")
+          m1 (parse-uuid "00000000-0000-0000-0000-000000000201")
+          data {:pelada {:home-fixed-goalkeeper-id p1 :away-fixed-goalkeeper-id p2}
+                :teams [{:id t1 :name "Time A"}
+                        {:id t2 :name "Time B"}]
+                :matches [{:id m1 :home-team-id t1 :away-team-id t2 :home-score 5 :away-score 2}]
+                :lineups []
+                :team-players [{:player_id p1 :player_name "Fixed Home GK"}
+                               {:player_id p2 :player_name "Fixed Away GK"}]}
+          msg (notifications/generate-matches-results-message data)]
+      (is (re-find #"Gols sofridos:" msg))
+      (is (re-find #"Fixed Home GK 2" msg))
+      (is (re-find #"Fixed Away GK 5" msg)))))

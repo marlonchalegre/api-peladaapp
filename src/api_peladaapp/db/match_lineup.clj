@@ -3,17 +3,11 @@
    [api-peladaapp.db.match :as db.match]
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.team :as db.team]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
    [schema.core :as s]))
-
-(defn- unqualify-row [row]
-  (into {}
-        (map (fn [[k v]]
-               (let [kw (if (keyword? k) (keyword (name k)) k)]
-                 [kw v])))
-        row))
 
 (s/defn list-by-match :- [s/Any]
   [match-id :- s/Uuid db]
@@ -21,7 +15,7 @@
                   (h/from :MatchLineups)
                   (h/where [:= :match_id match-id]))]
     (->> (jdbc/execute! db (hsql/format query) hsql/opts)
-         (map unqualify-row))))
+         (map misc/unamespace))))
 
 (s/defn list-by-match-grouped :- {s/Uuid [s/Any]}
   [match-id :- s/Uuid db]
@@ -103,10 +97,12 @@
 
 (s/defn list-match-lineups-by-pelada :- [s/Any]
   [pelada-id :- s/Uuid db]
-  (let [query (-> (h/select :ml.*)
+  (let [query (-> (h/select :ml.* [:u.position :position] [:u.name :player_name])
                   (h/from [:MatchLineups :ml])
                   (h/join [:Matches :m] [:= :ml.match_id :m.id])
+                  (h/left-join [:OrganizationPlayers :op] [:= :ml.player_id :op.id])
+                  (h/left-join [:Users :u] [:= :u.id :op.user_id])
                   (h/where [:= :m.pelada_id pelada-id]))]
     (->> (jdbc/execute! db (hsql/format query) hsql/opts)
-         (map unqualify-row)
+         (map misc/unamespace)
          vec)))
