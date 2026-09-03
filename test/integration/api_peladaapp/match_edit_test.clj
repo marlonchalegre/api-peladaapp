@@ -156,5 +156,67 @@
               (is (nil? g1-db) "Goal 1 should be deleted")
               (is (nil? g1-assist-db) "Goal 1's assist should be cascade deleted")
               (is (some? g2-db) "Goal 2 should still exist")
-              (is (some? g2-assist-db) "Goal 2's assist should still exist"))))))))
+              (is (some? g2-assist-db) "Goal 2's assist should still exist"))))))
 
+    (testing "Fallback assist cascade deletion by timestamp matching when parent_event_id is nil"
+      (let [p-admin-id (th/player-id-by-user-id db (th/user-id-by-email db "admin@test.com") org-id)
+            goal-id (java.util.UUID/randomUUID)
+            assist-id (java.util.UUID/randomUUID)
+            session-time 5555
+            match-time 2222]
+        ;; Insert legacy goal and assist without parent_event_id
+        (jdbc/execute! db ["INSERT INTO \"MatchEvents\" (id, match_id, player_id, event_type, session_time_ms, match_time_ms) VALUES (?::uuid, ?::uuid, ?::uuid, 'goal', ?, ?)"
+                           goal-id match-id p-admin-id session-time match-time])
+        (jdbc/execute! db ["INSERT INTO \"MatchEvents\" (id, match_id, player_id, event_type, session_time_ms, match_time_ms) VALUES (?::uuid, ?::uuid, ?::uuid, 'assist', ?, ?)"
+                           assist-id match-id p-admin-id session-time match-time])
+
+        ;; Delete goal
+        (let [delete-resp (app (-> (mock/request :delete (str "/api/matches/" match-id "/events"))
+                                   (mock/json-body {:player_id (str p-admin-id) :event_type "goal" :id (str goal-id)})
+                                   auth))]
+          (is (= 200 (:status delete-resp)))
+          (let [goal-after (jdbc/execute-one! db ["SELECT id FROM \"MatchEvents\" WHERE id = ?::uuid" goal-id] {:builder-fn rs/as-unqualified-lower-maps})
+                assist-after (jdbc/execute-one! db ["SELECT id FROM \"MatchEvents\" WHERE id = ?::uuid" assist-id] {:builder-fn rs/as-unqualified-lower-maps})]
+            (is (nil? goal-after) "Legacy goal should be deleted")
+            (is (nil? assist-after) "Associated assist should be deleted via timestamp fallback in find-associated-assist")))))
+
+    (testing "Match timer status transitions and idempotency"
+      ;; Create a fresh scheduled match
+      (let [t-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/matches"))
+                            (mock/json-body {:sequence 99})
+                            auth))
+            new-match-id (:id (th/decode-body t-resp))]
+        (when new-match-id
+          ;; Verify initial status is scheduled
+          (let [m-init (jdbc/execute-one! db ["SELECT status, timer_status FROM \"Matches\" WHERE id = ?::uuid" new-match-id] {:builder-fn rs/as-unqualified-lower-maps})]
+            (is (= "scheduled" (:status m-init)))
+            (is (= "stopped" (:timer_status m-init))))
+
+          ;; Start timer -> status becomes running and timer_status becomes running
+          (let [start-resp (app (-> (mock/request :post (str "/api/matches/" new-match-id "/timer/start")) auth))
+                _ (is (= 200 (:status start-resp)))
+                m-running (jdbc/execute-one! db ["SELECT status, timer_status, timer_started_at FROM \"Matches\" WHERE id = ?::uuid" new-match-id] {:builder-fn rs/as-unqualified-lower-maps})
+                first-started-at (:timer_started_at m-running)]
+            (is (= "running" (:status m-running)))
+            (is (= "running" (:timer_status m-running)))
+            (is (some? first-started-at))
+
+            ;; Idempotent call to start when already running should not change timer_started_at
+            (let [start2-resp (app (-> (mock/request :post (str "/api/matches/" new-match-id "/timer/start")) auth))
+                  _ (is (= 200 (:status start2-resp)))
+                  m-running2 (jdbc/execute-one! db ["SELECT status, timer_status, timer_started_at FROM \"Matches\" WHERE id = ?::uuid" new-match-id] {:builder-fn rs/as-unqualified-lower-maps})]
+              (is (= first-started-at (:timer_started_at m-running2)))
+
+              ;; Pause timer -> timer_status becomes paused, status remains running
+              (let [pause-resp (app (-> (mock/request :post (str "/api/matches/" new-match-id "/timer/pause")) auth))
+                    _ (is (= 200 (:status pause-resp)))
+                    m-paused (jdbc/execute-one! db ["SELECT status, timer_status FROM \"Matches\" WHERE id = ?::uuid" new-match-id] {:builder-fn rs/as-unqualified-lower-maps})]
+                (is (= "running" (:status m-paused)))
+                (is (= "paused" (:timer_status m-paused)))
+
+                ;; Start again from paused -> resumes timer, status remains running
+                (let [resume-resp (app (-> (mock/request :post (str "/api/matches/" new-match-id "/timer/start")) auth))
+                      _ (is (= 200 (:status resume-resp)))
+                      m-resumed (jdbc/execute-one! db ["SELECT status, timer_status FROM \"Matches\" WHERE id = ?::uuid" new-match-id] {:builder-fn rs/as-unqualified-lower-maps})]
+                  (is (= "running" (:status m-resumed)))
+                  (is (= "running" (:timer_status m-resumed))))))))))))
