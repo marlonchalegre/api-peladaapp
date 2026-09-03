@@ -63,13 +63,13 @@
   (db.match/get-match match-id db))
 
 (s/defn create-event :- models.match-event/MatchEvent
-  [match-id :- s/Uuid {:keys [player-id event-type session-time-ms match-time-ms assistant-id]} db]
+  [match-id :- s/Uuid {:keys [player-id event-type session-time-ms match-time-ms assistant-id team-id]} db]
   (let [player-id (match-event.logic/ensure-player-id player-id)
         canonical-type (match-event.logic/canonical-type event-type)]
     (jdbc/with-transaction [tx db]
-      (let [event-id (db.match-event/insert-event match-id player-id canonical-type session-time-ms match-time-ms tx)]
+      (let [event-id (db.match-event/insert-event match-id player-id canonical-type session-time-ms match-time-ms nil team-id tx)]
         (when (and (= canonical-type "goal") assistant-id)
-          (db.match-event/insert-event match-id assistant-id "assist" session-time-ms match-time-ms event-id tx))
+          (db.match-event/insert-event match-id assistant-id "assist" session-time-ms match-time-ms event-id team-id tx))
         (db.match-event/get-event event-id tx)))))
 
 (s/defn list-events-by-pelada :- [models.match-event/MatchEvent]
@@ -86,21 +86,15 @@
   (let [player-id (match-event.logic/ensure-player-id player-id)
         canonical-type (match-event.logic/canonical-type event-type)]
     (jdbc/with-transaction [tx db]
-      (if id
-        (if-let [event (db.match-event/get-event id tx)]
-          (do
-            (when (= (:event-type event) "goal")
-              (when-let [assist (find-associated-assist match-id event tx)]
-                (db.match-event/delete-event-by-id (:id assist) tx)))
-            (db.match-event/delete-event-by-id id tx))
-          0)
-        (if-let [event (db.match-event/get-last-event match-id player-id canonical-type tx)]
-          (do
-            (when (= (:event-type event) "goal")
-              (when-let [assist (find-associated-assist match-id event tx)]
-                (db.match-event/delete-event-by-id (:id assist) tx)))
-            (db.match-event/delete-event-by-id (:id event) tx))
-          0)))))
+      (if-let [event (if id
+                       (db.match-event/get-event id tx)
+                       (db.match-event/get-last-event match-id player-id canonical-type tx))]
+        (do
+          (when (= (:event-type event) "goal")
+            (when-let [assist (find-associated-assist match-id event tx)]
+              (db.match-event/delete-event-by-id (:id assist) tx)))
+          (db.match-event/delete-event-by-id (:id event) tx))
+        0))))
 
 (s/defn update-event :- models.match-event/MatchEvent
   [match-id :- s/Uuid event-id :- s/Uuid {:keys [player-id assistant-id]} db]
@@ -116,7 +110,7 @@
               assistant-id
               (if existing-assist
                 (db.match-event/update-event-player (:id existing-assist) assistant-id tx)
-                (db.match-event/insert-event match-id assistant-id "assist" old-session old-match event-id tx))
+                (db.match-event/insert-event match-id assistant-id "assist" old-session old-match event-id (:team-id updated-goal) tx))
               (not assistant-id)
               (when existing-assist
                 (db.match-event/delete-event-by-id (:id existing-assist) tx))))

@@ -19,7 +19,8 @@
            :event-type (:event_type request)}
     (:session_time_ms request) (assoc :session-time-ms (:session_time_ms request))
     (:match_time_ms request) (assoc :match-time-ms (:match_time_ms request))
-    (:assistant_id request) (assoc :assistant-id (misc/as-uuid (:assistant_id request)))))
+    (:assistant_id request) (assoc :assistant-id (misc/as-uuid (:assistant_id request)))
+    (:team_id request) (assoc :team-id (misc/as-uuid (:team_id request)))))
 
 (s/defn delete-event-request->model :- (s/pred map?)
   [request :- requests.match/DeleteMatchEventRequest]
@@ -64,7 +65,7 @@
     timer-status (assoc :timer_status timer-status)))
 
 (s/defn event->response :- responses.match/MatchEventResponse
-  [{:keys [id match-id player-id event-type created-at session-time-ms match-time-ms parent-event-id]}]
+  [{:keys [id match-id player-id event-type created-at session-time-ms match-time-ms parent-event-id team-id]}]
   (cond-> {:id id
            :match_id match-id
            :player_id player-id
@@ -72,7 +73,8 @@
     created-at (assoc :created_at created-at)
     session-time-ms (assoc :session_time_ms session-time-ms)
     match-time-ms (assoc :match_time_ms match-time-ms)
-    parent-event-id (assoc :parent_event_id parent-event-id)))
+    parent-event-id (assoc :parent_event_id parent-event-id)
+    team-id (assoc :team_id team-id)))
 
 (s/defn stats->response :- responses.match/PlayerStatsResponse
   [{:keys [player-id user-id name goals assists own-goals avatar-filename]}]
@@ -108,4 +110,6 @@
       (:created_at p) (assoc :created-at (:created_at p))
       (:session_time_ms p) (assoc :session-time-ms (:session_time_ms p))
       (:match_time_ms p) (assoc :match-time-ms (:match_time_ms p))
-      (:parent_event_id p) (assoc :parent-event-id (:parent_event_id p)))))
+      (:parent_event_id p) (assoc :parent-event-id (:parent_event_id p))
+      (:team_id p) (assoc :team-id (:team_id p)))))
+

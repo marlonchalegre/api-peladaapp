@@ -23,7 +23,8 @@
    (s/optional-key :created_at) s/Any
    (s/optional-key :session_time_ms) (s/maybe s/Int)
    (s/optional-key :match_time_ms) (s/maybe s/Int)
-   (s/optional-key :parent_event_id) (s/maybe s/Uuid)})
+   (s/optional-key :parent_event_id) (s/maybe s/Uuid)
+   (s/optional-key :team_id) (s/maybe s/Uuid)})
 
 (s/defschema PlayerStatsResponse
   {:player_id s/Uuid

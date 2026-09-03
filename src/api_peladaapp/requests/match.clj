@@ -12,7 +12,8 @@
    :event_type s/Str
    (s/optional-key :session_time_ms) (s/maybe s/Int)
    (s/optional-key :match_time_ms) (s/maybe s/Int)
-   (s/optional-key :assistant_id) (s/maybe s/Uuid)})
+   (s/optional-key :assistant_id) (s/maybe s/Uuid)
+   (s/optional-key :team_id) (s/maybe s/Uuid)})
 
 (s/defschema DeleteMatchEventRequest
   {:player_id s/Uuid

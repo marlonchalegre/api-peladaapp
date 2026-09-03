@@ -10,5 +10,6 @@
    (s/optional-key :created-at) s/Any
    (s/optional-key :session-time-ms) (s/maybe s/Int)
    (s/optional-key :match-time-ms) (s/maybe s/Int)
-   (s/optional-key :parent-event-id) (s/maybe s/Uuid)})
+   (s/optional-key :parent-event-id) (s/maybe s/Uuid)
+   (s/optional-key :team-id) (s/maybe s/Uuid)})
 

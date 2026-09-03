@@ -25,16 +25,19 @@
 
 (s/defn insert-event :- s/Uuid
   ([match-id player-id event-type db]
-   (insert-event match-id player-id event-type nil nil nil db))
+   (insert-event match-id player-id event-type nil nil nil nil db))
   ([match-id player-id event-type session-time-ms match-time-ms db]
-   (insert-event match-id player-id event-type session-time-ms match-time-ms nil db))
-  ([match-id :- s/Uuid player-id :- s/Uuid event-type :- s/Str session-time-ms match-time-ms parent-event-id db]
+   (insert-event match-id player-id event-type session-time-ms match-time-ms nil nil db))
+  ([match-id player-id event-type session-time-ms match-time-ms parent-event-id db]
+   (insert-event match-id player-id event-type session-time-ms match-time-ms parent-event-id nil db))
+  ([match-id :- s/Uuid player-id :- s/Uuid event-type :- s/Str session-time-ms match-time-ms parent-event-id team-id db]
    (let [row (cond-> {:match_id match-id
                       :player_id player-id
                       :event_type [:cast event-type :match_event_type]}
                session-time-ms (assoc :session_time_ms session-time-ms)
                match-time-ms (assoc :match_time_ms match-time-ms)
-               parent-event-id (assoc :parent_event_id parent-event-id))
+               parent-event-id (assoc :parent_event_id parent-event-id)
+               team-id (assoc :team_id team-id))
          query (-> (h/insert-into :MatchEvents)
                    (h/values [row])
                    (h/returning :id))]
@@ -42,7 +45,7 @@
 
 (s/defn list-events-by-pelada :- [models.match-event/MatchEvent]
   [pelada-id :- s/Uuid db]
-  (let [query (-> (h/select :e.id :e.match_id :e.player_id :e.event_type :e.created_at :e.session_time_ms :e.match_time_ms :e.parent_event_id)
+  (let [query (-> (h/select :e.id :e.match_id :e.player_id :e.event_type :e.created_at :e.session_time_ms :e.match_time_ms :e.parent_event_id :e.team_id)
                   (h/from [:MatchEvents :e])
                   (h/join [:Matches :m] [:= :m.id :e.match_id])
                   (h/where [:= :m.pelada_id pelada-id])

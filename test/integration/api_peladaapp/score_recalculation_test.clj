@@ -159,3 +159,93 @@
                         (is (= 0 (:home_score match)))
                         (is (= 0 (:away_score match)))
                         (is (= 0 (:goals home-player-stats)))))))))))))))
+
+(deftest substitution-score-preservation-test
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
+
+        token-admin (th/register-and-login! app {:name "Admin" :email "admin-sub@test.com" :password "pass"})
+        auth-admin (th/auth-cookie token-admin)
+
+        org-resp (app (-> (mock/request :post "/api/organizations") (mock/json-body {:name "Org"}) auth-admin))
+        org-id (misc/as-uuid (:id (th/decode-body org-resp)))]
+
+    ;; Register Player 1, Player 2 and Player 3 (substitute)
+    (th/register-and-login! app {:name "Player 1" :email "p1-sub@test.com" :password "pass"})
+    (th/register-and-login! app {:name "Player 2" :email "p2-sub@test.com" :password "pass"})
+    (th/register-and-login! app {:name "Player 3" :email "p3-sub@test.com" :password "pass"})
+
+    (doseq [email ["p1-sub@test.com" "p2-sub@test.com" "p3-sub@test.com"]]
+      (let [uid (th/user-id-by-email ds email)]
+        (db.player/insert-player {:organization-id org-id :user-id uid} ds)))
+
+    (let [pelada-id (misc/as-uuid (:id (th/decode-body (app (-> (mock/request :post "/api/peladas")
+                                                                (mock/json-body {:organization_id org-id})
+                                                                auth-admin)))))
+          t1-id (misc/as-uuid (:id (th/decode-body (app (-> (mock/request :post "/api/teams")
+                                                            (mock/json-body {:pelada_id pelada-id :name "Team A"})
+                                                            auth-admin)))))
+          t2-id (misc/as-uuid (:id (th/decode-body (app (-> (mock/request :post "/api/teams")
+                                                            (mock/json-body {:pelada_id pelada-id :name "Team B"})
+                                                            auth-admin)))))
+          p1-id (th/player-id-by-user-id ds (th/user-id-by-email ds "p1-sub@test.com") org-id)
+          p2-id (th/player-id-by-user-id ds (th/user-id-by-email ds "p2-sub@test.com") org-id)
+          p3-id (th/player-id-by-user-id ds (th/user-id-by-email ds "p3-sub@test.com") org-id)]
+
+      ;; Assign Player 1 to Team A, Player 2 to Team B. Player 3 is on the bench (unassigned)
+      (exec! ds (-> (h/insert-into :TeamPlayers) (h/values [{:team_id t1-id :player_id p1-id}])))
+      (exec! ds (-> (h/insert-into :TeamPlayers) (h/values [{:team_id t2-id :player_id p2-id}])))
+
+      (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth-admin))
+      (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin")) auth-admin))
+
+      (let [dashboard-resp (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/dashboard-data")) auth-admin))
+            dashboard (th/decode-body dashboard-resp)
+            match-id (-> dashboard :matches first :id)
+            home-team-id (misc/as-uuid (-> dashboard :matches first :home_team_id))]
+
+        (testing "Initial score is 0 - 0"
+          (let [match (-> (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/dashboard-data")) auth-admin))
+                          th/decode-body :matches first)]
+            (is (= 0 (:home_score match)))
+            (is (= 0 (:away_score match)))))
+
+        (testing "Substitute Player 1 with Player 3 in Team A"
+          (let [sub-resp (app (-> (mock/request :post (str "/api/matches/" match-id "/lineups/replace"))
+                                  (mock/json-body {:team_id (str home-team-id)
+                                                   :out_player_id (str p1-id)
+                                                   :in_player_id (str p3-id)})
+                                  auth-admin))]
+            (is (= 200 (:status sub-resp)))))
+
+        (testing "Player 3 scores a goal -> score becomes 1 - 0 and Player 3 stats update"
+          (let [goal-resp (app (-> (mock/request :post (str "/api/matches/" match-id "/events"))
+                                   (mock/json-body {:player_id (str p3-id) :event_type "goal"})
+                                   auth-admin))
+                match (-> (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/dashboard-data")) auth-admin))
+                          th/decode-body :matches first)
+                stats (-> (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/dashboard-data")) auth-admin))
+                          th/decode-body :player_stats)
+                p3-stats (first (filter #(= (:player_id %) (str p3-id)) stats))]
+            (is (= 200 (:status goal-resp)))
+            (is (= 1 (:home_score match)))
+            (is (= 0 (:away_score match)))
+            (is (= 1 (:goals p3-stats)))))
+
+        (testing "Substitute Player 3 back with Player 1 -> score MUST remain 1 - 0 and Player 3 keeps 1 goal"
+          (let [sub-resp (app (-> (mock/request :post (str "/api/matches/" match-id "/lineups/replace"))
+                                  (mock/json-body {:team_id (str home-team-id)
+                                                   :out_player_id (str p3-id)
+                                                   :in_player_id (str p1-id)})
+                                  auth-admin))
+                match (-> (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/dashboard-data")) auth-admin))
+                          th/decode-body :matches first)
+                stats (-> (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/dashboard-data")) auth-admin))
+                          th/decode-body :player_stats)
+                p3-stats (first (filter #(= (:player_id %) (str p3-id)) stats))]
+            (is (= 200 (:status sub-resp)))
+            (is (= 1 (:home_score match)))
+            (is (= 0 (:away_score match)))
+            (is (= 1 (:goals p3-stats)))))))))
+
