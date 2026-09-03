@@ -27,12 +27,19 @@
 
 (s/defn start-match-timer :- models.match/Match
   [match-id :- s/Uuid db]
-  (let [match (db.match/get-match match-id db)]
-    (if (= "running" (:timer-status match))
-      match
-      (let [now (str (java.time.Instant/now))]
-        (db.match/update-match match-id {:timer-status "running" :timer-started-at now} db)
-        (db.match/get-match match-id db)))))
+  (let [match (db.match/get-match match-id db)
+        now (str (java.time.Instant/now))
+        should-update-timer? (not= "running" (:timer-status match))
+        should-update-status? (= "scheduled" (:status match))]
+    (if (or should-update-timer? should-update-status?)
+      (do
+        (db.match/update-match match-id
+                               (cond-> {}
+                                 should-update-timer? (assoc :timer-status "running" :timer-started-at now)
+                                 should-update-status? (assoc :status "running"))
+                               db)
+        (db.match/get-match match-id db))
+      match)))
 
 (s/defn pause-match-timer :- models.match/Match
   [match-id :- s/Uuid db]

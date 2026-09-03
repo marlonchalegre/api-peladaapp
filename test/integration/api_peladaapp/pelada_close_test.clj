@@ -79,6 +79,11 @@
             match-id (:id (first matches))]
         (is (= 200 (:status (app (-> (mock/request :post (str "/api/matches/" match-id "/timer/start")) auth)))))
 
+        ;; Verify match status became running upon starting timer
+        (let [match-running (exec-one! ds (-> (h/select :*) (h/from :Matches) (h/where [:= :id (misc/as-uuid match-id)])))]
+          (is (= "running" (:status match-running)))
+          (is (= "running" (:timer_status match-running))))
+
         ;; Wait a bit more to ensure elapsed time >= 1s for Postgres epoch
         (Thread/sleep 1100)
 
