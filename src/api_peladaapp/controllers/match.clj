@@ -76,6 +76,11 @@
   [pelada-id :- s/Uuid db]
   (db.match-event/list-events-by-pelada pelada-id db))
 
+(defn- find-associated-assist
+  [match-id goal-event tx]
+  (or (db.match-event/get-assist-by-goal-id (:id goal-event) tx)
+      (db.match-event/get-assist-by-time match-id (:session-time-ms goal-event) (:match-time-ms goal-event) (:player-id goal-event) tx)))
+
 (s/defn delete-last-event :- s/Int
   [match-id :- s/Uuid {:keys [player-id event-type id]} db]
   (let [player-id (match-event.logic/ensure-player-id player-id)
@@ -85,16 +90,14 @@
         (if-let [event (db.match-event/get-event id tx)]
           (do
             (when (= (:event-type event) "goal")
-              (when-let [assist (or (db.match-event/get-assist-by-goal-id id tx)
-                                    (db.match-event/get-assist-by-time match-id (:session-time-ms event) (:match-time-ms event) (:player-id event) tx))]
+              (when-let [assist (find-associated-assist match-id event tx)]
                 (db.match-event/delete-event-by-id (:id assist) tx)))
             (db.match-event/delete-event-by-id id tx))
           0)
         (if-let [event (db.match-event/get-last-event match-id player-id canonical-type tx)]
           (do
             (when (= (:event-type event) "goal")
-              (when-let [assist (or (db.match-event/get-assist-by-goal-id (:id event) tx)
-                                    (db.match-event/get-assist-by-time match-id (:session-time-ms event) (:match-time-ms event) (:player-id event) tx))]
+              (when-let [assist (find-associated-assist match-id event tx)]
                 (db.match-event/delete-event-by-id (:id assist) tx)))
             (db.match-event/delete-event-by-id (:id event) tx))
           0)))))
@@ -107,8 +110,7 @@
         (let [old-session (:session-time-ms goal-event)
               old-match (:match-time-ms goal-event)
               updated-goal (db.match-event/update-event-player event-id player-id tx)
-              existing-assist (or (db.match-event/get-assist-by-goal-id event-id tx)
-                                  (db.match-event/get-assist-by-time match-id old-session old-match (:player-id goal-event) tx))]
+              existing-assist (find-associated-assist match-id goal-event tx)]
           (when (= (:event-type goal-event) "goal")
             (cond
               assistant-id
