@@ -188,3 +188,94 @@
         (is (= 1 (count payments)))
         (is (= p2-player-id (misc/as-uuid (:player_id (first payments)))))
         (is (false? (:paid (first payments))))))))
+
+(deftest monthly-substitutions-ended-early-month-test
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
+        token (th/register-and-login! app {:name "Rafa Lucena" :email "rafa@ex.com" :password "p"})
+        p2-token (th/register-and-login! app {:name "Alan" :email "alan@ex.com" :password "p"})
+        p3-token (th/register-and-login! app {:name "Mala" :email "mala@ex.com" :password "p"})
+        auth (th/auth-cookie token)
+        p2-auth (th/auth-cookie p2-token)
+        p3-auth (th/auth-cookie p3-token)
+        rafa-id (th/user-id-by-email ds "rafa@ex.com")
+        alan-id (th/user-id-by-email ds "alan@ex.com")
+        mala-id (th/user-id-by-email ds "mala@ex.com")
+
+        org-resp (app (-> (mock/request :post "/api/organizations")
+                          (mock/json-body {:name "Sub Club Early Month"})
+                          auth))
+        org-id (misc/as-uuid (:id (decode-body org-resp)))]
+
+    (is (= 201 (:status org-resp)))
+
+    ;; Enable features: monthly_substitutions and finance_control
+    (jdbc/execute! ds [(str "UPDATE \"OrganizationFeatureFlags\" SET monthly_substitutions = TRUE, finance_control = TRUE WHERE organization_id = '" org-id "'")])
+
+    ;; Invite and accept alan and mala
+    (app (-> (mock/request :post (str "/api/organizations/" org-id "/invite"))
+             (mock/json-body {:email "alan@ex.com" :name "Alan"})
+             auth))
+    (app (-> (mock/request :post (str "/api/organizations/" org-id "/invite"))
+             (mock/json-body {:email "mala@ex.com" :name "Mala"})
+             auth))
+
+    (let [invites (decode-body (app (-> (mock/request :get "/api/invitations/pending") p2-auth)))
+          inv-token (:token (first invites))]
+      (app (-> (mock/request :post (str "/api/invitations/" inv-token "/accept")) p2-auth)))
+
+    (let [invites (decode-body (app (-> (mock/request :get "/api/invitations/pending") p3-auth)))
+          inv-token (:token (first invites))]
+      (app (-> (mock/request :post (str "/api/invitations/" inv-token "/accept")) p3-auth)))
+
+    (let [players (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/players")) auth)))
+          rafa-player (first (filter #(= (misc/as-uuid (:user_id %)) rafa-id) players))
+          rafa-player-id (misc/as-uuid (:id rafa-player))
+          alan-player (first (filter #(= (misc/as-uuid (:user_id %)) alan-id) players))
+          alan-player-id (misc/as-uuid (:id alan-player))
+          mala-player (first (filter #(= (misc/as-uuid (:user_id %)) mala-id) players))
+          mala-player-id (misc/as-uuid (:id mala-player))]
+
+      ;; Rafa and Mala are mensalistas, Alan is diarista
+      (db.player/update-player rafa-player-id {:member-type "mensalista"} ds)
+      (db.player/update-player mala-player-id {:member-type "mensalista"} ds)
+      (db.player/update-player alan-player-id {:member-type "diarista"} ds)
+
+      ;; Step 1: Alan substitutes Rafa starting in August
+      (let [sub1-resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/substitutions"))
+                               (mock/json-body {:permanent_player_id rafa-player-id
+                                                :temporary_player_id alan-player-id
+                                                :start_date "2026-08-01"})
+                               auth))]
+        (is (= 200 (:status sub1-resp))))
+
+      (let [subs (decode-body (app (-> (mock/request :get (str "/api/organizations/" org-id "/substitutions")) auth)))
+            sub1-id (misc/as-uuid (:id (first subs)))]
+
+        ;; Step 2: On September 4th, Rafa returns and sub1 is ended (end_date = 2026-09-04)
+        (let [end-resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/substitutions/" sub1-id "/end"))
+                                (mock/json-body {:end_date "2026-09-04"})
+                                auth))]
+          (is (= 200 (:status end-resp))))
+
+        ;; Step 3: On September 4th, Alan substitutes Mala (start_date = 2026-09-04)
+        (let [sub2-resp (app (-> (mock/request :post (str "/api/organizations/" org-id "/substitutions"))
+                                 (mock/json-body {:permanent_player_id mala-player-id
+                                                  :temporary_player_id alan-player-id
+                                                  :start_date "2026-09-04"})
+                                 auth))]
+          (is (= 200 (:status sub2-resp))))
+
+        ;; Step 4: Verify September 2026 finance
+        ;; Rafa (returned mensalista) and Alan (substituting Mala) should BOTH be listed!
+        ;; Mala should NOT be listed (he is substituted).
+        ;; Total mensalistas must be 2.
+        (let [payments-resp (app (-> (mock/request :get (str "/api/organizations/" org-id "/finance/monthly-payments") {:year "2026" :month "9"}) auth))
+              payments (decode-body payments-resp)
+              player-ids (set (map #(misc/as-uuid (:player_id %)) payments))]
+          (is (= 200 (:status payments-resp)))
+          (is (= 2 (count payments)))
+          (is (contains? player-ids rafa-player-id))
+          (is (contains? player-ids alan-player-id))
+          (is (not (contains? player-ids mala-player-id))))))))

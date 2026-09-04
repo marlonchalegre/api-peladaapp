@@ -95,10 +95,14 @@
 
 (defn- substitution-active-in-month? [sub first-day last-day]
   (let [start-date (str (:start_date sub))
-        end-date (some-> (:end_date sub) str)]
+        end-date (some-> (:end_date sub) str)
+        active? (:active sub)]
     (and (<= (compare start-date last-day) 0)
-         (or (nil? (:end_date sub))
-             (>= (compare end-date first-day) 0)))))
+         (if active?
+           (or (nil? end-date)
+               (>= (compare end-date first-day) 0))
+           (and end-date
+                (>= (compare end-date last-day) 0))))))
 
 (defn- get-effective-member-type [player-id current-member-type active-subs-in-month]
   (let [player-id (misc/as-uuid player-id)
@@ -120,13 +124,21 @@
         first-day (str (.atDay ym 1))
         last-day (str (.atEndOfMonth ym))
         subs (db.monthly-sub/list-substitutions-by-org org-id db)
-        active-subs (filter (fn [sub] (substitution-active-in-month? sub first-day last-day)) subs)
+        active-subs (->> subs
+                         (filter (fn [sub] (substitution-active-in-month? sub first-day last-day)))
+                         (sort-by (comp not boolean :active)))
         candidate-query (-> (h/select :op.id)
                             (h/from [:OrganizationPlayers :op])
                             (h/where [:and [:= :op.organization_id org-id]
                                       [:or [:in :op.member_type [[:cast "mensalista" :member_type]
                                                                  [:cast "mensalista_temporario" :member_type]
                                                                  [:cast "diarista_temporario" :member_type]]]
+                                       [:exists (-> (h/select 1)
+                                                    (h/from [:MonthlyPayments :mp])
+                                                    (h/where [:and [:= :mp.organization_id org-id]
+                                                              [:= :mp.player_id :op.id]
+                                                              [:= :mp.year year]
+                                                              [:= :mp.month month]]))]
                                        [:exists (-> (h/select 1)
                                                     (h/from [:MonthlyPlayerSubstitutions :ms])
                                                     (h/where [:and [:= :ms.organization_id org-id]
@@ -155,7 +167,8 @@
                                       (assoc row :member_type effective-type))))
                              (filter (fn [row]
                                        (let [t (:member_type row)]
-                                         (or (= t "mensalista")
+                                         (or (:paid row)
+                                             (= t "mensalista")
                                              (= t "mensalista_temporario"))))))]
     (map adapter.finance/db->monthly-payment mapped-payments)))
 
