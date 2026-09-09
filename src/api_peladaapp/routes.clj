@@ -10,6 +10,7 @@
    [api-peladaapp.handlers.internal :as handler.internal]
    [api-peladaapp.handlers.manual-stats :as handler.manual-stats]
    [api-peladaapp.handlers.match :as handler.match]
+   [api-peladaapp.handlers.monthly-waitlist :as handler.monthly-waitlist]
    [api-peladaapp.handlers.organization :as handler.organization]
    [api-peladaapp.handlers.pelada :as handler.pelada]
    [api-peladaapp.handlers.player :as handler.player]
@@ -35,6 +36,13 @@
     (GET "/organizations/:organization_id/substitutions" [] handler.organization/list-substitutions)
     (POST "/organizations/:organization_id/substitutions" [] handler.organization/create-substitution)
     (POST "/organizations/:organization_id/substitutions/:sub_id/end" [] handler.organization/end-substitution)
+
+    ;; Monthly Waitlist
+    (GET "/organizations/:organization_id/monthly-waitlist" [] handler.monthly-waitlist/list-waitlist)
+    (GET "/organizations/:organization_id/monthly-waitlist/me" [] handler.monthly-waitlist/get-my-status)
+    (POST "/organizations/:organization_id/monthly-waitlist" [] handler.monthly-waitlist/add-candidate)
+    (DELETE "/organizations/:organization_id/monthly-waitlist/:player_id" [] handler.monthly-waitlist/remove-candidate)
+    (POST "/organizations/:organization_id/monthly-waitlist/:player_id/promote" [] handler.monthly-waitlist/promote-candidate)
 
     ;; Users
     (GET "/users" [] handler.user/list-all)
