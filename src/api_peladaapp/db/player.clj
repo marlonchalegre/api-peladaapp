@@ -114,12 +114,23 @@
    db]
   (if (empty? player-ids)
     []
-    (let [query (-> (h/select [:op.id :id] [:op.grade :grade] [[:coalesce :op.position :u.position] :position])
+    (let [query (-> (h/select [:op.id :id] [:op.grade :grade] [:op.member_type :member_type]
+                              [[:coalesce :op.position :u.position] :position] [:u.name :name])
                     (h/from [:OrganizationPlayers :op])
                     (h/join [:Users :u] [:= :op.user_id :u.id])
                     (h/where [:= :op.organization_id organization-id]
                              [:in :op.id player-ids]))]
       (jdbc/execute! db (hsql/format query) hsql/opts))))
+
+(s/defn list-players-for-balance :- [s/Any]
+  "Same projection as `get-players-details-for-balance` for a whole organization."
+  [organization-id :- s/Uuid db]
+  (let [query (-> (h/select [:op.id :id] [:op.grade :grade] [:op.member_type :member_type]
+                            [[:coalesce :op.position :u.position] :position] [:u.name :name])
+                  (h/from [:OrganizationPlayers :op])
+                  (h/join [:Users :u] [:= :op.user_id :u.id])
+                  (h/where [:= :op.organization_id organization-id]))]
+    (jdbc/execute! db (hsql/format query) hsql/opts)))
 
 (s/defn count-players-by-org :- s/Int
   [organization-id :- s/Uuid db]

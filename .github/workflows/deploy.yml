@@ -11,6 +11,11 @@ jobs:
   test:
     name: Test & Lint
     runs-on: ubuntu-latest
+    # The summary step below comments on the PR, which the default read-only
+    # token cannot do.
+    permissions:
+      contents: read
+      pull-requests: write
     env:
       PELADA_API_SECURITY_SIGNING_KEY: dummy-secret-for-testing-in-ci
       DATABASE_URL: postgres://pelada:pelada_pass@localhost:5432/peladaapp_test
@@ -141,6 +146,9 @@ jobs:
 
       - name: Post PR Comment
         if: always() && github.event_name == 'pull_request'
+        # A cosmetic summary must never fail an otherwise green build — a fork
+        # PR only ever gets a read-only token.
+        continue-on-error: true
         uses: mshick/add-pr-comment@v2
         with:
           message: ${{ steps.summary.outputs.content }}
