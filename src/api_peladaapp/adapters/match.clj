@@ -49,9 +49,17 @@
    :out-player-id (misc/as-uuid (:out_player_id request))
    :in-player-id (misc/as-uuid (:in_player_id request))})
 
+(s/defn update-support-lineup-request->model :- (s/pred map?)
+  [request :- requests.match/UpdateSupportLineupRequest]
+  (cond-> {}
+    (contains? request :support_camera_player_id)
+    (assoc :support-camera-player-id (some-> (:support_camera_player_id request) misc/as-uuid))
+    (contains? request :support_stats_player_id)
+    (assoc :support-stats-player-id (some-> (:support_stats_player_id request) misc/as-uuid))))
+
 (s/defn model->response :- responses.match/MatchResponse
   [{:keys [id pelada-id home-team-id away-team-id sequence status home-score away-score
-           timer-started-at timer-accumulated-ms timer-status]}]
+           timer-started-at timer-accumulated-ms timer-status support-camera-player-id support-stats-player-id]}]
   (cond-> {:id id
            :pelada_id pelada-id
            :home_team_id home-team-id
@@ -62,7 +70,9 @@
     (some? away-score) (assoc :away_score away-score)
     timer-started-at (assoc :timer_started_at (some-> timer-started-at helpers.time/->instant str))
     (some? timer-accumulated-ms) (assoc :timer_accumulated_ms timer-accumulated-ms)
-    timer-status (assoc :timer_status timer-status)))
+    timer-status (assoc :timer_status timer-status)
+    (some? support-camera-player-id) (assoc :support_camera_player_id support-camera-player-id)
+    (some? support-stats-player-id) (assoc :support_stats_player_id support-stats-player-id)))
 
 (s/defn event->response :- responses.match/MatchEventResponse
   [{:keys [id match-id player-id event-type created-at session-time-ms match-time-ms parent-event-id team-id]}]
@@ -98,7 +108,9 @@
       (some? (:away_score p)) (assoc :away-score (:away_score p))
       (:timer_started_at p) (assoc :timer-started-at (:timer_started_at p))
       (some? (:timer_accumulated_ms p)) (assoc :timer-accumulated-ms (:timer_accumulated_ms p))
-      (:timer_status p) (assoc :timer-status (:timer_status p)))))
+      (:timer_status p) (assoc :timer-status (:timer_status p))
+      (:support_camera_player_id p) (assoc :support-camera-player-id (:support_camera_player_id p))
+      (:support_stats_player_id p) (assoc :support-stats-player-id (:support_stats_player_id p)))))
 
 (s/defn db-event->model :- models.match-event/MatchEvent
   [e]

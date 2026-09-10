@@ -36,3 +36,7 @@
   {:team_id s/Uuid
    :out_player_id s/Uuid
    :in_player_id s/Uuid})
+
+(s/defschema UpdateSupportLineupRequest
+  {(s/optional-key :support_camera_player_id) (s/maybe s/Uuid)
+   (s/optional-key :support_stats_player_id) (s/maybe s/Uuid)})

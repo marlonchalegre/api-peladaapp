@@ -1,11 +1,14 @@
 (ns api-peladaapp.controllers.match
   (:require
+   [api-peladaapp.db.attendance :as db.attendance]
    [api-peladaapp.db.match :as db.match]
    [api-peladaapp.db.match-event :as db.match-event]
    [api-peladaapp.db.match-lineup :as db.match-lineup]
+   [api-peladaapp.db.team :as db.team]
    [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.match :as match.logic]
    [api-peladaapp.logic.match-event :as match-event.logic]
+   [api-peladaapp.logic.support-lineup :as support-lineup]
    [api-peladaapp.models.match :as models.match]
    [api-peladaapp.models.match-event :as models.match-event]
    [next.jdbc :as jdbc]
@@ -141,3 +144,25 @@
   [match-id :- s/Uuid {:keys [team-id out-player-id in-player-id]} db]
   (do (db.match-lineup/ensure-seeded match-id db)
       (db.match-lineup/replace-player match-id team-id out-player-id in-player-id db)))
+
+(s/defn update-support-lineup :- models.match/Match
+  [match-id :- s/Uuid update-data db]
+  (db.match/update-match match-id update-data db)
+  (db.match/get-match match-id db))
+
+(s/defn reroll-support-lineup :- models.match/Match
+  [match-id :- s/Uuid db]
+  (let [target-match (db.match/get-match match-id db)
+        pelada-id (:pelada-id target-match)
+        all-matches (db.match/list-matches-by-pelada pelada-id db)
+        other-matches (remove #(= (:id %) match-id) all-matches)
+        teams (db.team/list-pelada-teams pelada-id db)
+        team-ids (mapv :id teams)
+        team-players (db.team/list-team-players-by-pelada pelada-id db)
+        confirmed-player-ids (mapv :player-id (db.attendance/list-confirmed-players-by-pelada pelada-id db))
+        updated-match (support-lineup/reroll-single-match target-match other-matches team-ids team-players confirmed-player-ids)]
+    (db.match/update-match match-id
+                           {:support-camera-player-id (:support-camera-player-id updated-match)
+                            :support-stats-player-id (:support-stats-player-id updated-match)}
+                           db)
+    (db.match/get-match match-id db)))

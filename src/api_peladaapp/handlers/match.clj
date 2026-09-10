@@ -143,3 +143,34 @@
       (pelada-logic/ensure-running pelada {:allow-closed? true})
       (updated (match-controller/replace-lineup-player id (adapter.match/replace-lineup-request->model body) db)))
     (catch Exception e (exception/api-exception-handler e))))
+
+(defn update-support-lineup [request]
+  (try
+    (let [db (:database request)
+          id (parse-uuid (clojure.core/str (get-in request [:params :id])))
+          body (:body request)
+          user-id (auth/get-user-id-from-request request)
+          match (match-controller/get-match id db)
+          pelada (pelada-controller/get-pelada (:pelada-id match) db)
+          org-id (:organization-id pelada)]
+      (auth/require-organization-admin! user-id org-id db)
+      (pelada-logic/ensure-running pelada {:allow-closed? true})
+      (-> (match-controller/update-support-lineup id (adapter.match/update-support-lineup-request->model body) db)
+          adapter.match/model->response
+          ok))
+    (catch Exception e (exception/api-exception-handler e))))
+
+(defn reroll-support-lineup [request]
+  (try
+    (let [db (:database request)
+          id (parse-uuid (clojure.core/str (get-in request [:params :id])))
+          user-id (auth/get-user-id-from-request request)
+          match (match-controller/get-match id db)
+          pelada (pelada-controller/get-pelada (:pelada-id match) db)
+          org-id (:organization-id pelada)]
+      (auth/require-organization-admin! user-id org-id db)
+      (pelada-logic/ensure-running pelada {:allow-closed? true})
+      (-> (match-controller/reroll-support-lineup id db)
+          adapter.match/model->response
+          ok))
+    (catch Exception e (exception/api-exception-handler e))))

@@ -70,6 +70,7 @@
     (GET "/organizations/:organization_id/peladas" [] handler.pelada/list-by-org)
     (GET "/users/:user_id/peladas" [] handler.pelada/list-by-user)
     (POST "/peladas/:id/begin" [] handler.pelada/begin)
+    (POST "/peladas/:id/support-lineup/generate" [] handler.pelada/generate-support-lineup)
     (POST "/peladas/:id/close" [] handler.pelada/close)
     (POST "/peladas/:id/timer/start" [] handler.pelada/start-timer)
     (POST "/peladas/:id/timer/pause" [] handler.pelada/pause-timer)
@@ -98,6 +99,8 @@
     (DELETE "/matches/:id/events" [] handler.match/delete-event)
     (POST "/matches/:id/lineups" [] handler.match/add-lineup-player)
     (POST "/matches/:id/lineups/replace" [] handler.match/replace-lineup-player)
+    (PUT "/matches/:id/support-lineup" [] handler.match/update-support-lineup)
+    (POST "/matches/:id/support-lineup/reroll" [] handler.match/reroll-support-lineup)
 
     ;; Players
     (POST "/players" [] handler.player/create)

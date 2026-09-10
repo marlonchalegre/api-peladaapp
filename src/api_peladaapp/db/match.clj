@@ -8,21 +8,26 @@
    [schema.core :as s]))
 
 (s/defn insert-match :- s/Uuid
-  [{:keys [pelada-id home-team-id away-team-id sequence status home-score away-score]} :- {:pelada-id s/Uuid
-                                                                                           :home-team-id s/Uuid
-                                                                                           :away-team-id s/Uuid
-                                                                                           :sequence s/Int
-                                                                                           :status s/Str
-                                                                                           (s/optional-key :home-score) (s/maybe s/Int)
-                                                                                           (s/optional-key :away-score) (s/maybe s/Int)}
+  [{:keys [pelada-id home-team-id away-team-id sequence status home-score away-score
+           support-camera-player-id support-stats-player-id]} :- {:pelada-id s/Uuid
+                                                                  :home-team-id s/Uuid
+                                                                  :away-team-id s/Uuid
+                                                                  :sequence s/Int
+                                                                  :status s/Str
+                                                                  (s/optional-key :home-score) (s/maybe s/Int)
+                                                                  (s/optional-key :away-score) (s/maybe s/Int)
+                                                                  (s/optional-key :support-camera-player-id) (s/maybe s/Uuid)
+                                                                  (s/optional-key :support-stats-player-id) (s/maybe s/Uuid)}
    db]
-  (let [row {:pelada_id pelada-id
-             :home_team_id home-team-id
-             :away_team_id away-team-id
-             :sequence sequence
-             :status [:cast status :match_status]
-             :home_score home-score
-             :away_score away-score}
+  (let [row (cond-> {:pelada_id pelada-id
+                     :home_team_id home-team-id
+                     :away_team_id away-team-id
+                     :sequence sequence
+                     :status [:cast status :match_status]
+                     :home_score home-score
+                     :away_score away-score}
+              support-camera-player-id (assoc :support_camera_player_id support-camera-player-id)
+              support-stats-player-id (assoc :support_stats_player_id support-stats-player-id))
         query (-> (h/insert-into :Matches)
                   (h/values [row])
                   (h/returning :id))]
@@ -45,14 +50,17 @@
         adapter.match/db->model)))
 
 (s/defn update-match :- s/Int
-  [id :- s/Uuid {:keys [home-score away-score status timer-started-at timer-accumulated-ms timer-status]} db]
+  [id :- s/Uuid {:keys [home-score away-score status timer-started-at timer-accumulated-ms timer-status
+                        support-camera-player-id support-stats-player-id] :as data} db]
   (let [db-row (cond-> {}
                  (some? home-score) (assoc :home_score home-score)
                  (some? away-score) (assoc :away_score away-score)
                  status (assoc :status [:cast status :match_status])
                  timer-started-at (assoc :timer_started_at [[:cast (helpers.time/to-utc-timestamp-str timer-started-at) :timestamp]])
                  (some? timer-accumulated-ms) (assoc :timer_accumulated_ms timer-accumulated-ms)
-                 timer-status (assoc :timer_status [:cast timer-status :timer_status]))]
+                 timer-status (assoc :timer_status [:cast timer-status :timer_status])
+                 (contains? data :support-camera-player-id) (assoc :support_camera_player_id support-camera-player-id)
+                 (contains? data :support-stats-player-id) (assoc :support_stats_player_id support-stats-player-id))]
     (if (empty? db-row)
       1
       (let [query (-> (h/update :Matches)

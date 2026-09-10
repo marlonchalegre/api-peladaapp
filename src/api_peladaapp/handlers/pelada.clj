@@ -1,6 +1,7 @@
 (ns api-peladaapp.handlers.pelada
   (:refer-clojure :exclude [update])
   (:require
+   [api-peladaapp.adapters.match :as adapter.match]
    [api-peladaapp.adapters.pelada :as adapter.pelada]
    [api-peladaapp.controllers.pelada :as controller.pelada]
    [api-peladaapp.db.organization :as db.organization]
@@ -96,6 +97,17 @@
               (if matches-per-team
                 (controller.pelada/begin-pelada id db {:matches_per_team matches-per-team})
                 (controller.pelada/begin-pelada id db)))))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn generate-support-lineup [request]
+  (try (let [db (:database request)
+             id (misc/as-uuid (get-in request [:params :id]))
+             user-id (auth/get-user-id-from-request request)
+             pelada (controller.pelada/get-pelada id db)
+             org-id (:organization-id pelada)]
+         (auth/require-organization-admin! user-id org-id db)
+         (let [updated-matches (controller.pelada/generate-support-lineup id db)]
+           (ok (mapv adapter.match/model->response updated-matches))))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn close [request]

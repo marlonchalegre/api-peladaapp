@@ -17,6 +17,7 @@
    [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.notifications :as notifications]
    [api-peladaapp.logic.pelada :as pelada.logic]
+   [api-peladaapp.logic.support-lineup :as support-lineup]
    [api-peladaapp.models.pelada :as models.pelada]
    [clojure.tools.logging :as log]
    [next.jdbc :as jdbc]
@@ -47,6 +48,20 @@
   (->> (db.match/list-matches-by-pelada pelada-id db)
        (map :id)
        (run! #(db.match-lineup/ensure-seeded % db))))
+
+(defn- generate-and-save-support-lineups!
+  [pelada-id db]
+  (let [matches (db.match/list-matches-by-pelada pelada-id db)
+        team-ids (fetch-team-ids pelada-id db)
+        team-players (db.team/list-team-players-by-pelada pelada-id db)
+        confirmed-player-ids (mapv :player-id (db.attendance/list-confirmed-players-by-pelada pelada-id db))
+        assigned-matches (support-lineup/generate-support-lineups matches team-ids team-players confirmed-player-ids)]
+    (doseq [m assigned-matches]
+      (db.match/update-match (:id m)
+                             {:support-camera-player-id (:support-camera-player-id m)
+                              :support-stats-player-id (:support-stats-player-id m)}
+                             db))
+    assigned-matches))
 
 (s/defn get-schedule-preview
   [pelada-id :- s/Uuid matches-per-team :- s/Int db]
@@ -217,6 +232,7 @@
                      (persist-match-plan! pelada-id match-plan tx)
                      (db.pelada/update-pelada pelada-id {:status "running"} tx)
                      (seed-lineups-from-teams! pelada-id tx)
+                     (generate-and-save-support-lineups! pelada-id tx)
                      {:pelada pelada :matches-created (count match-plan)}))
                  (catch Exception e
                    (log/error e "CRITICAL ERROR in begin-pelada transaction:")
@@ -232,6 +248,11 @@
         (catch Exception e (log/error e "Error sending start notification:"))))
 
     {:matches-created (:matches-created result)}))
+
+(s/defn generate-support-lineup
+  [pelada-id :- s/Uuid db]
+  (jdbc/with-transaction [tx db]
+    (generate-and-save-support-lineups! pelada-id tx)))
 
 (s/defn start-pelada-timer :- models.pelada/Pelada
   [pelada-id :- s/Uuid db]
