@@ -324,6 +324,9 @@
                 team-players (db.team/list-team-players-with-names-by-pelada pelada-id db)]
             (notifications/send-notification! org-id :start {:teams teams :team-players team-players :force? true} db))
 
+          :support-lineup
+          (notifications/send-notification! org-id :support-lineup {:pelada-id pelada-id :force? true} db)
+
           :end
           (let [matches (db.match/list-matches-by-pelada pelada-id db)
                 teams (db.team/list-pelada-teams pelada-id db)

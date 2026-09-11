@@ -228,3 +228,63 @@
       (is (re-find #"Gols sofridos:" msg))
       (is (re-find #"Fixed Home GK 2" msg))
       (is (re-find #"Fixed Away GK 5" msg)))))
+
+(deftest generate-support-lineup-message-test
+  (testing "generates correct support lineup message with mentions, roles and match info"
+    (let [t1 (parse-uuid "00000000-0000-0000-0000-000000000001")
+          t2 (parse-uuid "00000000-0000-0000-0000-000000000002")
+          t3 (parse-uuid "00000000-0000-0000-0000-000000000003")
+          p1 (parse-uuid "00000000-0000-0000-0000-000000000101")
+          p2 (parse-uuid "00000000-0000-0000-0000-000000000102")
+          p3 (parse-uuid "00000000-0000-0000-0000-000000000103")
+          teams [{:id t1 :name "Time Preto"}
+                 {:id t2 :name "Time Branco"}
+                 {:id t3 :name "Time Vermelho"}]
+          matches [{:sequence 1
+                    :home-team-id t1
+                    :away-team-id t2
+                    :support-camera-player-id p1
+                    :support-stats-player-id p2}
+                   {:sequence 2
+                    :home-team-id t2
+                    :away-team-id t3
+                    :support-camera-player-id p3
+                    :support-stats-player-id p1}]
+          players {p1 {:player-id p1 :player-name "Lucas Silva" :phone "5511999991111"}
+                   p2 {:player-id p2 :player-name "Bruno Souza" :phone "5511999992222"}
+                   p3 {:player-id p3 :player-name "Rafael Lima" :phone nil}}
+          msg (notifications/generate-support-lineup-message matches teams players)]
+      (is (re-find #"ESCALAÇÃO DE SUPORTE" msg))
+      (is (re-find #"\*Jogo 1 - Time Preto x Time Branco\*" msg))
+      (is (re-find #"• 📹 Câmera: @5511999991111 \(Lucas Silva\)" msg))
+      (is (re-find #"• 📝 Súmula: @5511999992222 \(Bruno Souza\)" msg))
+      (is (re-find #"\*Jogo 2 - Time Branco x Time Vermelho\*" msg))
+      (is (re-find #"• 📹 Câmera: Rafael Lima" msg))
+      (is (re-find #"• 📝 Súmula: @5511999991111 \(Lucas Silva\)" msg))))
+
+  (testing "handles unassigned roles gracefully"
+    (let [teams [{:id (parse-uuid "00000000-0000-0000-0000-000000000001") :name "Time A"}
+                 {:id (parse-uuid "00000000-0000-0000-0000-000000000002") :name "Time B"}]
+          matches [{:sequence 1
+                    :home-team-id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                    :away-team-id (parse-uuid "00000000-0000-0000-0000-000000000002")
+                    :support-camera-player-id nil
+                    :support-stats-player-id nil}]
+          msg (notifications/generate-support-lineup-message matches teams {})]
+      (is (re-find #"• 📹 Câmera: Não definido" msg))
+      (is (re-find #"• 📝 Súmula: Não definido" msg)))))
+
+(deftest extract-support-lineup-mentions-test
+  (testing "extracts unique phone JIDs of assigned players across all matches"
+    (let [p1 (parse-uuid "00000000-0000-0000-0000-000000000101")
+          p2 (parse-uuid "00000000-0000-0000-0000-000000000102")
+          p3 (parse-uuid "00000000-0000-0000-0000-000000000103")
+          matches [{:support-camera-player-id p1
+                    :support-stats-player-id p2}
+                   {:support-camera-player-id p3
+                    :support-stats-player-id p1}]
+          players {p1 {:player-id p1 :player-name "Player 1" :phone "5511999991111"}
+                   p2 {:player-id p2 :player-name "Player 2" :phone "5511999992222"}
+                   p3 {:player-id p3 :player-name "Player 3" :phone nil}}
+          mentions (notifications/extract-support-lineup-mentions matches players)]
+      (is (= #{"5511999991111@c.us" "5511999992222@c.us"} (set mentions))))))

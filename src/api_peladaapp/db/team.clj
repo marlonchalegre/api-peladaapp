@@ -1,17 +1,11 @@
 (ns api-peladaapp.db.team
   (:require
    [api-peladaapp.adapters.team :as adapter.team]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [honey.sql.helpers :as h]
    [next.jdbc :as jdbc]
    [schema.core :as s]))
-
-(defn- unqualify-row [row]
-  (into {}
-        (map (fn [[k v]]
-               (let [kw (if (keyword? k) (keyword (name k)) k)]
-                 [kw v])))
-        row))
 
 (s/defn insert-team :- s/Uuid
   [{:keys [pelada-id name]} :- {:pelada-id s/Uuid :name s/Str}
@@ -143,7 +137,7 @@
                   (h/from :TeamPlayers)
                   (h/where [:= :team_id team-id]))]
     (->> (jdbc/execute! db (hsql/format query) hsql/opts)
-         (map unqualify-row)
+         (map misc/unamespace)
          (map (fn [m]
                 {:team-id (:team_id m)
                  :player-id (:player_id m)
@@ -155,20 +149,20 @@
                   (h/join [:Teams :t] [:= :tp.team_id :t.id])
                   (h/where [:= :t.pelada_id pelada-id]))]
     (->> (jdbc/execute! db (hsql/format query) hsql/opts)
-         (map unqualify-row)
+         (map misc/unamespace)
          (map (fn [m]
                 (assoc m :is_goalkeeper (if (boolean? (:is_goalkeeper m)) (:is_goalkeeper m) (not= 0 (:is_goalkeeper m))))))
          vec)))
 
 (s/defn list-team-players-with-names-by-pelada [pelada-id :- s/Uuid db]
-  (let [query (-> (h/select :tp.* [:t.name :team_name] [:u.name :player_name] :u.position)
+  (let [query (-> (h/select :tp.* [:t.name :team_name] [:u.name :player_name] :u.position [:u.phone :phone])
                   (h/from [:TeamPlayers :tp])
                   (h/join [:Teams :t] [:= :tp.team_id :t.id])
                   (h/join [:OrganizationPlayers :op] [:= :tp.player_id :op.id])
                   (h/join [:Users :u] [:= :u.id :op.user_id])
                   (h/where [:= :t.pelada_id pelada-id]))]
     (->> (jdbc/execute! db (hsql/format query) hsql/opts)
-         (map unqualify-row)
+         (map misc/unamespace)
          (map (fn [m]
                 (assoc m :is_goalkeeper (if (boolean? (:is_goalkeeper m)) (:is_goalkeeper m) (not= 0 (:is_goalkeeper m))))))
          vec)))

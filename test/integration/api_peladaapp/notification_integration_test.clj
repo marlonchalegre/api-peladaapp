@@ -1,7 +1,11 @@
 (ns api-peladaapp.notification-integration-test
   (:require
    [api-peladaapp.controllers.organization :as controller.organization]
+   [api-peladaapp.db.match :as db.match]
    [api-peladaapp.db.organization :as db.organization]
+   [api-peladaapp.db.pelada :as db.pelada]
+   [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.db.team :as db.team]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.logic.notifications :as notifications]
@@ -268,4 +272,62 @@
 
             ;; Should have only 1 call (the group message)
             (is (= 1 (count @sent-calls)))))))))
+
+(deftest send-support-lineup-notification-test
+  (let [db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
+        org-id (db.organization/insert-organization {:name "Support Lineup Org"} ds)
+        owner-id (db.user/insert-user {:name "Owner User" :username "owner_user" :email "owner@test.com"} ds)
+        pelada-id (db.pelada/insert-pelada {:organization-id org-id
+                                            :created-by owner-id
+                                            :scheduled-at "2026-09-20T10:00:00Z"
+                                            :status "running"} ds)]
+
+    (jdbc/execute! ds (hsql/format (-> (h/insert-into :OrganizationWahaConfigs)
+                                       (h/values [{:organization_id org-id
+                                                   :enabled true
+                                                   :api_url "http://waha:3000"
+                                                   :instance "default"
+                                                   :group_id "group123"
+                                                   :start_msg_enabled true}]))))
+
+    (let [u1-id (db.user/insert-user {:name "Camera Player" :username "cam_player" :phone "5511911112222"} ds)
+          u2-id (db.user/insert-user {:name "Stats Player" :username "stat_player" :phone "5511933334444"} ds)
+          p1-id (db.player/insert-player {:organization-id org-id :user-id u1-id :member-type "convidado"} ds)
+          p2-id (db.player/insert-player {:organization-id org-id :user-id u2-id :member-type "convidado"} ds)
+          t1-id (db.team/insert-team {:pelada-id pelada-id :name "Time Ouro"} ds)
+          t2-id (db.team/insert-team {:pelada-id pelada-id :name "Time Prata"} ds)]
+
+      (db.match/insert-match {:pelada-id pelada-id
+                              :home-team-id t1-id
+                              :away-team-id t2-id
+                              :sequence 1
+                              :status "scheduled"
+                              :support-camera-player-id p1-id
+                              :support-stats-player-id p2-id} ds)
+
+      (testing "Sends dedicated support lineup notification with user mentions"
+        (let [sent-calls (atom [])]
+          (with-redefs [waha/send-message (fn [config msg mentions]
+                                            (swap! sent-calls conj {:config config :msg msg :mentions mentions}))]
+            (notifications/send-notification! org-id :support-lineup {:pelada-id pelada-id} ds)
+
+            (is (= 1 (count @sent-calls)))
+            (let [{:keys [msg mentions]} (first @sent-calls)]
+              (is (str/includes? msg "ESCALAÇÃO DE SUPORTE"))
+              (is (str/includes? msg "Jogo 1 - Time Ouro x Time Prata"))
+              (is (str/includes? msg "• 📹 Câmera: @5511911112222 (Camera Player)"))
+              (is (str/includes? msg "• 📝 Súmula: @5511933334444 (Stats Player)"))
+              (is (= #{"5511911112222@c.us" "5511933334444@c.us"} (set mentions)))))))
+
+      (testing "Resending support lineup notification via controller.organization"
+        (let [sent-calls (atom [])]
+          (with-redefs [waha/send-message (fn [config msg mentions]
+                                            (swap! sent-calls conj {:config config :msg msg :mentions mentions}))]
+            (controller.organization/resend-notification org-id "support-lineup" pelada-id ds)
+
+            (is (= 1 (count @sent-calls)))
+            (let [{:keys [msg mentions]} (first @sent-calls)]
+              (is (str/includes? msg "ESCALAÇÃO DE SUPORTE"))
+              (is (= #{"5511911112222@c.us" "5511933334444@c.us"} (set mentions))))))))))
 

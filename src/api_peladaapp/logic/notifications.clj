@@ -1,8 +1,11 @@
 (ns api-peladaapp.logic.notifications
   (:require
    [api-peladaapp.db.attendance :as db.attendance]
+   [api-peladaapp.db.match :as db.match]
    [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.db.pelada :as db.pelada]
+   [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.db.team :as db.team]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.time :as helpers.time]
@@ -292,7 +295,7 @@
     (str title "Confira os destaques no link abaixo:\n" link)))
 
 (defn- format-mention [player]
-  (let [name (:player-name player)
+  (let [name (or (:player-name player) (:player_name player) (:name player))
         words (str/split (or name "") #"\s+")
         short-name (str/join " " (take 2 words))
         jid (some-> (:phone player) waha/normalize-phone)]
@@ -302,6 +305,61 @@
 
 (defn- generate-pelada-link [pelada-id]
   (str (get-base-url) "/peladas/" pelada-id))
+
+(defn- format-support-match [team-map players-by-id idx m]
+  (let [home-name (get team-map (or (:home-team-id m) (:home_team_id m) (:home m)) "Time A")
+        away-name (get team-map (or (:away-team-id m) (:away_team_id m) (:away m)) "Time B")
+        camera (get players-by-id (or (:support-camera-player-id m) (:support_camera_player_id m)))
+        stats (get players-by-id (or (:support-stats-player-id m) (:support_stats_player_id m)))
+        seq-num (or (:sequence m) (:sequence_num m) (inc idx))]
+    (str "*Jogo " seq-num " - " home-name " x " away-name "*\n"
+         "• 📹 Câmera: " (if camera (format-mention camera) "Não definido") "\n"
+         "• 📝 Súmula: " (if stats (format-mention stats) "Não definido"))))
+
+(defn generate-support-lineup-message [matches teams players-by-id]
+  (let [team-map (into {} (map (fn [t] [(or (:id t) (:team_id t)) (:name t)]) teams))
+        matches-str (->> (sort-by (fn [m] (or (:sequence m) (:sequence_num m) 0)) matches)
+                         (map-indexed (partial format-support-match team-map players-by-id))
+                         (str/join "\n\n"))]
+    (str "🎥 *ESCALAÇÃO DE SUPORTE* 📋\n\n"
+         "Escala de apoio para gravação e súmula das partidas:\n\n"
+         matches-str)))
+
+(defn- match-support-ids [m]
+  (let [camera-id (or (:support-camera-player-id m) (:support_camera_player_id m))
+        stats-id (or (:support-stats-player-id m) (:support_stats_player_id m))]
+    (remove nil? [camera-id stats-id])))
+
+(defn- extract-phone-jids [players]
+  (->> players
+       (keep #(some-> (:phone %) waha/normalize-phone))
+       distinct
+       vec))
+
+(defn extract-support-lineup-mentions [matches players-by-id]
+  (->> matches
+       (mapcat match-support-ids)
+       (keep #(get players-by-id %))
+       extract-phone-jids))
+
+(defn- has-support-assignments? [matches]
+  (boolean (some #(seq (match-support-ids %)) matches)))
+
+(defn- prepare-support-lineup-data [pelada-id data db]
+  (let [matches (or (:matches data) (db.match/list-matches-by-pelada pelada-id db))
+        teams (or (:teams data) (db.team/list-pelada-teams pelada-id db))
+        players-by-id
+        (or (:players-by-id data)
+            (let [support-ids (->> matches
+                                   (mapcat match-support-ids)
+                                   distinct
+                                   vec)
+                  db-players (when (seq support-ids)
+                               (db.player/list-players-with-users-by-ids support-ids db))]
+              (into {} (map (fn [p] [(:player-id p) p]) db-players))))]
+    {:matches matches
+     :teams teams
+     :players-by-id players-by-id}))
 
 (defn generate-attendance-reminder [pelada-id pending-players]
   (let [title "⏰ *Lembrete de Presença!* ⏰\n\nAinda temos jogadores com presença pendente para a próxima pelada:\n\n"
@@ -438,6 +496,7 @@
       (let [enabled-key (case type
                           :new-pelada :waha-attendance-reminder-enabled
                           :start :waha-start-msg-enabled
+                          :support-lineup :waha-start-msg-enabled
                           :end :waha-end-msg-enabled
                           :vote-ended :waha-vote-ended-msg-enabled
                           :attendance-reminder :waha-attendance-reminder-enabled
@@ -447,39 +506,44 @@
             should-send? (or (:force? data) (get org enabled-key))]
         (when should-send?
           (when-not (= type :casual-priority-ended)
-            (let [message (case type
-                            :new-pelada (generate-new-pelada-message (:pelada-id data) (:scheduled-at data) (:confirmed-players data))
-                            :start (generate-start-message (:teams data) (:team-players data))
-                            :end (generate-end-message data)
-                            :vote-ended (generate-vote-ended-message (:pelada-id data))
-                            :attendance-reminder (generate-attendance-reminder (:pelada-id data) (:pending-players data))
-                            :priority-ending (generate-priority-ending-reminder (:pelada-id data) (:limit-hours data) (:pending-players data))
-                            :vote-reminder (generate-vote-reminder (:pelada-id data) (:pending-voters data)))
-                  mentions (case type
-                             :attendance-reminder (->> (:pending-players data)
-                                                       (keep #(some-> (:phone %) waha/normalize-phone))
-                                                       vec)
-                             :priority-ending (->> (:pending-players data)
-                                                   (keep #(some-> (:phone %) waha/normalize-phone))
-                                                   vec)
-                             :vote-reminder (->> (:pending-voters data)
-                                                 (keep #(some-> (:phone %) waha/normalize-phone))
-                                                 vec)
-                             nil)
-                  use-all? (:waha-use-all-mention org)
-                  all-mention? (and (contains? all-mention-types type)
-                                    use-all?)
-                  final-mentions (if all-mention?
-                                   (conj mentions "all")
-                                   mentions)
-                  final-message (if all-mention?
-                                  (str/replace message #"!\*" "! @all*")
-                                  message)]
-              (waha/send-message org final-message final-mentions)
-              (when (= type :start)
-                (let [team-names (map :name (:teams data))]
-                  (waha/send-poll org "Quem será o campeão?" team-names false)))
-              (when (= type :end)
-                (let [results-message (generate-matches-results-message data)]
-                  (waha/send-message org results-message nil)))))
+            (let [support-data (when (= type :support-lineup)
+                                 (prepare-support-lineup-data (:pelada-id data) data db))
+                  matches (if (= type :support-lineup) (:matches support-data) (:matches data))
+                  teams (if (= type :support-lineup) (:teams support-data) (:teams data))
+                  players-by-id (when (= type :support-lineup) (:players-by-id support-data))
+                  has-support? (if (= type :support-lineup)
+                                 (or (:force? data) (has-support-assignments? matches))
+                                 true)]
+              (when has-support?
+                (let [message (case type
+                                :new-pelada (generate-new-pelada-message (:pelada-id data) (:scheduled-at data) (:confirmed-players data))
+                                :start (generate-start-message (:teams data) (:team-players data))
+                                :support-lineup (generate-support-lineup-message matches teams players-by-id)
+                                :end (generate-end-message data)
+                                :vote-ended (generate-vote-ended-message (:pelada-id data))
+                                :attendance-reminder (generate-attendance-reminder (:pelada-id data) (:pending-players data))
+                                :priority-ending (generate-priority-ending-reminder (:pelada-id data) (:limit-hours data) (:pending-players data))
+                                :vote-reminder (generate-vote-reminder (:pelada-id data) (:pending-voters data)))
+                      mentions (case type
+                                 :attendance-reminder (extract-phone-jids (:pending-players data))
+                                 :priority-ending (extract-phone-jids (:pending-players data))
+                                 :vote-reminder (extract-phone-jids (:pending-voters data))
+                                 :support-lineup (extract-support-lineup-mentions matches players-by-id)
+                                 nil)
+                      use-all? (:waha-use-all-mention org)
+                      all-mention? (and (contains? all-mention-types type)
+                                        use-all?)
+                      final-mentions (if all-mention?
+                                       (conj mentions "all")
+                                       mentions)
+                      final-message (if all-mention?
+                                      (str/replace message #"!\*" "! @all*")
+                                      message)]
+                  (waha/send-message org final-message final-mentions)
+                  (when (= type :start)
+                    (let [team-names (map :name (:teams data))]
+                      (waha/send-poll org "Quem será o campeão?" team-names false)))
+                  (when (= type :end)
+                    (let [results-message (generate-matches-results-message data)]
+                      (waha/send-message org results-message nil)))))))
           (send-private-casual-player-notifications! org type data db))))))

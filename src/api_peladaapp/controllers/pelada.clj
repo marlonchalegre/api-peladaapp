@@ -242,10 +242,14 @@
     (future
       (try
         (let [pelada (:pelada result)
+              org-id (:organization-id pelada)
               teams (db.team/list-pelada-teams pelada-id db)
               team-players (db.team/list-team-players-with-names-by-pelada pelada-id db)]
-          (notifications/send-notification! (:organization-id pelada) :start {:teams teams :team-players team-players} db))
-        (catch Exception e (log/error e "Error sending start notification:"))))
+          (notifications/send-notification! org-id :start {:teams teams :team-players team-players} db)
+          ;; Pacing interval to ensure WAHA delivers the start announcement before the support lineup in chat
+          (Thread/sleep 1000)
+          (notifications/send-notification! org-id :support-lineup {:pelada-id pelada-id :teams teams} db))
+        (catch Exception e (log/error e "Error sending start/support notification:"))))
 
     {:matches-created (:matches-created result)}))
 

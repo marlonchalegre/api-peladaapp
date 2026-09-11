@@ -141,3 +141,17 @@
         :count
         int)))
 
+(s/defn list-players-with-users-by-ids :- [s/Any]
+  [player-ids :- [s/Uuid]
+   db]
+  (if (empty? player-ids)
+    []
+    (let [query (-> (h/select [:op.id :player_id] [:u.name :player_name] :u.phone)
+                    (h/from [:OrganizationPlayers :op])
+                    (h/join [:Users :u] [:= :op.user_id :u.id])
+                    (h/where [:in :op.id player-ids]))]
+      (->> (jdbc/execute! db (hsql/format query) hsql/opts)
+           (mapv (fn [r] {:player-id (:player_id r)
+                          :player-name (:player_name r)
+                          :phone (:phone r)}))))))
+
