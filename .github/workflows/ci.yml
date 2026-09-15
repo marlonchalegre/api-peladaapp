@@ -1,16 +1,13 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
-  push:
+  pull_request:
     branches: [ main ]
-    tags: [ 'v*' ]
 
 jobs:
   test:
     name: Test & Lint
     runs-on: ubuntu-latest
-    # The summary step below comments on the PR, which the default read-only
-    # token cannot do.
     permissions:
       contents: read
       pull-requests: write
@@ -142,85 +139,11 @@ jobs:
           echo "$SUMMARY" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-  build-and-push:
-    name: Build Image
-    needs: test
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v6
-        with:
-          images: ghcr.io/${{ github.repository }}
-          tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=sha,format=long
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-
-      - name: Build and push
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: true
-          platforms: linux/amd64,linux/arm64
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          provenance: false
-          sbom: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  deploy:
-    name: Update Cluster
-    needs: build-and-push
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to Kubernetes
-        id: deploy
-        env:
-          IMAGE_TAG: ghcr.io/${{ github.repository }}:latest
-          KUBECONFIG: ~/.kube/config
-        continue-on-error: true
-        run: |
-          echo "${{ secrets.KUBECONFIG }}" | base64 -d > /tmp/kubeconfig
-          chmod 600 /tmp/kubeconfig
-          export KUBECONFIG=/tmp/kubeconfig
-          kubectl rollout restart deployment/backend -n peladaapp
-          kubectl rollout status deployment/backend -n peladaapp --timeout=90s
-
-      - name: Generate Deployment Summary
+      - name: Post PR Comment
         if: always()
-        run: |
-          echo "### 🚀 Deployment Summary (API)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Resource | Status | Namespace |" >> $GITHUB_STEP_SUMMARY
-          echo "| :--- | :--- | :--- |" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "${{ steps.deploy.outcome }}" == "success" ]; then
-            echo "| 🚢 deployment/backend | ✅ Rolled out | peladaapp |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| 🚢 deployment/backend | ❌ Failed/Timeout | peladaapp |" >> $GITHUB_STEP_SUMMARY
-          fi
+        continue-on-error: true
+        uses: mshick/add-pr-comment@v2
+        with:
+          message: ${{ steps.summary.outputs.content }}
+          message-id: api-test-lint-summary
+          allow-repeats: false
