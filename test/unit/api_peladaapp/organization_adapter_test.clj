@@ -62,3 +62,31 @@
                  :default-max-players 18}
           resp (adapter.organization/model->response model)]
       (is (= 18 (:default_max_players resp))))))
+
+(deftest test-default-location-adapter-mapping
+  (testing "db->model maps default_location"
+    (let [db-row {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                  :name "Test Org"
+                  :default_location "Arena Central · Quadra 1"}
+          model (adapter.organization/db->model db-row)]
+      (is (= "Arena Central · Quadra 1" (:default-location model)))))
+
+  (testing "update-request->model maps default_location"
+    (let [req {:name "Updated Org"
+               :default_location "Arena Vila Nova"}
+          model (adapter.organization/update-request->model req)]
+      (is (= "Arena Vila Nova" (:default-location model)))))
+
+  (testing "model->response maps default-location"
+    (let [model {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                 :name "Test Org"
+                 :default-location "Arena Show"}
+          resp (adapter.organization/model->response model)]
+      (is (= "Arena Show" (:default_location resp)))))
+
+  (testing "model->db maps default-location"
+    (let [model {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                 :name "Test Org"
+                 :default-location "Arena Show"}
+          db-map (adapter.organization/model->db model)]
+      (is (= "Arena Show" (:default_location db-map))))))

@@ -15,7 +15,8 @@
                                     :name (:name organization)
                                     :owner_id (:owner-id organization)
                                     :priority_confirmation_limit_hours (:priority-confirmation-limit-hours organization)
-                                    :default_max_players (:default-max-players organization))
+                                    :default_max_players (:default-max-players organization)
+                                    :default_location (:default-location organization))
         query (-> (h/insert-into :Organizations)
                   (h/values [row])
                   (h/returning :id))]
@@ -26,11 +27,15 @@
    organization
    db]
   (jdbc/with-transaction [tx db]
-    (let [org-row (medley.core/assoc-some {}
-                                          :name (:name organization)
-                                          :owner_id (:owner-id organization)
-                                          :priority_confirmation_limit_hours (:priority-confirmation-limit-hours organization)
-                                          :default_max_players (:default-max-players organization))
+    (let [org-row (cond-> (medley.core/assoc-some {}
+                                                  :name (:name organization)
+                                                  :owner_id (:owner-id organization))
+                    (contains? organization :priority-confirmation-limit-hours)
+                    (assoc :priority_confirmation_limit_hours (:priority-confirmation-limit-hours organization))
+                    (contains? organization :default-max-players)
+                    (assoc :default_max_players (:default-max-players organization))
+                    (contains? organization :default-location)
+                    (assoc :default_location (:default-location organization)))
           _ (when (seq org-row)
               (jdbc/execute! tx (hsql/format (-> (h/update :Organizations)
                                                  (h/set org-row)
@@ -197,6 +202,115 @@
                         (h/left-join [:PlayerRatings :pr] [:= :ap.player_id :pr.player_id])
                         (h/group-by :ap.player_id :u.id :u.name :u.position :u.avatar_filename :pp.peladas_count :pr.avg_rating :pe.event_type))]
     (jdbc/execute! db (hsql/format final-query) hsql/opts)))
+
+(s/defn list-closed-peladas-for-history
+  "Closed peladas of an organization (optionally filtered by `year`), with the
+   number of finished matches and participating players."
+  [organization-id :- s/Uuid year :- s/Int db]
+  (let [id-uuid [:cast organization-id :uuid]
+        query (-> (h/select :p.id :p.scheduled_at :p.location :p.max_players
+                            [[:count [:distinct :m.id]] :matches_count]
+                            [[:count [:distinct :tp.player_id]] :players_count])
+                  (h/from [:Peladas :p])
+                  (h/left-join [:Matches :m] [:= :m.pelada_id :p.id])
+                  (h/left-join [:Teams :t] [:= :t.pelada_id :p.id])
+                  (h/left-join [:TeamPlayers :tp] [:= :tp.team_id :t.id])
+                  (h/where (cond-> [:and [:= :p.organization_id id-uuid]
+                                    [:= :p.status [:cast "closed" :pelada_status]]]
+                             (pos? year) (conj [:= [:to_char :p.scheduled_at "YYYY"] (str year)])))
+                  (h/group-by :p.id :p.scheduled_at :p.location :p.max_players)
+                  (h/order-by [:p.scheduled_at :desc]))]
+    (jdbc/execute! db (hsql/format query) hsql/opts)))
+
+(s/defn list-finished-matches-by-peladas :- [s/Any]
+  [pelada-ids db]
+  (when (seq pelada-ids)
+    (let [query (-> (h/select :pelada_id :home_team_id :away_team_id :home_score :away_score)
+                    (h/from :Matches)
+                    (h/where [:and [:= :status [:cast "finished" :match_status]]
+                              [:in :pelada_id pelada-ids]]))]
+      (jdbc/execute! db (hsql/format query) hsql/opts))))
+
+(s/defn list-teams-by-peladas :- [s/Any]
+  [pelada-ids db]
+  (when (seq pelada-ids)
+    (let [query (-> (h/select :id :pelada_id :name)
+                    (h/from :Teams)
+                    (h/where [:in :pelada_id pelada-ids]))]
+      (jdbc/execute! db (hsql/format query) hsql/opts))))
+
+(s/defn list-team-players-by-peladas :- [s/Any]
+  [pelada-ids db]
+  (when (seq pelada-ids)
+    (let [query (-> (h/select [:t.pelada_id :pelada_id]
+                              [:tp.team_id :team_id]
+                              [:tp.player_id :player_id])
+                    (h/from [:TeamPlayers :tp])
+                    (h/join [:Teams :t] [:= :t.id :tp.team_id])
+                    (h/where [:in :t.pelada_id pelada-ids]))]
+      (jdbc/execute! db (hsql/format query) hsql/opts))))
+
+(s/defn list-closed-peladas-with-team-ids :- [s/Any]
+  "Closed peladas of an organization (optionally a `year`) that have teams,
+   used to derive the night's champion."
+  [organization-id :- s/Uuid year :- s/Int db]
+  (let [id-uuid [:cast organization-id :uuid]
+        query (-> (h/select :p.id)
+                  (h/from [:Peladas :p])
+                  (h/where (cond-> [:and [:= :p.organization_id id-uuid]
+                                    [:= :p.status [:cast "closed" :pelada_status]]]
+                             (pos? year) (conj [:= [:to_char :p.scheduled_at "YYYY"] (str year)]))))]
+    (jdbc/execute! db (hsql/format query) hsql/opts)))
+
+(s/defn list-weekly-presence
+  "Number of confirmed attendances per ISO week for the organization, oldest
+   first, for the last `weeks` weeks that have any attendance."
+  [organization-id :- s/Uuid weeks :- s/Int db]
+  (let [id-uuid [:cast organization-id :uuid]
+        query (-> (h/select [[:raw "to_char(date_trunc('week', p.scheduled_at), 'YYYY-MM-DD')"] :week_start]
+                            [[:count :*] :confirmed])
+                  (h/from [:Attendance :a])
+                  (h/join [:Peladas :p] [:= :p.id :a.pelada_id])
+                  (h/where [:and [:= :p.organization_id id-uuid]
+                            [:= :a.status [:cast "confirmed" :attendance_status]]])
+                  (h/group-by [:raw "date_trunc('week', p.scheduled_at)"])
+                  (h/order-by [[:raw "date_trunc('week', p.scheduled_at)"] :desc])
+                  (h/limit weeks))]
+    (->> (jdbc/execute! db (hsql/format query) hsql/opts)
+         (map (fn [r] {:week_start (:week_start r) :confirmed (int (:confirmed r))}))
+         (reverse)
+         vec)))
+
+(s/defn list-participant-lines-by-peladas :- [s/Any]
+  "Per-player line of each pelada based on real participation (the team roster),
+   with own scouts (defaulting to zero), the team they played for and their
+   average vote stars. Players who played without scoring are still included."
+  [pelada-ids db]
+  (when (seq pelada-ids)
+    (let [query (-> (h/select [:t.pelada_id :pelada_id]
+                              [:tp.player_id :player_id]
+                              [:op.user_id :user_id]
+                              [:u.name :player_name]
+                              [:u.position :player_position]
+                              :u.avatar_filename
+                              [[:coalesce :ps.goals 0] :goals]
+                              [[:coalesce :ps.assists 0] :assists]
+                              [[:coalesce :ps.own_goals 0] :own_goals]
+                              [:t.id :team_id]
+                              [[:avg :v.stars] :avg_stars]
+                              [[:count :v.id] :vote_count])
+                    (h/from [:TeamPlayers :tp])
+                    (h/join [:Teams :t] [:= :t.id :tp.team_id])
+                    (h/join [:OrganizationPlayers :op] [:= :op.id :tp.player_id])
+                    (h/join [:Users :u] [:= :u.id :op.user_id])
+                    (h/left-join [:PeladaPlayerStats :ps] [:and [:= :ps.pelada_id :t.pelada_id]
+                                                           [:= :ps.player_id :tp.player_id]])
+                    (h/left-join [:Votes :v] [:and [:= :v.pelada_id :t.pelada_id]
+                                              [:= :v.target_id :tp.player_id]])
+                    (h/where [:in :t.pelada_id pelada-ids])
+                    (h/group-by :t.pelada_id :tp.player_id :op.user_id :u.name :u.position
+                                :u.avatar_filename :t.id :ps.goals :ps.assists :ps.own_goals))]
+      (jdbc/execute! db (hsql/format query) hsql/opts))))
 
 (s/defn update-organization-flags :- s/Int
   "Update organization flags (is_blocked) in the database"

@@ -85,6 +85,28 @@
        (catch NumberFormatException _ (bad-request "Invalid ID or Year format"))
        (catch Exception e (exception/api-exception-handler e))))
 
+(defn get-history [request]
+  (try (let [db (:database request)
+             id (misc/as-uuid (get-in request [:params :id]))
+             year (or (some-> (get-in request [:query-params "year"]) str Integer/parseInt) 0)
+             user-id (auth/get-user-id-from-request request)]
+         (auth/require-organization-member! user-id id db)
+         (-> (controller.organization/get-history id user-id year db)
+             ok))
+       (catch NumberFormatException _ (bad-request "Invalid ID or Year format"))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn get-weekly-presence [request]
+  (try (let [db (:database request)
+             id (misc/as-uuid (get-in request [:params :id]))
+             weeks (or (some-> (get-in request [:query-params "weeks"]) str Integer/parseInt) 12)
+             user-id (auth/get-user-id-from-request request)]
+         (auth/require-organization-member! user-id id db)
+         (-> (controller.organization/get-weekly-presence id weeks db)
+             ok))
+       (catch NumberFormatException _ (bad-request "Invalid ID or Weeks format"))
+       (catch Exception e (exception/api-exception-handler e))))
+
 (defn invite [request]
   (try (let [db (:database request)
              organization-id (misc/as-uuid (get-in request [:params :id]))

@@ -48,6 +48,7 @@
     (GET "/users" [] handler.user/list-all)
     (GET "/users/search" [] handler.user/search)
     (GET "/user/:id" [] handler.user/get-by-id)
+    (GET "/user/:id/profile-dashboard" [] handler.user/profile-dashboard)
     (PUT "/user/:id/profile" [] handler.user/update-profile)
     (DELETE "/user/:id" [] handler.user/delete)
     (POST "/user/:id/reset-password" [] handler.user/reset-password)
@@ -116,6 +117,8 @@
     (DELETE "/organizations/:id" [] handler.organization/delete)
     (POST "/organizations/:id/leave" [] handler.organization/leave)
     (GET "/organizations/:id/statistics" [] handler.organization/get-statistics)
+    (GET "/organizations/:id/history" [] handler.organization/get-history)
+    (GET "/organizations/:id/weekly-presence" [] handler.organization/get-weekly-presence)
     (GET "/organizations/:id/manual-stats" [] handler.manual-stats/list-manual-stats)
     (POST "/organizations/:id/manual-stats" [] handler.manual-stats/upsert-manual-stats)
 

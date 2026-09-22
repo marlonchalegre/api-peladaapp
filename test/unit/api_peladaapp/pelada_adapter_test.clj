@@ -75,3 +75,58 @@
                  :max-players 16}
           resp (adapter.pelada/model->response model)]
       (is (= 16 (:max_players resp))))))
+
+(deftest test-location-pelada-adapter-mapping
+  (testing "db->model maps location, confirmed_count and confirmed_preview"
+    (let [db-row {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                  :organization_id (parse-uuid "00000000-0000-0000-0000-000000000010")
+                  :location "Arena Vila Nova · Q2"
+                  :confirmed_count 3
+                  :confirmed_preview "Ana|Bia|Caio"}
+          model (adapter.pelada/db->model db-row)]
+      (is (= "Arena Vila Nova · Q2" (:location model)))
+      (is (= 3 (:confirmed-count model)))
+      (is (= "Ana|Bia|Caio" (:confirmed-preview model)))))
+
+  (testing "db->model omits nil preview (no confirmations yet)"
+    (let [model (adapter.pelada/db->model {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                                           :organization_id (parse-uuid "00000000-0000-0000-0000-000000000010")
+                                           :location nil
+                                           :confirmed_count 0
+                                           :confirmed_preview nil})]
+      (is (not (contains? model :location)))
+      (is (= 0 (:confirmed-count model)))
+      (is (not (contains? model :confirmed-preview)))))
+
+  (testing "create-request->model maps location"
+    (let [model (adapter.pelada/create-request->model {:organization_id "00000000-0000-0000-0000-000000000010"
+                                                       :location "Quadra do Parque"})]
+      (is (= "Quadra do Parque" (:location model)))))
+
+  (testing "create-request->model omits location when not provided"
+    (let [model (adapter.pelada/create-request->model {:organization_id "00000000-0000-0000-0000-000000000010"})]
+      (is (not (contains? model :location)))))
+
+  (testing "update-request->model maps location"
+    (let [model (adapter.pelada/update-request->model {:location "Nova Arena"})]
+      (is (= "Nova Arena" (:location model)))))
+
+  (testing "model->response maps location and confirmation summary"
+    (let [model {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                 :organization-id (parse-uuid "00000000-0000-0000-0000-000000000010")
+                 :scheduled-at "2026-06-03T19:00:00Z"
+                 :status "attendance"
+                 :location "Rua das Flores, 10"
+                 :confirmed-count 2
+                 :confirmed-preview "Ana|Bia"}
+          resp (adapter.pelada/model->response model)]
+      (is (= "Rua das Flores, 10" (:location resp)))
+      (is (= 2 (:confirmed_count resp)))
+      (is (= "Ana|Bia" (:confirmed_preview resp)))))
+
+  (testing "model->response omits location when absent"
+    (let [resp (adapter.pelada/model->response {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                                                :organization-id (parse-uuid "00000000-0000-0000-0000-000000000010")
+                                                :scheduled-at "2026-06-03T19:00:00Z"
+                                                :status "attendance"})]
+      (is (not (contains? resp :location))))))
