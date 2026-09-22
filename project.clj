@@ -25,7 +25,7 @@
                  [clj-http "3.13.1"]
                  [com.draines/postal "2.0.5"]
                  [com.stuartsierra/component "1.2.0"]
-                 [hikari-cp "3.3.0"]
+                 [hikari-cp "4.1.0"]
                  [migratus "1.6.7"]
                  [org.clojure/tools.logging "1.3.1"]
                  [ch.qos.logback/logback-classic "1.6.3"]
