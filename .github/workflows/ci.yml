@@ -31,12 +31,12 @@ jobs:
           --health-retries 5
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Setup Java
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
-          java-version: '23'
+          java-version: '25'
           distribution: 'temurin'
 
       - name: Setup Clojure
@@ -46,7 +46,7 @@ jobs:
           clj-kondo: 'latest'
 
       - name: Cache dependencies
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.m2/repository
           key: ${{ runner.os }}-maven-${{ hashFiles('project.clj') }}
@@ -142,7 +142,7 @@ jobs:
       - name: Post PR Comment
         if: always()
         continue-on-error: true
-        uses: mshick/add-pr-comment@v2
+        uses: mshick/add-pr-comment@v3
         with:
           message: ${{ steps.summary.outputs.content }}
           message-id: api-test-lint-summary
