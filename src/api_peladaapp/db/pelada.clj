@@ -138,6 +138,24 @@
         :count
         int)))
 
+(def ^:private confirmed-preview-sql
+  ;; Mirrors the attendance roster order (member type priority, then FIFO) so the
+  ;; card preview shows the same players as the top of the confirmed list. Names
+  ;; are pipe-delimited, so pipes inside a name are replaced to keep the split safe.
+  (str "(SELECT string_agg(preview.name, '|' ORDER BY preview.position) FROM ("
+       "SELECT replace(u2.name, '|', ' ') AS name, "
+       "row_number() OVER (ORDER BY "
+       "CASE op2.member_type::text "
+       "WHEN 'mensalista' THEN 0 WHEN 'mensalista_temporario' THEN 0 "
+       "WHEN 'diarista' THEN 1 WHEN 'diarista_temporario' THEN 1 "
+       "WHEN 'convidado' THEN 2 ELSE 3 END, "
+       "at_p.updated_at ASC, u2.name ASC) AS position "
+       "FROM \"Attendance\" at_p "
+       "JOIN \"OrganizationPlayers\" op2 ON op2.id = at_p.player_id "
+       "JOIN \"Users\" u2 ON u2.id = op2.user_id "
+       "WHERE at_p.pelada_id = p.id AND at_p.status = 'confirmed' "
+       "ORDER BY position LIMIT 4) preview)"))
+
 (s/defn list-peladas-by-user :- [s/Any]
   [user-id :- s/Uuid
    limit :- s/Int
@@ -146,7 +164,7 @@
   (let [one-day-ago (-> (Instant/now) (.minus (Duration/ofDays 1)) Timestamp/from)
         query (-> (h/select :p.* [:o.name :organization_name] [:a.status :user_attendance_status]
                             [[:raw "(SELECT count(*) FROM \"Attendance\" at_c WHERE at_c.pelada_id = p.id AND at_c.status = 'confirmed')"] :confirmed_count]
-                            [[:raw "(SELECT string_agg(preview.name, '|') FROM (SELECT u2.name AS name FROM \"Attendance\" at_p JOIN \"OrganizationPlayers\" op2 ON op2.id = at_p.player_id JOIN \"Users\" u2 ON u2.id = op2.user_id WHERE at_p.pelada_id = p.id AND at_p.status = 'confirmed' ORDER BY at_p.updated_at ASC LIMIT 4) preview)"] :confirmed_preview])
+                            [[:raw confirmed-preview-sql] :confirmed_preview])
                   (h/from [:Peladas :p])
                   (h/join [:OrganizationPlayers :op] [:= :op.organization_id :p.organization_id])
                   (h/join [:Organizations :o] [:= :o.id :p.organization_id])

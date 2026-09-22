@@ -14,15 +14,18 @@
 (defn- exec! [ds query]
   (jdbc/execute! ds (hsql/format query) {:builder-fn rs/as-unqualified-lower-maps}))
 
-(defn- add-member! [ds org-id user-id]
-  (or (th/player-id-by-user-id ds user-id org-id)
-      (do
-        (exec! ds (-> (h/insert-into :OrganizationPlayers)
-                      (h/values [{:organization_id org-id
-                                  :user_id user-id
-                                  :grade 5.0
-                                  :member_type [:cast "diarista" :member_type]}])))
-        (th/player-id-by-user-id ds user-id org-id))))
+(defn- add-member!
+  ([ds org-id user-id]
+   (add-member! ds org-id user-id "diarista"))
+  ([ds org-id user-id member-type]
+   (or (th/player-id-by-user-id ds user-id org-id)
+       (do
+         (exec! ds (-> (h/insert-into :OrganizationPlayers)
+                       (h/values [{:organization_id org-id
+                                   :user_id user-id
+                                   :grade 5.0
+                                   :member_type [:cast member-type :member_type]}])))
+         (th/player-id-by-user-id ds user-id org-id)))))
 
 (deftest pelada-location-round-trip-test
   (let [app (-> th/*test-system* :app :app-handler)
@@ -104,6 +107,44 @@
       (is (= earliest-four (set preview-names))))
     (testing "location travels through the list endpoint too"
       (is (= "Campo Teste" (:location pelada))))))
+
+(deftest pelada-confirmed-preview-ordering-test
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
+        admin-token (th/register-and-login! app {:name "Order Admin" :email "order_admin@test.com" :password "pass123"})
+        admin-user-id (th/user-id-by-email ds "order_admin@test.com")
+        org-id (parse-uuid (:id (th/decode-body (app (-> (mock/request :post "/api/organizations")
+                                                         (mock/json-body {:name "Org Preview Order"})
+                                                         (th/auth-cookie admin-token))))))
+        pelada-id (:id (th/decode-body (app (-> (mock/request :post "/api/peladas")
+                                                (mock/json-body {:organization_id org-id
+                                                                 :scheduled_at "2026-09-25T19:00:00Z"})
+                                                (th/auth-cookie admin-token)))))
+        ;; Guests and casuals confirm first; monthly members confirm later.
+        confirmations [["Guest Early" "convidado"]
+                       ["Casual Early" "diarista"]
+                       ["Monthly A|B" "mensalista"]
+                       ["Monthly Temp" "mensalista_temporario"]
+                       ["Monthly Late" "mensalista"]]
+        _ (doseq [[idx [player-name member-type]] (map-indexed vector confirmations)]
+            (let [email (str "order_p" idx "@test.com")]
+              (th/register-and-login! app {:name player-name :email email :password "pass123"})
+              (exec! ds (-> (h/insert-into :Attendance)
+                            (h/values [{:pelada_id (parse-uuid pelada-id)
+                                        :player_id (add-member! ds org-id (th/user-id-by-email ds email) member-type)
+                                        :status [:cast "confirmed" :attendance_status]
+                                        :updated_at [[:cast (str "2026-09-2" idx " 10:00:00") :timestamp]]}])))))
+        body (th/decode-body (app (-> (mock/request :get (str "/api/users/" admin-user-id "/peladas"))
+                                      (th/auth-cookie admin-token))))
+        pelada (first (filter #(= pelada-id (:id %)) body))
+        preview-names (str/split (:confirmed_preview pelada) #"\|")]
+
+    (testing "the preview follows the attendance roster order: member type priority, then FIFO"
+      (is (= ["Monthly A B" "Monthly Temp" "Monthly Late" "Casual Early"] preview-names)))
+
+    (testing "a pipe inside a player's name does not break the delimited preview"
+      (is (= 4 (count preview-names))))))
 
 (deftest pelada-location-access-test
   (let [app (-> th/*test-system* :app :app-handler)
