@@ -37,7 +37,7 @@
   :profiles {:dev {:dependencies [[javax.servlet/servlet-api "2.5"]
                                   [org.clojure/tools.namespace "1.5.1"]
                                   [com.clojure-goes-fast/clj-async-profiler "1.8.0"]
-                                  [com.stuartsierra/component.repl "0.2.0"]
+                                  [com.stuartsierra/component.repl "1.0.0"]
                                   [clj-kondo "2026.08.04"]
                                   [com.github.clojure-lsp/clojure-lsp "2026.07.06-14.34.19"]]
                    :plugins [[com.github.clojure-lsp/lein-clojure-lsp "2.1.0"]
