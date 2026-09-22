@@ -1,4 +1,4 @@
-FROM clojure:temurin-23-lein
+FROM clojure:temurin-25-lein
 WORKDIR /app
 COPY project.clj ./
 RUN lein deps

@@ -26,6 +26,11 @@
       "description": "Group GitHub Actions updates",
       "matchManagers": ["github-actions"],
       "groupName": "GitHub Actions"
+    },
+    {
+      "description": "Restrict Postgres updates to version 15",
+      "matchPackageNames": ["postgres"],
+      "allowedVersions": "<16"
     }
   ]
 }

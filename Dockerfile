@@ -1,7 +1,7 @@
 # Multi-stage build for api-peladaapp
 
 # --- Builder image: builds the uberjar
-FROM --platform=$BUILDPLATFORM clojure:temurin-23-lein AS builder
+FROM --platform=$BUILDPLATFORM clojure:temurin-25-lein AS builder
 WORKDIR /app
 
 ENV LEIN_JVM_OPTS="-XX:MaxRAMPercentage=85.0 -XX:+UseSerialGC -XX:TieredStopAtLevel=1 -DSKIP_DB_INIT=true"
