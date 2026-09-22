@@ -264,7 +264,7 @@
                        (mock/cookie "authToken" token)))
         body1 (decode-body resp1)]
     (is (= 200 (:status resp1)))
-    (is (= {:goals 0 :assists 0 :matches 0} (:stats body1)))
+    (is (= {:goals 0 :assists 0 :matches 0 :attendance-rate nil :current-streak 0} (:stats body1)))
 
     ;; Now let's insert some mock manual stats and a completed match attendance
     (let [org-resp (app (-> (mock/request :post "/api/organizations")
@@ -305,5 +305,8 @@
       (is (= 200 (:status resp2)))
       (is (= 5 (get-in body2 [:stats :goals])))
       (is (= 3 (get-in body2 [:stats :assists])))
-      (is (= 1 (get-in body2 [:stats :matches]))))))
+      (is (= 1 (get-in body2 [:stats :matches])))
+      (testing "attendance-rate and current-streak reflect the confirmed closed pelada"
+        (is (= 100.0 (get-in body2 [:stats :attendance-rate])))
+        (is (= 1 (get-in body2 [:stats :current-streak])))))))
 

@@ -324,46 +324,125 @@
 
 (s/defn get-user-stats
   [user-id :- s/Uuid
-   db]
-  (let [user-uuid [:cast user-id :uuid]
-        current-year (.getYear (java.time.LocalDate/now))
-        year-str (str current-year)
+   db]  (let [user-uuid [:cast user-id :uuid]
+              current-year (.getYear (java.time.LocalDate/now))
+              year-str (str current-year)
         ;; 1. Goals and assists from PeladaPlayerStats
-        pelada-stats-query (-> (h/select [[:coalesce [:sum :ps.goals] 0] :goals]
-                                         [[:coalesce [:sum :ps.assists] 0] :assists])
-                               (h/from [:PeladaPlayerStats :ps])
-                               (h/join [:OrganizationPlayers :op] [:= :ps.player_id :op.id])
-                               (h/join [:Peladas :p] [:= :ps.pelada_id :p.id])
-                               (h/where [:and
-                                         [:= :op.user_id user-uuid]
-                                         [:= [:to_char :p.scheduled_at "YYYY"] year-str]]))
-        pelada-stats (jdbc/execute-one! db (hsql/format pelada-stats-query) hsql/opts)
+              pelada-stats-query (-> (h/select [[:coalesce [:sum :ps.goals] 0] :goals]
+                                               [[:coalesce [:sum :ps.assists] 0] :assists])
+                                     (h/from [:PeladaPlayerStats :ps])
+                                     (h/join [:OrganizationPlayers :op] [:= :ps.player_id :op.id])
+                                     (h/join [:Peladas :p] [:= :ps.pelada_id :p.id])
+                                     (h/where [:and
+                                               [:= :op.user_id user-uuid]
+                                               [:= [:to_char :p.scheduled_at "YYYY"] year-str]]))
+              pelada-stats (jdbc/execute-one! db (hsql/format pelada-stats-query) hsql/opts)
 
         ;; 2. Goals and assists from ManualStats
-        manual-stats-query (-> (h/select [[:coalesce [:sum :ms.goals] 0] :goals]
-                                         [[:coalesce [:sum :ms.assists] 0] :assists])
-                               (h/from [:ManualStats :ms])
-                               (h/join [:OrganizationPlayers :op] [:= :ms.player_id :op.id])
-                               (h/where [:and
-                                         [:= :op.user_id user-uuid]
-                                         [:= :ms.year current-year]]))
-        manual-stats (jdbc/execute-one! db (hsql/format manual-stats-query) hsql/opts)
+              manual-stats-query (-> (h/select [[:coalesce [:sum :ms.goals] 0] :goals]
+                                               [[:coalesce [:sum :ms.assists] 0] :assists])
+                                     (h/from [:ManualStats :ms])
+                                     (h/join [:OrganizationPlayers :op] [:= :ms.player_id :op.id])
+                                     (h/where [:and
+                                               [:= :op.user_id user-uuid]
+                                               [:= :ms.year current-year]]))
+              manual-stats (jdbc/execute-one! db (hsql/format manual-stats-query) hsql/opts)
 
         ;; 3. Attendance confirmed / matches played.
-        attendance-query (-> (h/select [[:count [:distinct :a.pelada_id]] :count])
-                             (h/from [:Attendance :a])
-                             (h/join [:OrganizationPlayers :op] [:= :a.player_id :op.id])
-                             (h/join [:Peladas :p] [:= :a.pelada_id :p.id])
-                             (h/where [:and
-                                       [:= :op.user_id user-uuid]
-                                       [:= :a.status [:cast "confirmed" :attendance_status]]
-                                       [:= :p.status [:cast "closed" :pelada_status]]
-                                       [:= [:to_char :p.scheduled_at "YYYY"] year-str]]))
-        attendance-count (:count (jdbc/execute-one! db (hsql/format attendance-query) hsql/opts))]
-    {:goals (+ (int (or (:goals pelada-stats) 0))
-               (int (or (:goals manual-stats) 0)))
-     :assists (+ (int (or (:assists pelada-stats) 0))
-                 (int (or (:assists manual-stats) 0)))
-     :matches (int (or attendance-count 0))}))
+              attendance-query (-> (h/select [[:count [:distinct :a.pelada_id]] :count])
+                                   (h/from [:Attendance :a])
+                                   (h/join [:OrganizationPlayers :op] [:= :a.player_id :op.id])
+                                   (h/join [:Peladas :p] [:= :a.pelada_id :p.id])
+                                   (h/where [:and
+                                             [:= :op.user_id user-uuid]
+                                             [:= :a.status [:cast "confirmed" :attendance_status]]
+                                             [:= :p.status [:cast "closed" :pelada_status]]
+                                             [:= [:to_char :p.scheduled_at "YYYY"] year-str]]))
+              attendance-count (:count (jdbc/execute-one! db (hsql/format attendance-query) hsql/opts))
+
+        ;; Decided peladas (confirmed or declined) for the attendance rate.
+              declined-query (-> (h/select [[:count [:distinct :a.pelada_id]] :count])
+                                 (h/from [:Attendance :a])
+                                 (h/join [:OrganizationPlayers :op] [:= :a.player_id :op.id])
+                                 (h/join [:Peladas :p] [:= :a.pelada_id :p.id])
+                                 (h/where [:and
+                                           [:= :op.user_id user-uuid]
+                                           [:= :a.status [:cast "declined" :attendance_status]]
+                                           [:= :p.status [:cast "closed" :pelada_status]]
+                                           [:= [:to_char :p.scheduled_at "YYYY"] year-str]]))
+              declined-count (:count (jdbc/execute-one! db (hsql/format declined-query) hsql/opts))
+              decided (+ (int (or attendance-count 0)) (int (or declined-count 0)))
+
+        ;; Consecutive most-recent closed peladas where the user confirmed.
+              streak-query (-> (h/select :a.status)
+                               (h/from [:Attendance :a])
+                               (h/join [:OrganizationPlayers :op] [:= :a.player_id :op.id])
+                               (h/join [:Peladas :p] [:= :a.pelada_id :p.id])
+                               (h/where [:and
+                                         [:= :op.user_id user-uuid]
+                                         [:= :p.status [:cast "closed" :pelada_status]]])
+                               (h/order-by [:p.scheduled_at :desc]))
+              streak-rows (jdbc/execute! db (hsql/format streak-query) hsql/opts)
+              current-streak (count (take-while #(= "confirmed" (some-> (:status %) name)) streak-rows))]
+          {:goals (+ (int (or (:goals pelada-stats) 0))
+                     (int (or (:goals manual-stats) 0)))
+           :assists (+ (int (or (:assists pelada-stats) 0))
+                       (int (or (:assists manual-stats) 0)))
+           :matches (int (or attendance-count 0))
+           :attendance-rate (when (pos? decided) (* 100.0 (/ (int (or attendance-count 0)) decided)))
+           :current-streak current-streak}))
+
+(s/defn get-user-skills
+  "Average of the player characteristics registered for this user across the
+   organizations they belong to, plus how many pelada ratings they received."
+  [user-id :- s/Uuid
+   db]
+  (let [user-uuid [:cast user-id :uuid]
+        chars-query (-> (h/select [[:avg :op.passing] :passing]
+                                  [[:avg :op.ball_control] :ball_control]
+                                  [[:avg :op.velocity] :velocity]
+                                  [[:avg :op.shooting] :shooting]
+                                  [[:avg :op.dribbling] :dribbling]
+                                  [[:avg :op.defending] :defending])
+                        (h/from [:OrganizationPlayers :op])
+                        (h/where [:= :op.user_id user-uuid]))
+        chars (jdbc/execute-one! db (hsql/format chars-query) hsql/opts)
+        ratings-query (-> (h/select [[:count :v.id] :ratings_count])
+                          (h/from [:Votes :v])
+                          (h/join [:OrganizationPlayers :op] [:= :v.target_id :op.id])
+                          (h/where [:= :op.user_id user-uuid]))
+        ratings (jdbc/execute-one! db (hsql/format ratings-query) hsql/opts)
+        ;; Characteristics are only meaningful once rated by an admin (1-5);
+        ;; treat the DB default of 0 as "not rated".
+        as-double #(let [value (some-> % double)]
+                     (when (and value (pos? value)) value))]
+    {:passing (as-double (:passing chars))
+     :ball_control (as-double (:ball_control chars))
+     :velocity (as-double (:velocity chars))
+     :shooting (as-double (:shooting chars))
+     :dribbling (as-double (:dribbling chars))
+     :defending (as-double (:defending chars))
+     :ratings_count (int (or (:ratings_count ratings) 0))}))
+
+(s/defn list-user-peladas-with-attendance
+  "Every pelada of the organizations this user belongs to (optionally a single
+   `year`), with the user's attendance status for it. Peladas the user has no
+   attendance record for keep a nil status."
+  [user-id :- s/Uuid
+   year :- s/Int
+   db]
+  (let [user-uuid [:cast user-id :uuid]
+        query (-> (h/select :p.id :p.scheduled_at :p.status
+                            [:a.status :attendance_status]
+                            [:o.id :organization_id]
+                            [:o.name :organization_name])
+                  (h/from [:OrganizationPlayers :op])
+                  (h/join [:Peladas :p] [:= :p.organization_id :op.organization_id])
+                  (h/join [:Organizations :o] [:= :o.id :p.organization_id])
+                  (h/left-join [:Attendance :a] [:and [:= :a.pelada_id :p.id] [:= :a.player_id :op.id]])
+                  (h/where (cond-> [:and [:= :op.user_id user-uuid]]
+                             (pos? year) (conj [:= [:to_char :p.scheduled_at "YYYY"] (str year)])))
+                  (h/order-by [:p.scheduled_at :desc]))]
+    (jdbc/execute! db (hsql/format query) hsql/opts)))
 
 

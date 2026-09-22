@@ -10,7 +10,7 @@
 
 (defn- request->model [request]
   (-> request
-      (select-keys [:name :priority_confirmation_limit_hours :default_max_players :waha_api_url :waha_instance :waha_group_id :waha_enabled :waha_start_msg_enabled :waha_end_msg_enabled :waha_attendance_reminder_enabled :waha_vote_reminder_enabled :waha_vote_ended_msg_enabled :waha_use_all_mention])
+      (select-keys [:name :priority_confirmation_limit_hours :default_max_players :default_location :waha_api_url :waha_instance :waha_group_id :waha_enabled :waha_start_msg_enabled :waha_end_msg_enabled :waha_attendance_reminder_enabled :waha_vote_reminder_enabled :waha_vote_ended_msg_enabled :waha_use_all_mention])
       (update-keys (comp keyword #(str/replace % "_" "-") name))))
 
 (s/defn create-request->model :- models.organization/Organization
@@ -24,14 +24,14 @@
 (s/defn model->response :- responses.organization/OrganizationResponse
   [model :- models.organization/Organization]
   (-> model
-      (select-keys [:id :name :owner-id :role :priority-confirmation-limit-hours :default-max-players :waha-api-url :waha-instance :waha-group-id :waha-enabled :waha-start-msg-enabled :waha-end-msg-enabled :waha-attendance-reminder-enabled :waha-vote-reminder-enabled :waha-vote-ended-msg-enabled :waha-use-all-mention :is-blocked])
+      (select-keys [:id :name :owner-id :role :priority-confirmation-limit-hours :default-max-players :default-location :waha-api-url :waha-instance :waha-group-id :waha-enabled :waha-start-msg-enabled :waha-end-msg-enabled :waha-attendance-reminder-enabled :waha-vote-reminder-enabled :waha-vote-ended-msg-enabled :waha-use-all-mention :is-blocked])
       (update-keys (comp keyword #(str/replace % "-" "_") name))))
 
 (s/defn db->model :- models.organization/Organization
   [o]
   (some-> o
           misc/unamespace
-          (select-keys [:id :name :role :owner_id :priority_confirmation_limit_hours :default_max_players :waha_api_url :waha_instance :waha_group_id :waha_enabled :waha_start_msg_enabled :waha_end_msg_enabled :waha_attendance_reminder_enabled :waha_vote_reminder_enabled :waha_vote_ended_msg_enabled :waha_use_all_mention :is_blocked])
+          (select-keys [:id :name :role :owner_id :priority_confirmation_limit_hours :default_max_players :default_location :waha_api_url :waha_instance :waha_group_id :waha_enabled :waha_start_msg_enabled :waha_end_msg_enabled :waha_attendance_reminder_enabled :waha_vote_reminder_enabled :waha_vote_ended_msg_enabled :waha_use_all_mention :is_blocked])
           (update-keys (comp keyword #(str/replace % "_" "-") name))
           (update :waha-enabled #(misc/to-bool % false))
           (update :waha-start-msg-enabled #(misc/to-bool % false))
@@ -43,7 +43,7 @@
           (update :is-blocked #(misc/to-bool % false))))
 (s/defn model->db [model :- models.organization/Organization]
   (-> model
-      (select-keys [:id :name :owner-id :priority-confirmation-limit-hours :default-max-players])
+      (select-keys [:id :name :owner-id :priority-confirmation-limit-hours :default-max-players :default-location])
       (update-keys (comp keyword #(str/replace % "-" "_") name))))
 
 (defn accept-invitation-response->frontend [result]

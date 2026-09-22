@@ -74,18 +74,29 @@
     (catch Exception e
       (exception/api-exception-handler e))))
 
-(defn update-profile [request]
+(defn profile-dashboard [request]
   (try
     (let [id (-> request :params :id parse-uuid)
-          body (-> request :body)
+          year (or (some-> (get-in request [:query-params "year"]) str Integer/parseInt) 0)
           db (-> request :database)]
       (auth/require-self-or-admin! request id)
-      (-> (adapter.user/update-profile-request->model body)
-          (controller.user/update-user-profile id db)
-          (adapter.user/model->response false)
-          responses/ok))
+      (responses/ok (controller.user/get-profile-dashboard id year db)))
+    (catch NumberFormatException _
+      (responses/bad-request "Invalid ID or Year format"))
     (catch Exception e
       (exception/api-exception-handler e))))
+
+(defn update-profile [request]  (try
+                                  (let [id (-> request :params :id parse-uuid)
+                                        body (-> request :body)
+                                        db (-> request :database)]
+                                    (auth/require-self-or-admin! request id)
+                                    (-> (adapter.user/update-profile-request->model body)
+                                        (controller.user/update-user-profile id db)
+                                        (adapter.user/model->response false)
+                                        responses/ok))
+                                  (catch Exception e
+                                    (exception/api-exception-handler e))))
 
 (defn delete [request]
   (try

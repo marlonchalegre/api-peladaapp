@@ -28,7 +28,9 @@
    (s/optional-key :receive-non-mensalista-updates) s/Bool
    (s/optional-key :stats) (s/maybe {:goals s/Int
                                      :assists s/Int
-                                     :matches s/Int})})
+                                     :matches s/Int
+                                     (s/optional-key :attendance-rate) (s/maybe s/Num)
+                                     (s/optional-key :current-streak) (s/maybe s/Int)})})
 
 (s/defschema UserProfileUpdate
   "Schema for user profile updates - excludes score and other protected fields"

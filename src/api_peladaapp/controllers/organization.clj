@@ -14,7 +14,9 @@
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.db.vote :as db.vote]
    [api-peladaapp.helpers.pagination :as pagination]
+   [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.notifications :as notifications]
+   [api-peladaapp.logic.pelada-summary :as logic.pelada-summary]
    [api-peladaapp.logic.waha :as waha]
    [api-peladaapp.models.organization :as models.organization]
    [clojure.string :as str]
@@ -245,14 +247,18 @@
   [user-id :- s/Uuid db]
   (db.organization/list-by-user user-id db))
 
+(declare compute-player-titles)
+
 (s/defn get-statistics
   [id :- s/Uuid
    year :- s/Int
    db]
-  (let [rows (db.organization/get-statistics id year db)]
+  (let [rows (db.organization/get-statistics id year db)
+        titles (compute-player-titles id year db)
+        participations (db.organization/list-closed-peladas-with-team-ids id year db)]
     (->> rows
          (group-by :player_id)
-         (map (fn [[_ player-rows]]
+         (map (fn [[player-id player-rows]]
                 (let [first-row (first player-rows)
                       base {:player_id (:player_id first-row)
                             :user_id (:user_id first-row)
@@ -261,6 +267,8 @@
                             :avatar_filename (:avatar_filename first-row)
                             :peladas_played (:peladas_count first-row)
                             :avg_rating (:avg_rating first-row)
+                            :titles (get titles player-id 0)
+                            :total_peladas (count participations)
                             :goal 0
                             :assist 0
                             :own_goal 0}]
@@ -270,6 +278,83 @@
                               acc))
                           base
                           player-rows)))))))
+
+(defn- compute-player-titles
+  "Counts how many times each player's team was the night's champion across the
+   organization's closed peladas (optionally a single `year`)."
+  [org-id year db]
+  (let [peladas (db.organization/list-closed-peladas-with-team-ids org-id year db)
+        pelada-ids (mapv :id peladas)]
+    (if (empty? pelada-ids)
+      {}
+      (let [teams (db.organization/list-teams-by-peladas pelada-ids db)
+            team-players (db.organization/list-team-players-by-peladas pelada-ids db)
+            matches (db.organization/list-finished-matches-by-peladas pelada-ids db)
+            standings (logic.pelada-summary/team-standings matches teams)
+            champion-by-pelada (into {}
+                                     (for [[pelada-id pelada-standings] standings
+                                           :let [champion (logic.pelada-summary/champion pelada-standings)]
+                                           :when champion]
+                                       [pelada-id (:team_id champion)]))
+            players-by-pelada-team (group-by (juxt :pelada_id :team_id) team-players)]
+        (reduce (fn [acc [pelada-id team-id]]
+                  (if (= team-id (get champion-by-pelada pelada-id))
+                    (reduce (fn [a tp] (update a (:player_id tp) (fnil inc 0)))
+                            acc
+                            (get players-by-pelada-team [pelada-id team-id]))
+                    acc))
+                {}
+                (keys players-by-pelada-team))))))
+
+(s/defn get-weekly-presence
+  [id :- s/Uuid weeks :- s/Int db]
+  (db.organization/list-weekly-presence id weeks db))
+
+(s/defn get-history
+  "History of the organization's closed peladas, with the night's champion and
+   team standings plus the requesting user's own scouts, final position and
+   awards (MVP / assist leader)."
+  [id :- s/Uuid
+   user-id :- s/Uuid
+   year :- s/Int
+   db]
+  (let [peladas (db.organization/list-closed-peladas-for-history id year db)
+        pelada-ids (mapv :id peladas)]
+    (if (empty? pelada-ids)
+      []
+      (let [matches (db.organization/list-finished-matches-by-peladas pelada-ids db)
+            teams (db.organization/list-teams-by-peladas pelada-ids db)
+            participants (db.organization/list-participant-lines-by-peladas pelada-ids db)
+            standings-by-pelada (logic.pelada-summary/team-standings matches teams)
+            participants-by-pelada (group-by :pelada_id participants)]
+        (mapv (fn [pelada]
+                (let [pelada-id (:id pelada)
+                      standings (get standings-by-pelada pelada-id [])
+                      line-participants (get participants-by-pelada pelada-id [])
+                      champ (logic.pelada-summary/champion standings)
+                      awards (logic.pelada-summary/awards line-participants)
+                      user-line (first (filter #(= (:user_id %) user-id) line-participants))
+                      user-standing (when user-line
+                                      (first (filter #(= (:team_id %) (:team_id user-line)) standings)))]
+                  {:id pelada-id
+                   :scheduled_at (some-> (:scheduled_at pelada) helpers.time/->instant str)
+                   :location (:location pelada)
+                   :max_players (:max_players pelada)
+                   :matches_count (int (or (:matches_count pelada) 0))
+                   :players_count (int (or (:players_count pelada) 0))
+                   :champion_team_name (:team_name champ)
+                   :user (when user-line
+                           {:player_id (:player_id user-line)
+                            :player_name (:player_name user-line)
+                            :team_name (:team_name user-standing)
+                            :team_position (:position user-standing)
+                            :goals (int (or (:goals user-line) 0))
+                            :assists (int (or (:assists user-line) 0))
+                            :own_goals (int (or (:own_goals user-line) 0))
+                            :avg_stars (some-> (:avg_stars user-line) double)
+                            :is_mvp (= (:player_id user-line) (:player_id (:mvp awards)))
+                            :is_garcom (= (:player_id user-line) (:player_id (:garcom awards)))})}))
+              peladas)))))
 
 (s/defn leave-organization
   [org-id :- s/Uuid

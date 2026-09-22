@@ -191,3 +191,52 @@
         response (app (mock/request :get (str "/api/organizations/" org-id "/statistics")))]
       ;; Should return 401 Unauthorized because no token is provided
     (is (= 401 (:status response)))))
+
+(deftest statistics-titles-and-total-peladas-test
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)
+        token (th/register-and-login! app {:name "Title Chaser" :email "title_chaser@test.com" :password "pass123"})
+        user-id (th/user-id-by-email ds "title_chaser@test.com")
+        _ (th/register-and-login! app {:name "Title Rival" :email "title_rival@test.com" :password "pass123"})
+        rival-user-id (th/user-id-by-email ds "title_rival@test.com")
+
+        org-id (:id (exec-one! ds (-> (h/insert-into :Organizations) (h/values [{:name "Org Titles"}]) (h/returning :id))))
+        _ (exec! ds (-> (h/insert-into :OrganizationPlayers)
+                        (h/values [{:organization_id org-id :user_id user-id :grade 5.0 :member_type [:cast "diarista" :member_type]}
+                                   {:organization_id org-id :user_id rival-user-id :grade 5.0 :member_type [:cast "diarista" :member_type]}])))
+        player-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id user-id] [:= :organization_id org-id]))))
+        rival-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id rival-user-id] [:= :organization_id org-id]))))
+
+        pelada-id (:id (exec-one! ds (-> (h/insert-into :Peladas)
+                                         (h/values [{:organization_id org-id
+                                                     :scheduled_at [[:cast "2026-07-20 10:00:00" :timestamp]]
+                                                     :status [:cast "closed" :pelada_status]}])
+                                         (h/returning :id))))
+        champ-team (:id (exec-one! ds (-> (h/insert-into :Teams) (h/values [{:pelada_id pelada-id :name "Champions"}]) (h/returning :id))))
+        other-team (:id (exec-one! ds (-> (h/insert-into :Teams) (h/values [{:pelada_id pelada-id :name "Runners-up"}]) (h/returning :id))))
+        match-id (:id (exec-one! ds (-> (h/insert-into :Matches)
+                                        (h/values [{:pelada_id pelada-id :home_team_id champ-team :away_team_id other-team
+                                                    :sequence 1 :home_score 3 :away_score 1
+                                                    :status [:cast "finished" :match_status]}])
+                                        (h/returning :id))))]
+    (exec! ds (-> (h/insert-into :TeamPlayers)
+                  (h/values [{:team_id champ-team :player_id player-id}
+                             {:team_id other-team :player_id rival-id}])))
+    (exec! ds (-> (h/insert-into :MatchLineups)
+                  (h/values [{:match_id match-id :team_id champ-team :player_id player-id}
+                             {:match_id match-id :team_id other-team :player_id rival-id}])))
+
+    (let [response (app (-> (mock/request :get (str "/api/organizations/" org-id "/statistics"))
+                            (mock/query-string {:year 2026})
+                            ((th/auth-cookie token))))
+          body (th/decode-body response)
+          winner (first (filter #(= "Title Chaser" (:player_name %)) body))
+          loser (first (filter #(= "Title Rival" (:player_name %)) body))]
+      (testing "champion-team players earn a title; runners-up do not"
+        (is (= 200 (:status response)))
+        (is (= 1 (:titles winner)))
+        (is (= 0 (:titles loser))))
+      (testing "total_peladas counts the organization's closed peladas for the year"
+        (is (= 1 (:total_peladas winner)))
+        (is (= 1 (:total_peladas loser)))))))

@@ -1,8 +1,12 @@
 (ns api-peladaapp.controllers.user
   (:require
+   [api-peladaapp.controllers.organization :as controller.organization]
    [api-peladaapp.db.admin :as db.admin]
+   [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.db.user :as db.user]
    [api-peladaapp.helpers.pagination :as pagination]
+   [api-peladaapp.helpers.time :as helpers.time]
+   [api-peladaapp.logic.grade :as logic.grade]
    [api-peladaapp.logic.user :as logic.user]
    [api-peladaapp.models.user :as models.user]
    [clojure.string :as str]
@@ -143,5 +147,88 @@
                          updated-user)]
         (db.user/update-user-profile user-id final-user db)
         (enrich-user final-user user-id db)))))
+
+(defn- start-of-week
+  "Monday (as a LocalDate) of the week a timestamp belongs to, in UTC."
+  [ts]
+  (let [inst (helpers.time/->instant ts)
+        local-date (.toLocalDate (.atZone inst (java.time.ZoneId/of "UTC")))]
+    (.with local-date
+           (java.time.temporal.TemporalAdjusters/previousOrSame java.time.DayOfWeek/MONDAY))))
+
+(defn- build-presence
+  "Last 12 weeks of activity for the user, oldest first. Each week is
+   `present` when they had at least one confirmed pelada, `absent` when they
+   declined one and confirmed none, and `no_game` otherwise."
+  [peladas-with-attendance]
+  (let [by-week (group-by (fn [p] (some-> (:scheduled_at p) start-of-week str))
+                          (remove #(nil? (:scheduled_at %)) peladas-with-attendance))
+        statuses (fn [rows]
+                   (let [states (set (map #(some-> (:attendance_status %) name) rows))]
+                     (cond
+                       (contains? states "confirmed") "present"
+                       (contains? states "declined") "absent"
+                       :else "no_game")))]
+    (->> by-week
+         (sort-by key)
+         (take-last 12)
+         (mapv (fn [[week rows]] {:week_start week :status (statuses rows)})))))
+
+(s/defn get-profile-dashboard
+  "Aggregated profile for a user: season summary, skills, per-group stats,
+   12-week presence and their recent peladas with own scouts and awards."
+  [user-id :- s/Uuid
+   year :- s/Int
+   db]
+  (let [orgs (db.organization/list-by-user user-id db)
+        per-org (mapv (fn [org]
+                        {:organization_id (:id org)
+                         :organization_name (:name org)
+                         :peladas (controller.organization/get-history (:id org) user-id year db)})
+                      orgs)
+        entries (vec (mapcat (fn [{:keys [organization_id organization_name peladas]}]
+                               (map #(assoc % :organization_id organization_id
+                                            :organization_name organization_name)
+                                    peladas))
+                             per-org))
+        played (filter :user entries)
+        rating-samples (keep #(get-in % [:user :avg_stars]) played)
+        avg-stars (if (seq rating-samples)
+                    (/ (reduce + rating-samples) (count rating-samples))
+                    0.0)
+        attendance (db.user/list-user-peladas-with-attendance user-id year db)
+        decided (filter #(contains? #{"confirmed" "declined"}
+                                    (some-> (:attendance_status %) name))
+                        attendance)
+        present (count (filter #(= "confirmed" (some-> (:attendance_status %) name)) decided))
+        summary {:avg_rating (when (seq rating-samples)
+                               (logic.grade/performance-from-stars avg-stars))
+                 :avg_stars (when (seq rating-samples) avg-stars)
+                 :matches_played (count played)
+                 :goals (reduce + 0 (map #(get-in % [:user :goals] 0) played))
+                 :assists (reduce + 0 (map #(get-in % [:user :assists] 0) played))
+                 :titles (count (filter #(= 1 (get-in % [:user :team_position])) played))
+                 :mvp_count (count (filter #(get-in % [:user :is_mvp]) played))
+                 :garcom_count (count (filter #(get-in % [:user :is_garcom]) played))
+                 :attendance_rate (when (pos? (count decided))
+                                    (* 100.0 (/ present (count decided))))}
+        groups (mapv (fn [{:keys [organization_id organization_name peladas]}]
+                       (let [p (filter :user peladas)]
+                         {:organization_id organization_id
+                          :organization_name organization_name
+                          :peladas_played (count p)
+                          :goals (reduce + 0 (map #(get-in % [:user :goals] 0) p))
+                          :assists (reduce + 0 (map #(get-in % [:user :assists] 0) p))
+                          :titles (count (filter #(= 1 (get-in % [:user :team_position])) p))}))
+                     per-org)]
+    {:year year
+     :summary summary
+     :skills (db.user/get-user-skills user-id db)
+     :groups groups
+     :presence (build-presence attendance)
+     :recent_peladas (->> entries
+                          (sort-by :scheduled_at (fn [a b] (compare b a)))
+                          (take 20)
+                          vec)}))
 
 
