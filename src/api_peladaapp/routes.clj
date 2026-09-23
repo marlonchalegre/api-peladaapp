@@ -5,6 +5,7 @@
    [api-peladaapp.handlers.auth :as auth]
    [api-peladaapp.handlers.avatar :as handler.avatar]
    [api-peladaapp.handlers.finance :as handler.finance]
+   [api-peladaapp.handlers.geo :as handler.geo]
    [api-peladaapp.handlers.global-admin :as handler.global-admin]
    [api-peladaapp.handlers.health :as handler.health]
    [api-peladaapp.handlers.internal :as handler.internal]
@@ -154,6 +155,9 @@
     (GET "/peladas/:id/voting-info" [] handler.vote/voting-info)
     (GET "/peladas/:id/voting-results" [] handler.vote/voting-results)
     (GET "/peladas/:id/voting-status" [] handler.vote/voting-status)
+
+    ;; Geo (Nominatim OSM Proxy)
+    (GET "/geo/search" [] handler.geo/search)
 
     ;; Health
     (GET "/health" [] handler.health/check)))
