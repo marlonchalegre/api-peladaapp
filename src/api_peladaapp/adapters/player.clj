@@ -62,20 +62,21 @@
 (s/defn db->model :- models.player/Player
   [p]
   (when-let [row (some-> p misc/unamespace)]
-    (medley.core/assoc-some {}
-                            :id (:id row)
-                            :user-id (:user_id row)
-                            :organization-id (:organization_id row)
-                            :grade (:grade row)
-                            :position (:position row)
-                            :member-type (:member_type row)
-                            :user-name (or (:user_name row) (:user-name row))
-                            :user-username (or (:user_username row) (:user-username row))
-                            :user-position (or (:user_position row) (:user-position row))
-                            :user-avatar-filename (:avatar_filename row)
-                            :passing (:passing row)
-                            :ball-control (:ball_control row)
-                            :velocity (:velocity row)
-                            :shooting (:shooting row)
-                            :dribbling (:dribbling row)
-                            :defending (:defending row))))
+    (let [user-pos (or (:user_position row) (:user-position row))]
+      (medley.core/assoc-some {}
+                              :id (:id row)
+                              :user-id (:user_id row)
+                              :organization-id (:organization_id row)
+                              :grade (:grade row)
+                              :position (or (:position row) user-pos)
+                              :member-type (:member_type row)
+                              :user-name (or (:user_name row) (:user-name row))
+                              :user-username (or (:user_username row) (:user-username row))
+                              :user-position user-pos
+                              :user-avatar-filename (:avatar_filename row)
+                              :passing (:passing row)
+                              :ball-control (:ball_control row)
+                              :velocity (:velocity row)
+                              :shooting (:shooting row)
+                              :dribbling (:dribbling row)
+                              :defending (:defending row)))))

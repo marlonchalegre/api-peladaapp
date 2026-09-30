@@ -279,7 +279,7 @@
                                                                  (when-let [player (get players-map (:player_id team-player))]
                                                                    (let [user (get users-map (:user-id player))]
                                                                      (assoc player :user user :is_goalkeeper (:is_goalkeeper team-player)))))
-                                                               (get team-players-grouped (:id team) []))))
+                                                               (medley.core/distinct-by :player_id (get team-players-grouped (:id team) [])))))
                                   teams)
 
           ;; Identify players already assigned to teams

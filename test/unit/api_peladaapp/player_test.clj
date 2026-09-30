@@ -1,5 +1,6 @@
 (ns api-peladaapp.player-test
   (:require
+   [api-peladaapp.adapters.player :as adapter.player]
    [api-peladaapp.controllers.player :as controller.player]
    [api-peladaapp.db.player :as db.player]
    [api-peladaapp.handlers.player :as handler.player]
@@ -213,4 +214,21 @@
               response (handler.player/list-by-org request)]
           (is (= 200 (:status response)))
           (is (= 1 (count (:body response)))))))))
+
+(deftest db->model-position-fallback-test
+  (testing "falls back to user_position when position is nil"
+    (let [row {:id (random-uuid)
+               :user_id (random-uuid)
+               :organization_id (random-uuid)
+               :position nil
+               :user_position "Defender"}]
+      (is (= "Defender" (:position (adapter.player/db->model row))))))
+
+  (testing "preserves position when position is present"
+    (let [row {:id (random-uuid)
+               :user_id (random-uuid)
+               :organization_id (random-uuid)
+               :position "Striker"
+               :user_position "Defender"}]
+      (is (= "Striker" (:position (adapter.player/db->model row)))))))
 
