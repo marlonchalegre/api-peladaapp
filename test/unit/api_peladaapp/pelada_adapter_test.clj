@@ -130,3 +130,30 @@
                                                 :scheduled-at "2026-06-03T19:00:00Z"
                                                 :status "attendance"})]
       (is (not (contains? resp :location))))))
+
+(deftest test-user-and-player-avatar-filename-response
+  (testing "user->response preserves avatar_filename when provided with snake_case :avatar_filename"
+    (let [user {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                :name "Augusto Gondim"
+                :avatar_filename "avatar-123.jpg"}
+          resp (adapter.pelada/user->response user)]
+      (is (= "avatar-123.jpg" (:avatar_filename resp)))))
+
+  (testing "user->response preserves avatar_filename when provided with kebab-case :avatar-filename"
+    (let [user {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                :name "Augusto Gondim"
+                :avatar-filename "avatar-123.jpg"}
+          resp (adapter.pelada/user->response user)]
+      (is (= "avatar-123.jpg" (:avatar_filename resp)))))
+
+  (testing "player->response preserves user avatar_filename from nested user map and player user_avatar_filename"
+    (let [player {:id (parse-uuid "00000000-0000-0000-0000-000000000002")
+                  :user-id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                  :user-name "Augusto Gondim"
+                  :user-avatar-filename "avatar-123.jpg"
+                  :user {:id (parse-uuid "00000000-0000-0000-0000-000000000001")
+                         :name "Augusto Gondim"
+                         :avatar_filename "avatar-123.jpg"}}
+          resp (adapter.pelada/player->response player)]
+      (is (= "avatar-123.jpg" (:user_avatar_filename resp)))
+      (is (= "avatar-123.jpg" (get-in resp [:user :avatar_filename]))))))

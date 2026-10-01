@@ -291,7 +291,7 @@
                                       :name (:user-name p)
                                       :username (:user-username p)
                                       :position (:user-position p)
-                                      :avatar_filename (:user-avatar-filename p)}]))
+                                      :avatar-filename (or (:user-avatar-filename p) (:avatar-filename p))}]))
                           all-players-in-org)
 
           all-org-players (if (= "attendance" (:status pelada))

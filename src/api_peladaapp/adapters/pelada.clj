@@ -111,7 +111,9 @@
                             :name (:name user)
                             :username (:username user)
                             :position (:position user)
-                            :avatar_filename (:user-avatar-filename user (:avatar-filename user)))))
+                            :avatar_filename (or (:avatar-filename user)
+                                                 (:avatar_filename user)
+                                                 (:user-avatar-filename user)))))
 
 (defn player->response [player]
   (when player
