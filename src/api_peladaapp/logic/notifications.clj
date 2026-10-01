@@ -16,23 +16,61 @@
    [java.time ZoneId]
    [java.time.format DateTimeFormatter]))
 
-(def ^:private goalkeeper-positions
-  #{"goalkeeper" "goleiro" "goleira" "gk" "g"})
-
 (def position-order
   {"goalkeeper" 0
+   "goleiro" 0
+   "goleira" 0
+   "gk" 0
+   "g" 0
    "defender" 1
+   "zagueiro" 1
+   "zagueira" 1
+   "df" 1
+   "zag" 1
+   "z" 1
    "midfielder" 2
-   "striker" 3})
+   "meia" 2
+   "meio-campo" 2
+   "mf" 2
+   "mei" 2
+   "m" 2
+   "striker" 3
+   "atacante" 3
+   "st" 3
+   "ata" 3
+   "a" 3})
+
+(def position-code-map
+  {"goalkeeper" "G"
+   "goleiro" "G"
+   "goleira" "G"
+   "gk" "G"
+   "g" "G"
+   "defender" "Z"
+   "zagueiro" "Z"
+   "zagueira" "Z"
+   "df" "Z"
+   "zag" "Z"
+   "z" "Z"
+   "midfielder" "M"
+   "meia" "M"
+   "meio-campo" "M"
+   "mf" "M"
+   "mei" "M"
+   "m" "M"
+   "striker" "A"
+   "atacante" "A"
+   "st" "A"
+   "ata" "A"
+   "a" "A"})
 
 (def ^:private all-mention-types
   #{:new-pelada :attendance-reminder :priority-ending :vote-reminder})
 
 (defn- get-position-rank [pos-str]
-  (let [p (some-> pos-str name str/lower-case)]
-    (if (contains? goalkeeper-positions p)
-      0
-      (get position-order p 4))))
+  (if-let [p (some-> pos-str name str/trim str/lower-case)]
+    (get position-order p 4)
+    4))
 
 (defn- sort-players [players]
   (sort-by (fn [p]
@@ -87,12 +125,6 @@
   (let [title "*ESCALAÇÃO DA PELADA*\n\n"
         teams-grouped (group-by :team_id team-players)
         name-width (calculate-name-width team-players)
-
-        pos-map {"goalkeeper" "G"
-                 "defender" "Z"
-                 "midfielder" "M"
-                 "striker" "A"}
-
         teams-str (->> teams
                        (map (fn [team]
                               (let [players (get teams-grouped (:id team) [])
@@ -101,7 +133,7 @@
                                                      (map (fn [p]
                                                             (let [pos (if (:is_goalkeeper p)
                                                                         "G"
-                                                                        (get pos-map (some-> (:position p) str/lower-case) "?"))]
+                                                                        (get position-code-map (some-> (:position p) str/trim str/lower-case) "?"))]
                                                               (str "• " (pad-end (:player_name p) name-width) pos))))
                                                      (str/join "\n"))]
                                 (str "*" (str/upper-case (:name team)) "*\n```\n" players-str "\n```"))))
@@ -118,10 +150,10 @@
 
 (defn- is-goalkeeper-entry? [x]
   (let [gk-flag (or (:is_goalkeeper x) (:is-goalkeeper x))
-        pos (some-> (or (:position x) "") name str/lower-case)]
+        pos (some-> (or (:position x) "") name str/trim str/lower-case)]
     (or (true? gk-flag)
         (and (number? gk-flag) (not= gk-flag 0))
-        (contains? goalkeeper-positions pos))))
+        (= "G" (get position-code-map pos)))))
 
 (defn- calculate-goalkeeper-goals-conceded
   ([matches lineups team-players]

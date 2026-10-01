@@ -8,6 +8,7 @@
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.score :as logic.score]
+   [clojure.string :as str]
    [honey.sql.helpers :as h]
    [medley.core :as medley.core]
    [next.jdbc :as jdbc]
@@ -15,6 +16,37 @@
   (:import (java.sql Timestamp)
            (java.time Duration Instant OffsetDateTime)
            (java.time.temporal ChronoUnit)))
+
+(def ^:private position-order
+  {"goalkeeper" 0
+   "goleiro" 0
+   "goleira" 0
+   "gk" 0
+   "g" 0
+   "defender" 1
+   "zagueiro" 1
+   "zagueira" 1
+   "df" 1
+   "zag" 1
+   "z" 1
+   "midfielder" 2
+   "meia" 2
+   "meio-campo" 2
+   "mf" 2
+   "mei" 2
+   "m" 2
+   "striker" 3
+   "atacante" 3
+   "st" 3
+   "ata" 3
+   "a" 3})
+
+(defn- player-position-rank [p]
+  (let [pos (some-> (or (:user-position p) (:position p) (get-in p [:user :position]))
+                    name
+                    str/trim
+                    str/lower-case)]
+    (get position-order pos 4)))
 
 (s/defn insert-pelada :- s/Uuid
   [pelada :- {:organization-id s/Uuid
@@ -275,11 +307,17 @@
 
           ;; Add players to teams - Use players-map to avoid O(N*M) filter
           teams-with-players (map (fn [team]
-                                    (assoc team :players (keep (fn [team-player]
-                                                                 (when-let [player (get players-map (:player_id team-player))]
-                                                                   (let [user (get users-map (:user-id player))]
-                                                                     (assoc player :user user :is_goalkeeper (:is_goalkeeper team-player)))))
-                                                               (medley.core/distinct-by :player_id (get team-players-grouped (:id team) [])))))
+                                    (let [players (keep (fn [team-player]
+                                                          (when-let [player (get players-map (:player_id team-player))]
+                                                            (let [user (get users-map (:user-id player))]
+                                                              (assoc player :user user :is_goalkeeper (:is_goalkeeper team-player)))))
+                                                        (medley.core/distinct-by :player_id (get team-players-grouped (:id team) [])))
+                                          sorted-players (sort-by (fn [p]
+                                                                    [(if (:is_goalkeeper p) 0 1)
+                                                                     (player-position-rank p)
+                                                                     (or (:user-name p) (get-in p [:user :name]) (:name p) "")])
+                                                                  players)]
+                                      (assoc team :players sorted-players)))
                                   teams)
 
           ;; Identify players already assigned to teams

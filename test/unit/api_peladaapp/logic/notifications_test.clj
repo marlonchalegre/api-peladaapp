@@ -28,7 +28,15 @@
                         {:team_id (parse-uuid "00000000-0000-0000-0000-000000000001") :player_name "Zagueiro" :is_goalkeeper false :position "defender"}]
           msg (notifications/generate-start-message teams team-players)]
       (is (re-find #"• Goleiro +G" msg))
-      (is (re-find #"• Zagueiro +Z" msg)))))
+      (is (re-find #"• Zagueiro +Z" msg))))
+
+  (testing "sorts Portuguese positions (zagueiro, meia, atacante) in proper formation order zag -> mei -> striker"
+    (let [teams [{:id (parse-uuid "00000000-0000-0000-0000-000000000001") :name "Time 1"}]
+          team-players [{:team_id (parse-uuid "00000000-0000-0000-0000-000000000001") :player_name "Atacante Um" :position "atacante"}
+                        {:team_id (parse-uuid "00000000-0000-0000-0000-000000000001") :player_name "Zagueiro Um" :position "zagueiro"}
+                        {:team_id (parse-uuid "00000000-0000-0000-0000-000000000001") :player_name "Meia Um" :position "meia"}]
+          msg (notifications/generate-start-message teams team-players)]
+      (is (re-find #"• Zagueiro Um +Z[\s\S]*• Meia Um +M[\s\S]*• Atacante Um +A" msg)))))
 
 (deftest generate-end-message-test
   (testing "generates correct end message with full round summary (standings, goals, assists)"
