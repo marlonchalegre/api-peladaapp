@@ -19,7 +19,7 @@
                  [compojure "1.7.2"]
                  [com.github.seancorfield/next.jdbc "1.3.1118"]
                  [medley/medley "1.4.0"]
-                 [org.postgresql/postgresql "42.7.13"]
+                 [org.postgresql/postgresql "42.7.14"]
                  [com.github.seancorfield/honeysql "2.7.1479"]
                  [prismatic/schema "1.4.2"]
                  [clj-http "3.13.1"]
