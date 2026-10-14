@@ -4,6 +4,7 @@
    [api-peladaapp.db.organization :as db.organization]
    [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.db.team :as db.team]
    [api-peladaapp.db.vote :as db.vote]
    [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.authorization :as auth]
@@ -11,6 +12,18 @@
    [schema.core :as s])
   (:import
    [java.time Duration Instant]))
+
+(defn- cleanup-declined-players!
+  "Removes declined player(s) from pelada teams and resets fixed goalkeeper assignments if needed."
+  [pelada-id pelada player-ids db]
+  (let [pids (if (coll? player-ids) player-ids [player-ids])
+        pid-set (set pids)]
+    (db.team/remove-players-from-pelada-teams pelada-id pids db)
+    (let [pelada-updates (cond-> {}
+                           (contains? pid-set (:home-fixed-goalkeeper-id pelada)) (assoc :home-fixed-goalkeeper-id nil)
+                           (contains? pid-set (:away-fixed-goalkeeper-id pelada)) (assoc :away-fixed-goalkeeper-id nil))]
+      (when (seq pelada-updates)
+        (db.pelada/update-pelada pelada-id pelada-updates db)))))
 
 (s/defn update-player-attendance :- s/Int
   [pelada-id :- s/Uuid
@@ -51,6 +64,8 @@
                                    "confirmed"))
                                "confirmed")))
                          status)]
+      (when (= status "declined")
+        (cleanup-declined-players! pelada-id pelada player-id db))
       (db.attendance/upsert-attendance pelada-id player-id final-status db))))
 
 (s/defn update-attendance :- s/Int
@@ -71,6 +86,8 @@
             (throw (ex-info "Pelada not found" {:type :not-found :message "Pelada not found"})))
         org-id (:organization-id pelada)]
     (auth/require-organization-admin! user-id org-id db)
+    (when (= status "declined")
+      (cleanup-declined-players! pelada-id pelada player-ids db))
     (db.attendance/batch-upsert-attendance pelada-id player-ids status db)))
 
 (s/defn close-attendance :- s/Any

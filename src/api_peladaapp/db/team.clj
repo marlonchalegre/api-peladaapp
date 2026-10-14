@@ -132,6 +132,26 @@
     (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         hsql/affected-rows-count)))
 
+(s/defn remove-players-from-pelada-teams :- s/Int
+  "Removes player(s) from any team of a specific pelada in a single batch query"
+  [pelada-id :- s/Uuid player-ids db]
+  (let [pids (if (coll? player-ids) (vec player-ids) [player-ids])]
+    (if (empty? pids)
+      0
+      (let [query (-> (h/delete-from :TeamPlayers)
+                      (h/where [:and
+                                (if (= 1 (count pids))
+                                  [:= :player_id (first pids)]
+                                  [:in :player_id pids])
+                                [:in :team_id (-> (h/select :id) (h/from :Teams) (h/where [:= :pelada_id pelada-id]))]]))]
+        (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+            hsql/affected-rows-count)))))
+
+(s/defn remove-player-from-pelada-teams :- s/Int
+  "Removes a specific player from any team of a specific pelada"
+  [pelada-id :- s/Uuid player-id :- s/Uuid db]
+  (remove-players-from-pelada-teams pelada-id [player-id] db))
+
 (s/defn list-team-players [team-id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :TeamPlayers)

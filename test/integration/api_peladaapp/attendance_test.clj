@@ -370,3 +370,82 @@
       ;; Verify Pelada 2 attendance is 'waitlist' (treated as daily player)
       (let [att2 (first (db.attendance/list-attendance-by-pelada pelada2-id ds))]
         (is (= "waitlist" (:status att2)))))))
+
+(deftest admin-remove-bench-player-test
+  (let [app (-> th/*test-system* :app :app-handler)
+        db-val (-> th/*test-system* :database :database)
+        ds (if (fn? db-val) (db-val) db-val)]
+    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Admin User" :email "admin_rm@ex.com" :password "p"})))
+    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Bench Player" :email "bench_rm@ex.com" :password "p"})))
+    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Team Player" :email "team_rm@ex.com" :password "p"})))
+
+    (let [admin-login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "admin_rm@ex.com" :password "p"})))
+          admin-token (:token (decode-body admin-login))
+          admin-auth (th/auth-cookie admin-token)
+          _ (th/grant-org-creation! ds "admin_rm@ex.com")
+
+          org-resp (app (-> (mock/request :post "/api/organizations")
+                            (mock/json-body {:name "Bench Org"})
+                            admin-auth))
+          org-id (misc/as-uuid (:id (decode-body org-resp)))
+
+          bench-user-id (th/user-id-by-email ds "bench_rm@ex.com")
+          team-user-id (th/user-id-by-email ds "team_rm@ex.com")
+
+          bench-p-resp (app (-> (mock/request :post "/api/players")
+                                (mock/json-body {:organization_id org-id :user_id bench-user-id :member_type "mensalista"})
+                                admin-auth))
+          bench-player-id (misc/as-uuid (:id (decode-body bench-p-resp)))
+
+          team-p-resp (app (-> (mock/request :post "/api/players")
+                               (mock/json-body {:organization_id org-id :user_id team-user-id :member_type "mensalista"})
+                               admin-auth))
+          team-player-id (misc/as-uuid (:id (decode-body team-p-resp)))
+
+          pelada-resp (app (-> (mock/request :post "/api/peladas")
+                               (mock/json-body {:organization_id org-id})
+                               admin-auth))
+          pelada-id (misc/as-uuid (:id (decode-body pelada-resp)))
+
+          _ (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance/batch"))
+                     (mock/json-body {:player_ids [bench-player-id team-player-id] :status "confirmed"})
+                     admin-auth))
+
+          _ (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance"))
+                     admin-auth))
+
+          team-resp (app (-> (mock/request :post "/api/teams")
+                             (mock/json-body {:pelada_id pelada-id :name "Team A"})
+                             admin-auth))
+          team-id (misc/as-uuid (:id (decode-body team-resp)))
+          _ (app (-> (mock/request :post (str "/api/teams/" team-id "/players"))
+                     (mock/json-body {:player_id team-player-id :is_goalkeeper false})
+                     admin-auth))
+
+          details-before (decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) admin-auth)))
+          avail-before (:available_players details-before)
+          teams-before (:teams details-before)]
+
+      (is (some #(= (str (:id %)) (str bench-player-id)) avail-before))
+      (is (not (some #(= (str (:id %)) (str team-player-id)) avail-before)))
+      (is (some #(= (str (:id %)) (str team-player-id)) (get-in (first teams-before) [:players])))
+
+      (let [rm-bench-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance"))
+                                   (mock/json-body {:player_id bench-player-id :status "declined"})
+                                   admin-auth))]
+        (is (= 200 (:status rm-bench-resp))))
+
+      (let [details-after-bench (decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) admin-auth)))
+            avail-after (:available_players details-after-bench)]
+        (is (not (some #(= (str (:id %)) (str bench-player-id)) avail-after))))
+
+      (let [rm-team-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/attendance"))
+                                  (mock/json-body {:player_id team-player-id :status "declined"})
+                                  admin-auth))]
+        (is (= 200 (:status rm-team-resp))))
+
+      (let [details-final (decode-body (app (-> (mock/request :get (str "/api/peladas/" pelada-id "/full-details")) admin-auth)))
+            avail-final (:available_players details-final)
+            teams-final (:teams details-final)]
+        (is (not (some #(= (str (:id %)) (str team-player-id)) avail-final)))
+        (is (empty? (get-in (first teams-final) [:players])))))))
