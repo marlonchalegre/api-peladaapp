@@ -191,6 +191,7 @@
         attendance-resp (map adapter.attendance/db->response attendance)
         users-resp (map user->response users)]
     {:pelada (assoc (model->response pelada) :is_admin is-admin)
+     :server_time (str (java.time.Instant/now))
      :matches matches-resp
      :teams teams-resp
      :users users-resp

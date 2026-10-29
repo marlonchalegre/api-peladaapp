@@ -210,9 +210,10 @@
               ;; Pause timer -> timer_status becomes paused, status remains running
               (let [pause-resp (app (-> (mock/request :post (str "/api/matches/" new-match-id "/timer/pause")) auth))
                     _ (is (= 200 (:status pause-resp)))
-                    m-paused (jdbc/execute-one! db ["SELECT status, timer_status FROM \"Matches\" WHERE id = ?::uuid" new-match-id] {:builder-fn rs/as-unqualified-lower-maps})]
+                    m-paused (jdbc/execute-one! db ["SELECT status, timer_status, timer_started_at FROM \"Matches\" WHERE id = ?::uuid" new-match-id] {:builder-fn rs/as-unqualified-lower-maps})]
                 (is (= "running" (:status m-paused)))
                 (is (= "paused" (:timer_status m-paused)))
+                (is (nil? (:timer_started_at m-paused)))
 
                 ;; Start again from paused -> resumes timer, status remains running
                 (let [resume-resp (app (-> (mock/request :post (str "/api/matches/" new-match-id "/timer/start")) auth))

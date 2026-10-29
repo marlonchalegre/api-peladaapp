@@ -189,3 +189,51 @@
                     resolved-gk (first (filter #(= gk-player-id (:player_id %)) team-players))]
                 (is (some? resolved-gk))
                 (is (= "My Fixed Goalkeeper Name" (:player_name resolved-gk)))))))))))
+
+(deftest pelada-timer-lifecycle-test
+  (let [app (-> th/*test-system* :app :app-handler)]
+    ;; Register and login user
+    (app (-> (mock/request :post "/auth/register") (mock/json-body {:name "Timer User" :email "timer@user.com" :password "password"})))
+    (let [login (app (-> (mock/request :post "/auth/login") (mock/json-body {:email "timer@user.com" :password "password"})))
+          token (:token (decode-body login))
+          auth (th/auth-cookie token)
+          db-val (-> th/*test-system* :database :database)
+          ds (if (fn? db-val) (db-val) db-val)
+
+          _ (th/grant-org-creation! ds "timer@user.com")
+
+          org (app (-> (mock/request :post "/api/organizations")
+                       (mock/json-body {:name "Timer Org"})
+                       auth))
+          org-id (:id (decode-body org))
+
+          pelada-resp (app (-> (mock/request :post "/api/peladas")
+                               (mock/json-body {:organization_id org-id
+                                                :name "Timer Pelada"
+                                                :scheduled_date "2026-10-30"
+                                                :match_duration 10})
+                               auth))
+          pelada-id (:id (decode-body pelada-resp))
+
+          ;; Start pelada timer
+          start-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/timer/start")) auth))
+          _ (is (= 200 (:status start-resp)))
+          p-running (jdbc/execute-one! ds ["SELECT timer_status, timer_started_at FROM \"Peladas\" WHERE id = ?::uuid" pelada-id] {:builder-fn rs/as-unqualified-lower-maps})
+          _ (is (= "running" (:timer_status p-running)))
+          _ (is (some? (:timer_started_at p-running)))
+
+          ;; Pause pelada timer -> timer_started_at must be cleared to NULL in Peladas table
+          pause-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/timer/pause")) auth))
+          _ (is (= 200 (:status pause-resp)))
+          p-paused (jdbc/execute-one! ds ["SELECT timer_status, timer_started_at, timer_accumulated_ms FROM \"Peladas\" WHERE id = ?::uuid" pelada-id] {:builder-fn rs/as-unqualified-lower-maps})
+          _ (is (= "paused" (:timer_status p-paused)))
+          _ (is (nil? (:timer_started_at p-paused)))
+          _ (is (>= (or (:timer_accumulated_ms p-paused) 0) 0))
+
+          ;; Reset pelada timer -> stopped, timer_started_at is NULL, accumulated is 0
+          reset-resp (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/timer/reset")) auth))
+          _ (is (= 200 (:status reset-resp)))
+          p-reset (jdbc/execute-one! ds ["SELECT timer_status, timer_started_at, timer_accumulated_ms FROM \"Peladas\" WHERE id = ?::uuid" pelada-id] {:builder-fn rs/as-unqualified-lower-maps})]
+      (is (= "stopped" (:timer_status p-reset)))
+      (is (nil? (:timer_started_at p-reset)))
+      (is (= 0 (:timer_accumulated_ms p-reset))))))

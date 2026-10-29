@@ -56,7 +56,7 @@
                  (some? home-score) (assoc :home_score home-score)
                  (some? away-score) (assoc :away_score away-score)
                  status (assoc :status [:cast status :match_status])
-                 timer-started-at (assoc :timer_started_at [[:cast (helpers.time/to-utc-timestamp-str timer-started-at) :timestamp]])
+                 (contains? data :timer-started-at) (assoc :timer_started_at (when timer-started-at [[:cast (helpers.time/to-utc-timestamp-str timer-started-at) :timestamp]]))
                  (some? timer-accumulated-ms) (assoc :timer_accumulated_ms timer-accumulated-ms)
                  timer-status (assoc :timer_status [:cast timer-status :timer_status])
                  (contains? data :support-camera-player-id) (assoc :support_camera_player_id support-camera-player-id)

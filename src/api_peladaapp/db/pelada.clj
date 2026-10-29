@@ -102,9 +102,9 @@
                                                                     (boolean (:fixed-goalkeepers pelada)))
                                                :status (when (:status pelada) [[:cast (:status pelada) :pelada_status]])
                                                :closed_at (when (:closed-at pelada) [[:cast (helpers.time/to-utc-timestamp-str (:closed-at pelada)) :timestamp]])
-                                               :timer_started_at (when (:timer-started-at pelada) [[:cast (helpers.time/to-utc-timestamp-str (:timer-started-at pelada)) :timestamp]])
                                                :timer_accumulated_ms (:timer-accumulated-ms pelada)
                                                :timer_status (when (:timer-status pelada) [[:cast (:timer-status pelada) :timer_status]]))
+                 (contains? pelada :timer-started-at) (assoc :timer_started_at (when (:timer-started-at pelada) [[:cast (helpers.time/to-utc-timestamp-str (:timer-started-at pelada)) :timestamp]]))
                  (contains? pelada :home-fixed-goalkeeper-id) (assoc :home_fixed_goalkeeper_id (:home-fixed-goalkeeper-id pelada))
                  (contains? pelada :away-fixed-goalkeeper-id) (assoc :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id pelada))
                  (contains? pelada :notify-casual-players) (assoc :notify_casual_players (boolean (:notify-casual-players pelada))))]
