@@ -116,6 +116,7 @@
            (wrap-json-body $ {:keywords? true :bigdecimals? true})
            (wrap-access-rules $ {:rules routes/access-rules :on-error on-error})
            (wrap-authorization $ auth/auth-backend)
+           (auth/wrap-sliding-session $)
            (auth/wrap-manual-auth $)
            (wrap-cookies $)
            (wrap-json-response $ {:charset "utf-8"})))

@@ -12,12 +12,17 @@
    [buddy.auth :refer [authenticated?]]
    [buddy.auth.accessrules :refer [error]]
    [buddy.auth.backends.token :refer [jws-backend]]
-   [buddy.sign.jwt :as jwt]))
+   [buddy.sign.jwt :as jwt]
+   [clojure.string :as str]))
+
+(def token-cookie-name "authToken")
+(def token-cookie-max-age (* 30 24 60 60))
+(def cookie-secure? (not= (System/getenv "APP_VERSION") "development"))
 
 (defn extract-token [request]
   (let [cookies (:cookies request)]
-    (or (get-in cookies ["authToken" :value])
-        (get-in cookies [:authToken :value]))))
+    (or (get-in cookies [token-cookie-name :value])
+        (get-in cookies [(keyword token-cookie-name) :value]))))
 
 (defn wrap-manual-auth
   "Custom authentication middleware that manually validates JWT from cookies or header.
@@ -36,6 +41,37 @@
         (catch Exception _
           (handler request)))
       (handler request))))
+
+(defn set-token-cookie
+  ([response token]
+   (set-token-cookie response token token-cookie-max-age))
+  ([response token max-age]
+   (assoc-in response [:cookies token-cookie-name]
+             {:value token
+              :http-only true
+              :secure cookie-secure?
+              :same-site :lax
+              :path "/"
+              :max-age max-age})))
+
+(defn wrap-sliding-session
+  "Middleware that re-issues the authToken cookie with renewed max-age
+  on successful responses for authenticated requests, so active users stay logged in."
+  [handler]
+  (fn [request]
+    (let [response (handler request)
+          status   (:status response)
+          uri      (:uri request)]
+      (if (and (authenticated? request)
+               (number? status)
+               (<= 200 status 299)
+               (not (and uri (str/ends-with? uri "/avatar")))
+               (not (or (get-in response [:cookies token-cookie-name])
+                        (get-in response [:cookies (keyword token-cookie-name)]))))
+        (if-let [token (extract-token request)]
+          (set-token-cookie response token)
+          response)
+        response))))
 
 (def auth-backend (jws-backend {:secret (fn [& _] (config/get-key :jwt-secret))
                                 :token extract-token
@@ -64,15 +100,6 @@
 (defn- clear-attempts [attempts-atom identifier]
   (swap! attempts-atom dissoc identifier))
 
-(defn- set-token-cookie [response token]
-  (assoc-in response [:cookies "authToken"]
-            {:value token
-             :http-only true
-             :secure (not= (System/getenv "APP_VERSION") "development")
-             :same-site :lax
-             :path "/"
-             :max-age 604800})) ;; 7 days
-
 (defn auth-handler
   [request]
   (let [body (-> request :body)
@@ -96,13 +123,7 @@
 (defn logout-handler
   [_]
   (-> (ok {:message "Logged out successfully."})
-      (assoc-in [:cookies "authToken"]
-                {:value ""
-                 :http-only true
-                 :secure (not= (System/getenv "APP_VERSION") "development")
-                 :same-site :lax
-                 :path "/"
-                 :max-age 0})))
+      (set-token-cookie "" 0)))
 
 (defn get-me-handler
   [request]

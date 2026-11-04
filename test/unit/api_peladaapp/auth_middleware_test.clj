@@ -171,6 +171,57 @@
     (let [resp (auth/logout-handler {})]
       (is (= 200 (:status resp)))
       (is (= "" (get-in resp [:cookies "authToken" :value])))
+      (is (= 0 (get-in resp [:cookies "authToken" :max-age])))))
+
+  (testing "auth-handler sets token cookie with 30-day max-age"
+    (with-redefs [controllers.auth/authenticate (fn [_ _] {:token "token-30d" :user {:id "u1" :email "u@test.com"}})]
+      (let [resp (auth/auth-handler {:body {:email "u@test.com" :password "pass"} :database nil})]
+        (is (= 200 (:status resp)))
+        (is (= 2592000 (get-in resp [:cookies "authToken" :max-age])))))))
+
+(deftest test-sliding-session-middleware
+  (testing "renews authToken cookie for authenticated 2xx requests"
+    (let [middleware (auth/wrap-sliding-session (fn [_] {:status 200 :body {:ok true}}))
+          req {:identity {:id (random-uuid)}
+               :cookies {"authToken" {:value "existing-jwt-token"}}}
+          resp (middleware req)]
+      (is (= 200 (:status resp)))
+      (is (= "existing-jwt-token" (get-in resp [:cookies "authToken" :value])))
+      (is (= 2592000 (get-in resp [:cookies "authToken" :max-age])))))
+
+  (testing "does not set cookie when request is unauthenticated"
+    (let [middleware (auth/wrap-sliding-session (fn [_] {:status 200 :body {:ok true}}))
+          req {}
+          resp (middleware req)]
+      (is (= 200 (:status resp)))
+      (is (nil? (get-in resp [:cookies "authToken"])))))
+
+  (testing "does not set cookie when response status is non-2xx"
+    (let [middleware (auth/wrap-sliding-session (fn [_] {:status 401 :body {:error "Unauthorized"}}))
+          req {:identity {:id (random-uuid)}
+               :cookies {"authToken" {:value "token"}}}
+          resp (middleware req)]
+      (is (= 401 (:status resp)))
+      (is (nil? (get-in resp [:cookies "authToken"])))))
+
+  (testing "does not set cookie for media endpoints like /avatar"
+    (let [middleware (auth/wrap-sliding-session (fn [_] {:status 200 :body "avatar-bytes"}))
+          req {:uri "/api/user/123/avatar"
+               :identity {:id (random-uuid)}
+               :cookies {"authToken" {:value "token"}}}
+          resp (middleware req)]
+      (is (= 200 (:status resp)))
+      (is (nil? (get-in resp [:cookies "authToken"])))))
+
+  (testing "does not overwrite explicit cookie modifications (e.g. logout)"
+    (let [middleware (auth/wrap-sliding-session (fn [_] {:status 200
+                                                         :body {:ok true}
+                                                         :cookies {"authToken" {:value "" :max-age 0}}}))
+          req {:identity {:id (random-uuid)}
+               :cookies {"authToken" {:value "token"}}}
+          resp (middleware req)]
+      (is (= 200 (:status resp)))
+      (is (= "" (get-in resp [:cookies "authToken" :value])))
       (is (= 0 (get-in resp [:cookies "authToken" :max-age]))))))
 
 (deftest test-get-me-handler
