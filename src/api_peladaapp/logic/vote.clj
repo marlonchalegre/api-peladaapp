@@ -11,6 +11,14 @@
                     {:type :bad-request
                      :message "Voter cannot vote for himself"}))))
 
+(defn ensure-same-team
+  "Ensure target player belongs to the same team as voter."
+  [voter-team-id target-team-id]
+  (when (and voter-team-id (not= voter-team-id target-team-id))
+    (throw (ex-info "Target player is not in voter's team"
+                    {:type :bad-request
+                     :message "You can only vote for players from your team"}))))
+
 (defn ensure-valid-stars
   [stars]
   (when-not (and (number? stars) (<= 1 stars 5))

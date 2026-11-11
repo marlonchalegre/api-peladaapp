@@ -24,11 +24,11 @@
         ds (if (fn? db-val) (db-val) db-val)
 
         ;; Setup: 3 users
-        token1 (th/register-and-login! app {:name "Admin" :email "admin@test.com" :password "pass"})
+        token1 (th/register-and-login! app {:name "Admin" :email "vd-admin@test.com" :password "pass"})
         auth1 (th/auth-cookie token1)
-        token2 (th/register-and-login! app {:name "Player 1" :email "p1@test.com" :password "pass"})
+        token2 (th/register-and-login! app {:name "Player 1" :email "vd-p1@test.com" :password "pass"})
         auth2 (th/auth-cookie token2)
-        _ (th/register-and-login! app {:name "Player 2" :email "p2@test.com" :password "pass"})
+        _ (th/register-and-login! app {:name "Player 2" :email "vd-p2@test.com" :password "pass"})
 
         ;; Admin creates org
         org-id (:id (th/decode-body (app (-> (mock/request :post "/api/organizations")
@@ -37,7 +37,7 @@
         _ (jdbc/execute! ds ["UPDATE \"OrganizationFeatureFlags\" SET peer_voting = TRUE WHERE organization_id = ?" (parse-uuid org-id)])]
 
     ;; Add P1 and P2 to org
-    (doseq [email ["p1@test.com" "p2@test.com"]]
+    (doseq [email ["vd-p1@test.com" "vd-p2@test.com"]]
       (let [uid (th/user-id-by-email ds email)]
         (exec! ds (-> (h/insert-into :OrganizationPlayers) (h/values [{:organization_id (misc/as-uuid org-id) :user_id (misc/as-uuid uid) :member_type [:cast "diarista" :member_type]}])))))
 
@@ -50,17 +50,16 @@
       (app (-> (mock/request :post "/api/teams") (mock/json-body {:pelada_id pelada-id :name "Team B"}) auth1))
 
       ;; Get player IDs and team IDs
-      (let [admin-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (misc/as-uuid (th/user-id-by-email ds "admin@test.com"))]))))
-            p1-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (misc/as-uuid (th/user-id-by-email ds "p1@test.com"))]))))
-            p2-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (misc/as-uuid (th/user-id-by-email ds "p2@test.com"))]))))
+      (let [admin-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (misc/as-uuid (th/user-id-by-email ds "vd-admin@test.com"))]))))
+            p1-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (misc/as-uuid (th/user-id-by-email ds "vd-p1@test.com"))]))))
+            p2-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (misc/as-uuid (th/user-id-by-email ds "vd-p2@test.com"))]))))
             teams (exec! ds (-> (h/select :id) (h/from :Teams) (h/where [:= :pelada_id (misc/as-uuid pelada-id)]) (h/order-by :id)))
-            t1-id (:id (first teams))
-            t2-id (:id (second teams))]
+            t1-id (:id (first teams))]
 
-        ;; Add players to teams
+        ;; Add players to teams (all in Team 1 so they are teammates under team-based voting)
         (exec! ds (-> (h/insert-into :TeamPlayers) (h/values [{:team_id (misc/as-uuid t1-id) :player_id (misc/as-uuid admin-id)}
                                                               {:team_id (misc/as-uuid t1-id) :player_id (misc/as-uuid p1-id)}
-                                                              {:team_id (misc/as-uuid t2-id) :player_id (misc/as-uuid p2-id)}])))
+                                                              {:team_id (misc/as-uuid t1-id) :player_id (misc/as-uuid p2-id)}])))
 
         ;; Create attendance records for all players with voting_enabled = true
         (doseq [pid [admin-id p1-id p2-id]]

@@ -59,3 +59,16 @@
           twenty-five-hours-ago (.minus now (Duration/ofHours 25))
           pelada {:status "closed" :closed-at twenty-five-hours-ago}]
       (is (false? (vote.logic/voting-open? pelada))))))
+
+(deftest test-ensure-same-team
+  (let [team-1 (parse-uuid "00000000-0000-0000-0000-000000000001")
+        team-2 (parse-uuid "00000000-0000-0000-0000-000000000002")]
+    (testing "Same team should not throw"
+      (is (nil? (vote.logic/ensure-same-team team-1 team-1))))
+
+    (testing "Different team should throw"
+      (is (thrown-with-msg? clojure.lang.ExceptionInfo #"Target player is not in voter's team"
+                            (vote.logic/ensure-same-team team-1 team-2))))
+
+    (testing "Nil voter-team (e.g. global/fixed gk) should not throw"
+      (is (nil? (vote.logic/ensure-same-team nil team-2))))))

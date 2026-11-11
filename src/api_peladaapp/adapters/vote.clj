@@ -77,6 +77,7 @@
                     (:voters model))
       :total_eligible (:total-eligible model)
       :total_voted (:total-voted model)}
+     :is_admin (:is-admin model)
      :organization_id (:organization-id model)
      :organization_name (:organization-name model))))
 

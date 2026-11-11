@@ -45,10 +45,9 @@
       (let [p1-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (misc/as-uuid (th/user-id-by-email ds "u1@test.com"))]))))
             p2-id (:id (exec-one! ds (-> (h/select :id) (h/from :OrganizationPlayers) (h/where [:= :user_id (misc/as-uuid (th/user-id-by-email ds "u2@test.com"))]))))
             teams (exec! ds (-> (h/select :id) (h/from :Teams) (h/where [:= :pelada_id (misc/as-uuid pelada-id)]) (h/order-by :id)))
-            t1-id (:id (first teams))
-            t2-id (:id (second teams))]
+            t1-id (:id (first teams))]
         (exec! ds (-> (h/insert-into :TeamPlayers) (h/values [{:team_id (misc/as-uuid t1-id) :player_id (misc/as-uuid p1-id)}
-                                                              {:team_id (misc/as-uuid t2-id) :player_id (misc/as-uuid p2-id)}]))))
+                                                              {:team_id (misc/as-uuid t1-id) :player_id (misc/as-uuid p2-id)}]))))
 
       (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/close-attendance")) auth1))
       (app (-> (mock/request :post (str "/api/peladas/" pelada-id "/begin")) auth1))

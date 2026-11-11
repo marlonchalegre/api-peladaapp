@@ -1,6 +1,7 @@
 (ns api-peladaapp.db.vote
   (:require
    [api-peladaapp.adapters.vote :as adapter.vote]
+   [api-peladaapp.db.team :as db.team]
    [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.logic.grade :as logic.grade]
@@ -131,21 +132,50 @@
 
 (s/defn list-eligible-players-for-voting
   [pelada-id :- s/Uuid voter-player-id :- (s/maybe s/Uuid) db]
-  (let [where-clause (cond-> [:and
-                              [:or
-                               [:in :op.id (-> (h/select :player_id)
-                                               (h/from [:TeamPlayers :sub_tp])
-                                               (h/join [:Teams :sub_t] [:= :sub_t.id :sub_tp.team_id])
-                                               (h/where [:= :sub_t.pelada_id pelada-id]))]
-                               [:in :op.id (-> (h/select :home_fixed_goalkeeper_id)
-                                               (h/from [:Peladas :sub_p1])
-                                               (h/where [:= :sub_p1.id pelada-id]
-                                                        [:is-not :sub_p1.home_fixed_goalkeeper_id nil]))]
-                               [:in :op.id (-> (h/select :away_fixed_goalkeeper_id)
-                                               (h/from [:Peladas :sub_p2])
-                                               (h/where [:= :sub_p2.id pelada-id]
-                                                        [:is-not :sub_p2.away_fixed_goalkeeper_id nil]))]]]
-                       voter-player-id (conj [:!= :op.id voter-player-id]))
+  (let [voter-team-id (when voter-player-id
+                        (db.team/get-player-team-id pelada-id voter-player-id db))
+        teams (when voter-team-id (db.team/list-pelada-teams pelada-id db))
+        home-team-id (:id (first teams))
+        away-team-id (:id (second teams))
+        team-gk-clause (cond
+                         (= voter-team-id home-team-id)
+                         [:in :op.id (-> (h/select :home_fixed_goalkeeper_id)
+                                         (h/from [:Peladas :sub_p1])
+                                         (h/where [:= :sub_p1.id pelada-id]
+                                                  [:is-not :sub_p1.home_fixed_goalkeeper_id nil]))]
+                         (= voter-team-id away-team-id)
+                         [:in :op.id (-> (h/select :away_fixed_goalkeeper_id)
+                                         (h/from [:Peladas :sub_p2])
+                                         (h/where [:= :sub_p2.id pelada-id]
+                                                  [:is-not :sub_p2.away_fixed_goalkeeper_id nil]))]
+                         :else nil)
+        where-clause (if voter-team-id
+                       [:and
+                        (if team-gk-clause
+                          [:or
+                           [:in :op.id (-> (h/select :sub_tp.player_id)
+                                           (h/from [:TeamPlayers :sub_tp])
+                                           (h/where [:= :sub_tp.team_id voter-team-id]))]
+                           team-gk-clause]
+                          [:in :op.id (-> (h/select :sub_tp.player_id)
+                                          (h/from [:TeamPlayers :sub_tp])
+                                          (h/where [:= :sub_tp.team_id voter-team-id]))])
+                        [:!= :op.id voter-player-id]]
+                       (cond-> [:and
+                                [:or
+                                 [:in :op.id (-> (h/select :player_id)
+                                                 (h/from [:TeamPlayers :sub_tp])
+                                                 (h/join [:Teams :sub_t] [:= :sub_t.id :sub_tp.team_id])
+                                                 (h/where [:= :sub_t.pelada_id pelada-id]))]
+                                 [:in :op.id (-> (h/select :home_fixed_goalkeeper_id)
+                                                 (h/from [:Peladas :sub_p1])
+                                                 (h/where [:= :sub_p1.id pelada-id]
+                                                          [:is-not :sub_p1.home_fixed_goalkeeper_id nil]))]
+                                 [:in :op.id (-> (h/select :away_fixed_goalkeeper_id)
+                                                 (h/from [:Peladas :sub_p2])
+                                                 (h/where [:= :sub_p2.id pelada-id]
+                                                          [:is-not :sub_p2.away_fixed_goalkeeper_id nil]))]]]
+                         voter-player-id (conj [:!= :op.id voter-player-id])))
         query (-> (h/select [:op.id :player_id] [:u.id :user_id] :u.name :u.position :u.avatar_filename
                             [:pa.voting_enabled :pa_voting_enabled]
                             [:p.home_fixed_goalkeeper_id :home_fixed_goalkeeper_id]

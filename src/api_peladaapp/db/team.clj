@@ -210,3 +210,41 @@
                   (h/where [:and [:= :team_id team-id] [:= :player_id player-id]]))
         res (jdbc/execute-one! db (hsql/format query) hsql/opts)]
     (boolean (:is_goalkeeper res))))
+
+(s/defn get-pelada-player-team-map :- {s/Uuid s/Uuid}
+  "Gets a map of {player-id team-id} for all players in a pelada, including fixed goalkeepers."
+  [pelada-id :- s/Uuid db]
+  (let [team-players (list-team-players-by-pelada pelada-id db)
+        base-map (into {} (map (fn [tp] [(:player_id tp) (:team_id tp)]) team-players))
+        p-query (-> (h/select :home_fixed_goalkeeper_id :away_fixed_goalkeeper_id)
+                    (h/from :Peladas)
+                    (h/where [:= :id pelada-id]))
+        pelada (jdbc/execute-one! db (hsql/format p-query) hsql/opts)
+        teams (list-pelada-teams pelada-id db)
+        home-team-id (:id (first teams))
+        away-team-id (:id (second teams))]
+    (cond-> base-map
+      (and (:home_fixed_goalkeeper_id pelada) home-team-id)
+      (assoc (:home_fixed_goalkeeper_id pelada) home-team-id)
+
+      (and (:away_fixed_goalkeeper_id pelada) away-team-id)
+      (assoc (:away_fixed_goalkeeper_id pelada) away-team-id))))
+
+(s/defn get-player-team-id :- (s/maybe s/Uuid)
+  "Gets the team id of a player in a specific pelada, or nil if not in any team."
+  [pelada-id :- s/Uuid player-id :- s/Uuid db]
+  (let [query (-> (h/select :tp.team_id)
+                  (h/from [:TeamPlayers :tp])
+                  (h/join [:Teams :t] [:= :t.id :tp.team_id])
+                  (h/where [:and [:= :t.pelada_id pelada-id] [:= :tp.player_id player-id]]))
+        team-id (:team_id (jdbc/execute-one! db (hsql/format query) hsql/opts))]
+    (or team-id
+        (let [p-query (-> (h/select :home_fixed_goalkeeper_id :away_fixed_goalkeeper_id)
+                          (h/from :Peladas)
+                          (h/where [:= :id pelada-id]))
+              pelada (jdbc/execute-one! db (hsql/format p-query) hsql/opts)
+              teams (list-pelada-teams pelada-id db)]
+          (cond
+            (= player-id (:home_fixed_goalkeeper_id pelada)) (:id (first teams))
+            (= player-id (:away_fixed_goalkeeper_id pelada)) (:id (second teams))
+            :else nil)))))

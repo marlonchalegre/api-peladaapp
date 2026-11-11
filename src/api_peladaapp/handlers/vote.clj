@@ -53,7 +53,8 @@
 (defn voting-status [request]
   (try (let [db (:database request)
              pelada-id (misc/as-uuid (get-in request [:params :id]))
+             user-id (auth/get-user-id-from-request request)
              _ (require-peer-voting-flag! pelada-id db)]
          (ok (adapter.vote/voting-status-model->response
-              (controller.vote/get-voting-status pelada-id db))))
+              (controller.vote/get-voting-status pelada-id user-id db))))
        (catch Exception e (exception/api-exception-handler e))))

@@ -49,6 +49,7 @@
    :voters [VoterStatus]
    :total-eligible s/Int
    :total-voted s/Int
+   (s/optional-key :is-admin) s/Bool
    (s/optional-key :organization-id) s/Uuid
    (s/optional-key :organization-name) s/Str})
 
