@@ -14,7 +14,9 @@
    (s/optional-key :home_fixed_goalkeeper_id) s/Uuid
    (s/optional-key :away_fixed_goalkeeper_id) s/Uuid
    (s/optional-key :notify_casual_players) s/Bool
-   (s/optional-key :status) s/Str})
+   (s/optional-key :status) s/Str
+   (s/optional-key :format) (s/maybe s/Str)
+   (s/optional-key :format_config) (s/maybe {s/Any s/Any})})
 
 (s/defschema UpdatePeladaRequest
   {(s/optional-key :organization_id) s/Uuid
@@ -31,7 +33,11 @@
    (s/optional-key :status) s/Str
    (s/optional-key :timer_started_at) (s/maybe s/Any)
    (s/optional-key :timer_accumulated_ms) (s/maybe s/Int)
-   (s/optional-key :timer_status) (s/maybe s/Str)})
+   (s/optional-key :timer_status) (s/maybe s/Str)
+   (s/optional-key :format) (s/maybe s/Str)
+   (s/optional-key :format_config) (s/maybe {s/Any s/Any})})
 
 (s/defschema BeginPeladaRequest
-  {(s/optional-key :matches_per_team) s/Int})
+  {(s/optional-key :matches_per_team) s/Int
+   (s/optional-key :format) (s/maybe s/Str)
+   (s/optional-key :format_config) (s/maybe {s/Any s/Any})})

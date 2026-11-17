@@ -9,9 +9,12 @@
 
 (s/defn update-score-request->model :- (s/pred map?)
   [request :- requests.match/UpdateMatchScoreRequest]
-  {:home-score (:home_score request)
-   :away-score (:away_score request)
-   :status (:status request)})
+  (cond-> {:home-score (:home_score request)
+           :away-score (:away_score request)
+           :status (:status request)}
+    (contains? request :winner_team_id) (assoc :winner-team-id (some-> (:winner_team_id request) misc/as-uuid))
+    (:home_team_id request) (assoc :home-team-id (misc/as-uuid (:home_team_id request)))
+    (:away_team_id request) (assoc :away-team-id (misc/as-uuid (:away_team_id request)))))
 
 (s/defn create-event-request->model :- (s/pred map?)
   [request :- requests.match/CreateMatchEventRequest]
@@ -59,12 +62,14 @@
 
 (s/defn model->response :- responses.match/MatchResponse
   [{:keys [id pelada-id home-team-id away-team-id sequence status home-score away-score
-           timer-started-at timer-accumulated-ms timer-status support-camera-player-id support-stats-player-id]}]
+           timer-started-at timer-accumulated-ms timer-status support-camera-player-id support-stats-player-id
+           stage winner-team-id]}]
   (cond-> {:id id
            :pelada_id pelada-id
            :home_team_id home-team-id
            :away_team_id away-team-id
-           :sequence sequence}
+           :sequence sequence
+           :stage (or stage "regular")}
     status (assoc :status status)
     (some? home-score) (assoc :home_score home-score)
     (some? away-score) (assoc :away_score away-score)
@@ -72,7 +77,8 @@
     (some? timer-accumulated-ms) (assoc :timer_accumulated_ms timer-accumulated-ms)
     timer-status (assoc :timer_status timer-status)
     (some? support-camera-player-id) (assoc :support_camera_player_id support-camera-player-id)
-    (some? support-stats-player-id) (assoc :support_stats_player_id support-stats-player-id)))
+    (some? support-stats-player-id) (assoc :support_stats_player_id support-stats-player-id)
+    (some? winner-team-id) (assoc :winner_team_id winner-team-id)))
 
 (s/defn event->response :- responses.match/MatchEventResponse
   [{:keys [id match-id player-id event-type created-at session-time-ms match-time-ms parent-event-id team-id]}]
@@ -102,7 +108,8 @@
              :pelada-id (:pelada_id p)
              :home-team-id (:home_team_id p)
              :away-team-id (:away_team_id p)
-             :sequence (:sequence p)}
+             :sequence (:sequence p)
+             :stage (or (:stage p) "regular")}
       (:status p) (assoc :status (:status p))
       (some? (:home_score p)) (assoc :home-score (:home_score p))
       (some? (:away_score p)) (assoc :away-score (:away_score p))
@@ -110,7 +117,8 @@
       (some? (:timer_accumulated_ms p)) (assoc :timer-accumulated-ms (:timer_accumulated_ms p))
       (:timer_status p) (assoc :timer-status (:timer_status p))
       (:support_camera_player_id p) (assoc :support-camera-player-id (:support_camera_player_id p))
-      (:support_stats_player_id p) (assoc :support-stats-player-id (:support_stats_player_id p)))))
+      (:support_stats_player_id p) (assoc :support-stats-player-id (:support_stats_player_id p))
+      (:winner_team_id p) (assoc :winner-team-id (:winner_team_id p)))))
 
 (s/defn db-event->model :- models.match-event/MatchEvent
   [e]

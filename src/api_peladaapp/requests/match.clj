@@ -3,9 +3,12 @@
    [schema.core :as s]))
 
 (s/defschema UpdateMatchScoreRequest
-  {:home_score s/Int
-   :away_score s/Int
-   (s/optional-key :status) s/Str})
+  {(s/optional-key :home_score) s/Int
+   (s/optional-key :away_score) s/Int
+   (s/optional-key :status) s/Str
+   (s/optional-key :winner_team_id) (s/maybe s/Uuid)
+   (s/optional-key :home_team_id) s/Uuid
+   (s/optional-key :away_team_id) s/Uuid})
 
 (s/defschema CreateMatchEventRequest
   {:player_id s/Uuid

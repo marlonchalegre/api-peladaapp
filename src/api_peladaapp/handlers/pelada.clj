@@ -88,14 +88,20 @@
              id (misc/as-uuid (get-in request [:params :id]))
              body (:body request)
              matches-per-team (some-> (:matches_per_team body) int)
+             fmt (:format body)
+             fmt-config (:format_config body)
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
-             org-id (:organization-id pelada)]
+             org-id (:organization-id pelada)
+             opts (cond-> {}
+                    matches-per-team (assoc :matches_per_team matches-per-team)
+                    fmt (assoc :format fmt)
+                    (contains? body :format_config) (assoc :format_config fmt-config))]
          ;; Only admins can begin peladas
          (auth/require-organization-admin! user-id org-id db)
          (ok (adapter.pelada/begin-model->response
-              (if matches-per-team
-                (controller.pelada/begin-pelada id db {:matches_per_team matches-per-team})
+              (if (seq opts)
+                (controller.pelada/begin-pelada id db opts)
                 (controller.pelada/begin-pelada id db)))))
        (catch Exception e (exception/api-exception-handler e))))
 
@@ -165,23 +171,30 @@
              matches-per-team (Integer/parseInt (str (or (get-in request [:params :matches_per_team])
                                                          (get-in request [:params "matches_per_team"])
                                                          "2")))
+             fmt (or (get-in request [:params :format])
+                     (get-in request [:params "format"]))
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
              org-id (:organization-id pelada)]
          (auth/require-organization-admin! user-id org-id db)
-         (ok (controller.pelada/get-schedule-preview id matches-per-team db)))
+         (ok (controller.pelada/get-schedule-preview id matches-per-team fmt db)))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn save-schedule-plan [request]
   (try (let [db (:database request)
              id (misc/as-uuid (get-in request [:params :id]))
              body (:body request)
-             matches (map (fn [m] (assoc m :home (misc/as-uuid (:home m)) :away (misc/as-uuid (:away m)))) (:matches body))
+             matches (map (fn [m] (cond-> (assoc m :home (misc/as-uuid (:home m)) :away (misc/as-uuid (:away m)))
+                                    (:stage m) (assoc :stage (:stage m))))
+                          (:matches body))
+             opts (cond-> {}
+                    (:format body) (assoc :format (:format body))
+                    (contains? body :format_config) (assoc :format-config (:format_config body)))
              user-id (auth/get-user-id-from-request request)
              pelada (controller.pelada/get-pelada id db)
              org-id (:organization-id pelada)]
          (auth/require-organization-admin! user-id org-id db)
-         (ok (controller.pelada/save-schedule-plan id matches db)))
+         (ok (controller.pelada/save-schedule-plan id matches opts db)))
        (catch Exception e (exception/api-exception-handler e))))
 
 (defn get-schedule-plan [request]

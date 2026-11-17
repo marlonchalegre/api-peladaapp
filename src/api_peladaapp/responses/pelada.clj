@@ -23,7 +23,9 @@
    (s/optional-key :timer_started_at) (s/maybe s/Any)
    (s/optional-key :timer_accumulated_ms) (s/maybe s/Int)
    (s/optional-key :timer_status) (s/maybe s/Str)
-   (s/optional-key :user_attendance_status) (s/maybe s/Str)})
+   (s/optional-key :user_attendance_status) (s/maybe s/Str)
+   (s/optional-key :format) (s/maybe s/Str)
+   (s/optional-key :format_config) (s/maybe {s/Any s/Any})})
 
 (s/defschema PeladaBeginResponse
   {:matches_created s/Int})

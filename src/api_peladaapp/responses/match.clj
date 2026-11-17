@@ -15,7 +15,9 @@
    (s/optional-key :timer_accumulated_ms) (s/maybe s/Int)
    (s/optional-key :timer_status) (s/maybe s/Str)
    (s/optional-key :support_camera_player_id) (s/maybe s/Uuid)
-   (s/optional-key :support_stats_player_id) (s/maybe s/Uuid)})
+   (s/optional-key :support_stats_player_id) (s/maybe s/Uuid)
+   (s/optional-key :stage) (s/maybe s/Str)
+   (s/optional-key :winner_team_id) (s/maybe s/Uuid)})
 
 (s/defschema MatchEventResponse
   {:id s/Uuid

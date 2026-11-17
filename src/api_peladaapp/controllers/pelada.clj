@@ -64,39 +64,53 @@
     assigned-matches))
 
 (s/defn get-schedule-preview
-  [pelada-id :- s/Uuid matches-per-team :- s/Int db]
-  (let [team-ids (fetch-team-ids pelada-id db)
-        team-count (count team-ids)]
-    (if (< team-count 2)
-      {:matches [] :is_from_format false}
-      (let [random-plan (try (pelada.logic/schedule-matches-for-start team-ids matches-per-team)
-                             (catch Exception e (log/error e "[ERROR] failed to gen random plan:") []))]
-        {:matches random-plan
-         :random_matches random-plan
-         :is_from_format false}))))
+  ([pelada-id :- s/Uuid matches-per-team :- s/Int db]
+   (get-schedule-preview pelada-id matches-per-team nil db))
+  ([pelada-id :- s/Uuid matches-per-team :- s/Int format-override db]
+   (let [team-ids (fetch-team-ids pelada-id db)
+         team-count (count team-ids)]
+     (if (< team-count 2)
+       {:matches [] :is_from_format false}
+       (let [fmt (or format-override
+                     (:format (db.pelada/get-pelada pelada-id db))
+                     "round_robin")
+             random-plan (try (pelada.logic/schedule-matches-for-start team-ids matches-per-team fmt)
+                              (catch Exception e (log/error e "[ERROR] failed to gen random plan:") []))]
+         {:matches random-plan
+          :random_matches random-plan
+          :is_from_format false})))))
 
 (s/defn save-schedule-plan
-  [pelada-id :- s/Uuid matches db]
-  (jdbc/with-transaction [tx db]
-    (let [team-ids (fetch-team-ids pelada-id tx)
-          team-set (set team-ids)]
+  ([pelada-id :- s/Uuid matches db]
+   (save-schedule-plan pelada-id matches {} db))
+  ([pelada-id :- s/Uuid matches opts db]
+   (jdbc/with-transaction [tx db]
+     (let [team-ids (fetch-team-ids pelada-id tx)
+           team-set (set team-ids)
+           pelada-updates (cond-> {}
+                            (:format opts) (assoc :format (:format opts))
+                            (contains? opts :format-config) (assoc :format-config (:format-config opts)))]
 
-      (doseq [match matches]
-        (when-not (and (contains? team-set (:home match))
-                       (contains? team-set (:away match)))
-          (throw (ex-info "One or more teams in the schedule do not belong to this pelada"
-                          {:type :bad-request
-                           :message "Invalid teams in schedule plan. Please refresh and try again."}))))
+       (when (seq pelada-updates)
+         (db.pelada/update-pelada pelada-id pelada-updates tx))
 
-      (db.schedule/delete-match-plans-by-pelada pelada-id tx)
+       (doseq [match matches]
+         (when-not (and (contains? team-set (:home match))
+                        (contains? team-set (:away match)))
+           (throw (ex-info "One or more teams in the schedule do not belong to this pelada"
+                           {:type :bad-request
+                            :message "Invalid teams in schedule plan. Please refresh and try again."}))))
 
-      (doseq [[idx match] (map-indexed vector matches)]
-        (db.schedule/insert-match-plan {:pelada-id pelada-id
-                                        :home-team-id (:home match)
-                                        :away-team-id (:away match)
-                                        :sequence (inc idx)}
-                                       tx))
-      {:status "success"})))
+       (db.schedule/delete-match-plans-by-pelada pelada-id tx)
+
+       (doseq [[idx match] (map-indexed vector matches)]
+         (db.schedule/insert-match-plan {:pelada-id pelada-id
+                                         :home-team-id (:home match)
+                                         :away-team-id (:away match)
+                                         :sequence (inc idx)
+                                         :stage (or (:stage match) "regular")}
+                                        tx))
+       {:status "success"}))))
 
 (s/defn get-schedule-plan
   [pelada-id :- s/Uuid db]
@@ -105,7 +119,8 @@
            (let [row (misc/unamespace p)]
              {:home (:home_team_id row)
               :away (:away_team_id row)
-              :sequence (:sequence row)}))
+              :sequence (:sequence row)
+              :stage (or (:stage row) "regular")}))
          plans)))
 
 (s/defn create-pelada :- models.pelada/Pelada
@@ -219,18 +234,35 @@
   [pelada-id :- s/Uuid db & [opts]]
   (let [result (try
                  (jdbc/with-transaction [tx db]
-                   (let [matches-per-team (:matches_per_team (or opts {}))
-                         pelada (db.pelada/get-pelada pelada-id tx)
+                   (let [opts-map (or opts {})
+                         matches-per-team (:matches_per_team opts-map)
+                         format-opt (:format opts-map)
+                         format-config-opt (:format_config opts-map)
+                         pelada-0 (db.pelada/get-pelada pelada-id tx)
+                         effective-format (or format-opt (:format pelada-0) "round_robin")
+                         effective-config (merge (or (:format-config pelada-0) {})
+                                                 (or format-config-opt {})
+                                                 (when matches-per-team {:matches_per_team matches-per-team}))
+                         pelada (assoc pelada-0 :format effective-format :format-config effective-config)
+                         team-ids (->> (fetch-team-ids pelada-id tx)
+                                       (pelada.logic/ensure-startable pelada))
                          saved-plan (db.schedule/list-match-plans-by-pelada pelada-id tx)
-                         match-plan (if (seq saved-plan)
+                         default-stage (pelada.logic/default-stage-for-format effective-format)
+                         match-plan (if (and (seq saved-plan)
+                                             ;; If format was overridden to winner_stays_on and saved plan had many matches, regenerate unless saved plan matches
+                                             (or (not= effective-format "winner_stays_on")
+                                                 (= 1 (count saved-plan))))
                                       (map (fn [p] {:home (:home_team_id p)
-                                                    :away (:away_team_id p)})
+                                                    :away (:away_team_id p)
+                                                    :stage (if (= "regular" (or (:stage p) "regular"))
+                                                             default-stage
+                                                             (:stage p))})
                                            saved-plan)
-                                      (let [team-ids (->> (fetch-team-ids pelada-id tx)
-                                                          (pelada.logic/ensure-startable pelada))]
-                                        (pelada.logic/schedule-matches-for-start team-ids matches-per-team)))]
+                                      (pelada.logic/schedule-matches-for-start team-ids matches-per-team effective-format))]
                      (persist-match-plan! pelada-id match-plan tx)
-                     (db.pelada/update-pelada pelada-id {:status "running"} tx)
+                     (db.pelada/update-pelada pelada-id {:status "running"
+                                                         :format effective-format
+                                                         :format-config effective-config} tx)
                      (seed-lineups-from-teams! pelada-id tx)
                      (generate-and-save-support-lineups! pelada-id tx)
                      {:pelada pelada :matches-created (count match-plan)}))

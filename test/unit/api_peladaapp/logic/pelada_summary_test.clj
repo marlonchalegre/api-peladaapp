@@ -101,3 +101,22 @@
     (is (nil? (:top-scorer awards)))
     (is (nil? (:garcom awards)))
     (is (= {:mvp nil :top-scorer nil :garcom nil} awards))))
+
+(deftest test-championship-final-crowns-final-winner-without-distorting-group-points
+  (let [group-and-final-matches
+        [{:pelada_id "p1" :home_team_id "a" :away_team_id "b" :home_score 3 :away_score 0 :stage "group"}
+         {:pelada_id "p1" :home_team_id "a" :away_team_id "c" :home_score 2 :away_score 0 :stage "group"}
+         {:pelada_id "p1" :home_team_id "b" :away_team_id "c" :home_score 1 :away_score 0 :stage "group"}
+         ;; In the final, 2nd place ("b") beats 1st place ("a") 1-0!
+         {:pelada_id "p1" :home_team_id "a" :away_team_id "b" :home_score 0 :away_score 1 :stage "final"}]
+        standings (get (summary/team-standings group-and-final-matches teams) "p1")
+        [champ runner-up third] standings]
+    (testing "The winner of the Final is crowned #1 Champion even with fewer group points"
+      (is (= "Time B" (:team_name champ)))
+      (is (= 1 (:position champ)))
+      (is (= "Time A" (:team_name runner-up)))
+      (is (= 2 (:position runner-up)))
+      (is (= "Time C" (:team_name third))))
+    (testing "Group stage points only reflect group matches (Time A still has 6 pts, Time B has 3 pts)"
+      (is (= 3 (:points champ)))
+      (is (= 6 (:points runner-up))))))

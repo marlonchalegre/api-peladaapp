@@ -4,10 +4,12 @@
    [api-peladaapp.db.match :as db.match]
    [api-peladaapp.db.match-event :as db.match-event]
    [api-peladaapp.db.match-lineup :as db.match-lineup]
+   [api-peladaapp.db.pelada :as db.pelada]
    [api-peladaapp.db.team :as db.team]
    [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.match :as match.logic]
    [api-peladaapp.logic.match-event :as match-event.logic]
+   [api-peladaapp.logic.pelada :as pelada.logic]
    [api-peladaapp.logic.support-lineup :as support-lineup]
    [api-peladaapp.models.match :as models.match]
    [api-peladaapp.models.match-event :as models.match-event]
@@ -22,11 +24,61 @@
   [match-id :- s/Uuid db]
   (db.match/get-match match-id db))
 
+(defn- create-dynamic-matches!
+  [pelada-id new-match-specs existing-matches teams tx]
+  (when (seq new-match-specs)
+    (let [max-seq (reduce max 0 (map :sequence existing-matches))
+          team-ids (mapv :id teams)
+          team-players (db.team/list-team-players-by-pelada pelada-id tx)
+          confirmed-player-ids (mapv :player-id (db.attendance/list-confirmed-players-by-pelada pelada-id tx))]
+      (loop [[spec & more] new-match-specs
+             curr-seq (inc max-seq)
+             accumulated-matches (vec existing-matches)]
+        (when spec
+          (let [draft-match {:pelada-id pelada-id
+                             :home-team-id (:home spec)
+                             :away-team-id (:away spec)
+                             :sequence curr-seq
+                             :status "scheduled"
+                             :home-score 0
+                             :away-score 0
+                             :stage (or (:stage spec) "regular")}
+                with-support (support-lineup/reroll-single-match draft-match
+                                                                 accumulated-matches
+                                                                 team-ids
+                                                                 team-players
+                                                                 confirmed-player-ids)
+                match-id (db.match/insert-match with-support tx)]
+            (db.match-lineup/ensure-seeded match-id tx)
+            (recur more (inc curr-seq) (conj accumulated-matches (assoc with-support :id match-id)))))))))
+
+(defn- maybe-advance-pelada-progression!
+  [pelada-id tx]
+  (let [pelada (db.pelada/get-pelada pelada-id tx)
+        fmt (or (:format pelada) "round_robin")]
+    (when (not= fmt "round_robin")
+      (let [all-matches (db.match/list-matches-by-pelada pelada-id tx)
+            teams (db.team/list-pelada-teams pelada-id tx)
+            new-specs (pelada.logic/compute-next-progression-matches pelada all-matches teams)]
+        (create-dynamic-matches! pelada-id new-specs all-matches teams tx)))))
+
 (s/defn update-score :- models.match/Match
   [match-id :- s/Uuid score-update db]
   (let [validated-update (match.logic/build-score-update score-update)]
-    (db.match/update-score match-id validated-update db)
-    (db.match/get-match match-id db)))
+    (jdbc/with-transaction [tx db]
+      (let [old-match (db.match/get-match match-id tx)
+            teams-changed? (or (and (:home-team-id validated-update)
+                                    (not= (:home-team-id validated-update) (:home-team-id old-match)))
+                               (and (:away-team-id validated-update)
+                                    (not= (:away-team-id validated-update) (:away-team-id old-match))))]
+        (db.match/update-score match-id validated-update tx)
+        (when teams-changed?
+          (db.match-lineup/delete-by-match match-id tx)
+          (db.match-lineup/ensure-seeded match-id tx))
+        (when (and (= "finished" (:status validated-update))
+                   (not= "finished" (:status old-match)))
+          (maybe-advance-pelada-progression! (:pelada-id old-match) tx))
+        (db.match/get-match match-id tx)))))
 
 (s/defn start-match-timer :- models.match/Match
   [match-id :- s/Uuid db]

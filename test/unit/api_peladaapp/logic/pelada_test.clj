@@ -57,8 +57,19 @@
       (is (= "At least two teams are required" (:message (ex-data ex1))))
       (is (= "At least two teams are required" (:message (ex-data ex2))))))
 
-  (testing "Returns vector of team IDs when count >= 2"
-    (is (= ["t1" "t2"] (pelada.logic/ensure-schedulable-team-count '("t1" "t2"))))))
+  (testing "Throws when team count is too small for specific formats"
+    (let [ex-final (try (pelada.logic/ensure-schedulable-team-count ["t1" "t2"] "championship_final") (catch Exception e e))
+          ex-semis (try (pelada.logic/ensure-schedulable-team-count ["t1" "t2" "t3"] "championship_semis_final") (catch Exception e e))
+          ex-wso (try (pelada.logic/ensure-schedulable-team-count ["t1" "t2"] "winner_stays_on") (catch Exception e e))]
+      (is (= "At least three teams are required for Group Stage + Final" (:message (ex-data ex-final))))
+      (is (= "At least four teams are required for Group Stage + Semifinals & Final" (:message (ex-data ex-semis))))
+      (is (= "At least three teams are required for Winner Stays On" (:message (ex-data ex-wso))))))
+
+  (testing "Returns vector of team IDs when count >= required"
+    (is (= ["t1" "t2"] (pelada.logic/ensure-schedulable-team-count '("t1" "t2"))))
+    (is (= ["t1" "t2" "t3"] (pelada.logic/ensure-schedulable-team-count ["t1" "t2" "t3"] "championship_final")))
+    (is (= ["t1" "t2" "t3" "t4"] (pelada.logic/ensure-schedulable-team-count ["t1" "t2" "t3" "t4"] "championship_semis_final")))
+    (is (= ["t1" "t2" "t3"] (pelada.logic/ensure-schedulable-team-count ["t1" "t2" "t3"] "winner_stays_on")))))
 
 (deftest test-get-voting-info
   (let [p-id (parse-uuid "00000000-0000-0000-0000-000000000001")
@@ -90,18 +101,54 @@
 (deftest test-schedule-matches-for-start
   (testing "Delegates to schedule-matches when matches-per-team is nil"
     (with-redefs [schedule/schedule-matches (fn [ids] (map #(hash-map :home %1 :away "t3") ids))]
-      (is (= [{:home "t1" :away "t3"} {:home "t2" :away "t3"}]
+      (is (= [{:home "t1" :away "t3" :stage "regular"} {:home "t2" :away "t3" :stage "regular"}]
              (pelada.logic/schedule-matches-for-start ["t1" "t2"] nil)))))
 
   (testing "Delegates to schedule-matches-with-limit when matches-per-team is provided"
     (with-redefs [schedule/schedule-matches-with-limit (fn [ids limit] (map #(hash-map :home %1 :away limit) ids))]
-      (is (= [{:home "t1" :away 3} {:home "t2" :away 3}]
-             (pelada.logic/schedule-matches-for-start ["t1" "t2"] 3))))))
+      (is (= [{:home "t1" :away 3 :stage "regular"} {:home "t2" :away 3 :stage "regular"}]
+             (pelada.logic/schedule-matches-for-start ["t1" "t2"] 3)))))
+
+  (testing "Assigns group stage for championship formats and single match for winner_stays_on"
+    (with-redefs [schedule/schedule-matches-with-limit (fn [ids _] [{:home (first ids) :away (second ids)}])]
+      (is (= [{:home "t1" :away "t2" :stage "group"}]
+             (pelada.logic/schedule-matches-for-start ["t1" "t2" "t3"] 2 "championship_final")))
+      (is (= [{:home "t1" :away "t2" :stage "regular"}]
+             (pelada.logic/schedule-matches-for-start ["t1" "t2" "t3"] 2 "winner_stays_on"))))))
 
 (deftest test-match-plan-to-rows
   (testing "Converts scheduled matches to DB ready rows"
     (let [p-id "pelada-1"
-          matches [{:home "t1" :away "t2"} {:home "t3" :away "t4"}]
-          expected [{:pelada-id p-id :home-team-id "t1" :away-team-id "t2" :sequence 1 :status "scheduled" :home-score 0 :away-score 0}
-                    {:pelada-id p-id :home-team-id "t3" :away-team-id "t4" :sequence 2 :status "scheduled" :home-score 0 :away-score 0}]]
+          matches [{:home "t1" :away "t2"} {:home "t3" :away "t4" :stage "final"}]
+          expected [{:pelada-id p-id :home-team-id "t1" :away-team-id "t2" :sequence 1 :status "scheduled" :home-score 0 :away-score 0 :stage "regular"}
+                    {:pelada-id p-id :home-team-id "t3" :away-team-id "t4" :sequence 2 :status "scheduled" :home-score 0 :away-score 0 :stage "final"}]]
       (is (= expected (pelada.logic/match-plan->rows p-id matches))))))
+
+(deftest test-compute-winner-stays-on-next-match
+  (testing "Challenger stays (default) on draw, winner stays on win, max consecutive wins rotates"
+    (let [teams ["t1" "t2" "t3" "t4"]]
+      ;; Match 1: t1 vs t2 -> 2-1 (t1 wins, t3 challenges)
+      (is (= {:home "t1" :away "t3" :stage "regular"}
+             (pelada.logic/compute-winner-stays-on-next-match
+              teams
+              [{:sequence 1 :home-team-id "t1" :away-team-id "t2" :home-score 2 :away-score 1}]
+              {})))
+      ;; Match 1: t1 vs t2 -> 1-1 draw -> challenger_stays means away (t2) stays, t4 is after t3
+      (is (= {:home "t2" :away "t3" :stage "regular"}
+             (pelada.logic/compute-winner-stays-on-next-match
+              teams
+              [{:sequence 1 :home-team-id "t1" :away-team-id "t2" :home-score 1 :away-score 1}]
+              {:draw_rule "challenger_stays"})))
+      ;; both_leave on draw with 4 teams -> t3 vs t4
+      (is (= {:home "t3" :away "t4" :stage "regular"}
+             (pelada.logic/compute-winner-stays-on-next-match
+              teams
+              [{:sequence 1 :home-team-id "t1" :away-team-id "t2" :home-score 1 :away-score 1}]
+              {:draw_rule "both_leave"})))
+      ;; max_consecutive_wins = 2 -> t1 wins twice -> rotates out!
+      (is (= {:home "t4" :away "t2" :stage "regular"}
+             (pelada.logic/compute-winner-stays-on-next-match
+              teams
+              [{:sequence 1 :home-team-id "t1" :away-team-id "t2" :home-score 2 :away-score 0}
+               {:sequence 2 :home-team-id "t1" :away-team-id "t3" :home-score 1 :away-score 0}]
+              {:max_consecutive_wins 2}))))))

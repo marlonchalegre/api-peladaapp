@@ -8,6 +8,7 @@
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.helpers.time :as helpers.time]
    [api-peladaapp.logic.score :as logic.score]
+   [clojure.data.json :as json]
    [clojure.string :as str]
    [honey.sql.helpers :as h]
    [medley.core :as medley.core]
@@ -48,6 +49,13 @@
                     str/lower-case)]
     (get position-order pos 4)))
 
+(defn- serialize-format-config [val]
+  (cond
+    (nil? val) nil
+    (string? val) val
+    (map? val) (json/write-str val)
+    :else nil))
+
 (s/defn insert-pelada :- s/Uuid
   [pelada :- {:organization-id s/Uuid
               (s/optional-key :scheduled-at) (s/maybe s/Str)
@@ -58,10 +66,12 @@
               (s/optional-key :fixed-goalkeepers) (s/maybe s/Bool)
               (s/optional-key :home-fixed-goalkeeper-id) (s/maybe s/Uuid)
               (s/optional-key :away-fixed-goalkeeper-id) (s/maybe s/Uuid)
-              (s/optional-key :notify-casual-players) (s/maybe s/Bool)}
+              (s/optional-key :notify-casual-players) (s/maybe s/Bool)
+              (s/optional-key :format) (s/maybe s/Str)
+              (s/optional-key :format-config) (s/maybe s/Any)}
    db]
   (let [{:keys [organization-id scheduled-at num-teams players-per-team max-players location fixed-goalkeepers
-                home-fixed-goalkeeper-id away-fixed-goalkeeper-id notify-casual-players]} pelada
+                home-fixed-goalkeeper-id away-fixed-goalkeeper-id notify-casual-players format format-config]} pelada
         row (cond-> {:organization_id organization-id :status [:cast "attendance" :pelada_status]}
               scheduled-at (assoc :scheduled_at [[:cast (helpers.time/to-utc-timestamp-str scheduled-at) :timestamp]])
               num-teams (assoc :num_teams num-teams)
@@ -71,7 +81,9 @@
               (some? fixed-goalkeepers) (assoc :fixed_goalkeepers (boolean fixed-goalkeepers))
               home-fixed-goalkeeper-id (assoc :home_fixed_goalkeeper_id home-fixed-goalkeeper-id)
               away-fixed-goalkeeper-id (assoc :away_fixed_goalkeeper_id away-fixed-goalkeeper-id)
-              (some? notify-casual-players) (assoc :notify_casual_players (boolean notify-casual-players)))
+              (some? notify-casual-players) (assoc :notify_casual_players (boolean notify-casual-players))
+              format (assoc :format format)
+              (some? format-config) (assoc :format_config (serialize-format-config format-config)))
         query (-> (h/insert-into :Peladas)
                   (h/values [row])
                   (h/returning :id))]
@@ -103,7 +115,9 @@
                                                :status (when (:status pelada) [[:cast (:status pelada) :pelada_status]])
                                                :closed_at (when (:closed-at pelada) [[:cast (helpers.time/to-utc-timestamp-str (:closed-at pelada)) :timestamp]])
                                                :timer_accumulated_ms (:timer-accumulated-ms pelada)
-                                               :timer_status (when (:timer-status pelada) [[:cast (:timer-status pelada) :timer_status]]))
+                                               :timer_status (when (:timer-status pelada) [[:cast (:timer-status pelada) :timer_status]])
+                                               :format (:format pelada))
+                 (contains? pelada :format-config) (assoc :format_config (serialize-format-config (:format-config pelada)))
                  (contains? pelada :timer-started-at) (assoc :timer_started_at (when (:timer-started-at pelada) [[:cast (helpers.time/to-utc-timestamp-str (:timer-started-at pelada)) :timestamp]]))
                  (contains? pelada :home-fixed-goalkeeper-id) (assoc :home_fixed_goalkeeper_id (:home-fixed-goalkeeper-id pelada))
                  (contains? pelada :away-fixed-goalkeeper-id) (assoc :away_fixed_goalkeeper_id (:away-fixed-goalkeeper-id pelada))

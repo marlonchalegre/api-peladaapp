@@ -95,4 +95,42 @@
                     matches (:matches dashboard)]
                 (is (= 3 (count matches)))
                 (is (= t1 (:home_team_id (first matches))))
-                (is (= t2 (:away_team_id (first matches))))))))))))
+                (is (= t2 (:away_team_id (first matches))))))))
+
+        (testing "championship_final automatic progression and winner_stays_on progression"
+          (let [champ-resp (app (-> (mock/request :post "/api/peladas")
+                                    (auth)
+                                    (mock/json-body {"organization_id" org-id
+                                                     "num_teams" 3
+                                                     "players_per_team" 5
+                                                     "format" "championship_final"
+                                                     "format_config" {"matches_per_team" 2
+                                                                      "knockout_tiebreaker" "best_campaign"}})))
+                champ-id (:id (th/decode-body champ-resp))]
+            (is (= "championship_final" (:format (th/decode-body champ-resp))))
+          ;; Close attendance and start pelada
+            (app (-> (mock/request :post (str "/api/peladas/" champ-id "/close-attendance")) auth))
+            (let [begin-resp (app (-> (mock/request :post (str "/api/peladas/" champ-id "/begin"))
+                                      (auth)
+                                      (mock/json-body {"matches_per_team" 2
+                                                       "format" "championship_final"})))]
+              (is (= 200 (:status begin-resp)))
+            ;; 3 teams * 2 matches / 2 = 3 group matches
+              (is (= 3 (:matches_created (th/decode-body begin-resp))))
+              (let [dash1 (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" champ-id "/dashboard-data")) (auth))))
+                    group-matches (:matches dash1)]
+                (is (every? #(= "group" (:stage %)) group-matches))
+              ;; Finish all 3 group matches
+                (doseq [[idx m] (map-indexed vector group-matches)]
+                  (app (-> (mock/request :put (str "/api/matches/" (:id m) "/score"))
+                           (auth)
+                           (mock/json-body {"home_score" (if (zero? idx) 3 1)
+                                            "away_score" 0
+                                            "status" "finished"}))))
+              ;; Verify the Final match was automatically created!
+                (let [dash2 (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" champ-id "/dashboard-data")) (auth))))
+                      all-matches (:matches dash2)
+                      final-match (last all-matches)]
+                  (is (= 4 (count all-matches)))
+                  (is (= "final" (:stage final-match)))
+                  (is (= "scheduled" (:status final-match))))))))))))

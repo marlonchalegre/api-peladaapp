@@ -225,7 +225,7 @@
 (s/defn list-finished-matches-by-peladas :- [s/Any]
   [pelada-ids db]
   (when (seq pelada-ids)
-    (let [query (-> (h/select :pelada_id :home_team_id :away_team_id :home_score :away_score)
+    (let [query (-> (h/select :pelada_id :home_team_id :away_team_id :home_score :away_score :stage :winner_team_id)
                     (h/from :Matches)
                     (h/where [:and [:= :status [:cast "finished" :match_status]]
                               [:in :pelada_id pelada-ids]]))]

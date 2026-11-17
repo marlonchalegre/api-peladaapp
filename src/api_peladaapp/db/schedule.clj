@@ -18,15 +18,17 @@
     (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         hsql/affected-rows-count)))
 
-(s/defn insert-match-plan [{:keys [pelada-id home-team-id away-team-id sequence]} :- {:pelada-id s/Uuid
-                                                                                      :home-team-id s/Uuid
-                                                                                      :away-team-id s/Uuid
-                                                                                      :sequence s/Int}
+(s/defn insert-match-plan [{:keys [pelada-id home-team-id away-team-id sequence stage]} :- {:pelada-id s/Uuid
+                                                                                            :home-team-id s/Uuid
+                                                                                            :away-team-id s/Uuid
+                                                                                            :sequence s/Int
+                                                                                            (s/optional-key :stage) (s/maybe s/Str)}
                            db]
   (let [query (-> (h/insert-into :PeladaMatchPlans)
                   (h/values [{:pelada_id pelada-id
                               :home_team_id home-team-id
                               :away_team_id away-team-id
-                              :sequence sequence}])
+                              :sequence sequence
+                              :stage (or stage "regular")}])
                   (h/returning :id))]
     (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))

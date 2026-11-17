@@ -15,7 +15,9 @@
    (s/optional-key :timer-accumulated-ms) (s/maybe s/Int)
    (s/optional-key :timer-status) (s/maybe s/Str)
    (s/optional-key :support-camera-player-id) (s/maybe s/Uuid)
-   (s/optional-key :support-stats-player-id) (s/maybe s/Uuid)})
+   (s/optional-key :support-stats-player-id) (s/maybe s/Uuid)
+   (s/optional-key :stage) (s/maybe s/Str)
+   (s/optional-key :winner-team-id) (s/maybe s/Uuid)})
 
 (s/defschema PlayerStats
   {:player-id s/Uuid

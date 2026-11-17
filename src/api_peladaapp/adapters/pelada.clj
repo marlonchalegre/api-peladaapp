@@ -11,8 +11,17 @@
    [api-peladaapp.models.pelada :as models.pelada]
    [api-peladaapp.requests.pelada :as requests.pelada]
    [api-peladaapp.responses.pelada :as responses.pelada]
+   [clojure.data.json :as json]
+   [clojure.string :as str]
    [medley.core :as medley.core]
    [schema.core :as s]))
+
+(defn- parse-format-config [val]
+  (cond
+    (map? val) val
+    (and (string? val) (not (str/blank? val)))
+    (try (json/read-str val :key-fn keyword) (catch Exception _ nil))
+    :else nil))
 
 (s/defn create-request->model :- models.pelada/Pelada
   [request :- requests.pelada/CreatePeladaRequest]
@@ -25,7 +34,9 @@
                                     :max-players (:max_players request)
                                     :location (:location request)
                                     :fixed-goalkeepers (:fixed_goalkeepers request)
-                                    :status (:status request))
+                                    :status (:status request)
+                                    :format (:format request)
+                                    :format-config (parse-format-config (:format_config request)))
       (contains? request :home_fixed_goalkeeper_id) (assoc :home-fixed-goalkeeper-id (misc/as-uuid (:home_fixed_goalkeeper_id request)))
       (contains? request :away_fixed_goalkeeper_id) (assoc :away-fixed-goalkeeper-id (misc/as-uuid (:away_fixed_goalkeeper_id request)))
       (contains? request :notify_casual_players) (assoc :notify-casual-players (boolean (:notify_casual_players request))))))
@@ -44,7 +55,9 @@
                                     :status (:status request)
                                     :timer-started-at (:timer_started_at request)
                                     :timer-accumulated-ms (:timer_accumulated_ms request)
-                                    :timer-status (:timer_status request))
+                                    :timer-status (:timer_status request)
+                                    :format (:format request)
+                                    :format-config (parse-format-config (:format_config request)))
       (contains? request :home_fixed_goalkeeper_id) (assoc :home-fixed-goalkeeper-id (misc/as-uuid (:home_fixed_goalkeeper_id request)))
       (contains? request :away_fixed_goalkeeper_id) (assoc :away-fixed-goalkeeper-id (misc/as-uuid (:away_fixed_goalkeeper_id request)))
       (contains? request :notify_casual_players) (assoc :notify-casual-players (boolean (:notify_casual_players request))))))
@@ -61,7 +74,8 @@
          :players_per_team (:players-per-team model)
          :fixed_goalkeepers (boolean (:fixed-goalkeepers model))
          :status display-status
-         :closed_at (:closed-at model)}
+         :closed_at (:closed-at model)
+         :format (or (:format model) "round_robin")}
         (medley.core/assoc-some
          :organization_name (:organization-name model)
          :max_players (:max-players model)
@@ -74,7 +88,8 @@
          :timer_started_at (some-> (:timer-started-at model) helpers.time/->instant str)
          :timer_accumulated_ms (:timer-accumulated-ms model)
          :timer_status (:timer-status model)
-         :user_attendance_status (:user-attendance-status model)))))
+         :user_attendance_status (:user-attendance-status model)
+         :format_config (:format-config model)))))
 
 (defn begin-model->response [model]
   {:matches_created (:matches-created model)})
@@ -102,7 +117,9 @@
                             :timer-started-at (:timer_started_at p)
                             :timer-accumulated-ms (:timer_accumulated_ms p)
                             :timer-status (:timer_status p)
-                            :user-attendance-status (some-> (:user_attendance_status p) (as-> x (if (keyword? x) (name x) (str x)))))))
+                            :user-attendance-status (some-> (:user_attendance_status p) (as-> x (if (keyword? x) (name x) (str x))))
+                            :format (or (:format p) "round_robin")
+                            :format-config (parse-format-config (:format_config p)))))
 
 (defn user->response [user]
   (when user

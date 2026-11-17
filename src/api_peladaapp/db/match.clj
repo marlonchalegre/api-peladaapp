@@ -9,15 +9,17 @@
 
 (s/defn insert-match :- s/Uuid
   [{:keys [pelada-id home-team-id away-team-id sequence status home-score away-score
-           support-camera-player-id support-stats-player-id]} :- {:pelada-id s/Uuid
-                                                                  :home-team-id s/Uuid
-                                                                  :away-team-id s/Uuid
-                                                                  :sequence s/Int
-                                                                  :status s/Str
-                                                                  (s/optional-key :home-score) (s/maybe s/Int)
-                                                                  (s/optional-key :away-score) (s/maybe s/Int)
-                                                                  (s/optional-key :support-camera-player-id) (s/maybe s/Uuid)
-                                                                  (s/optional-key :support-stats-player-id) (s/maybe s/Uuid)}
+           support-camera-player-id support-stats-player-id stage winner-team-id]} :- {:pelada-id s/Uuid
+                                                                                       :home-team-id s/Uuid
+                                                                                       :away-team-id s/Uuid
+                                                                                       :sequence s/Int
+                                                                                       :status s/Str
+                                                                                       (s/optional-key :home-score) (s/maybe s/Int)
+                                                                                       (s/optional-key :away-score) (s/maybe s/Int)
+                                                                                       (s/optional-key :support-camera-player-id) (s/maybe s/Uuid)
+                                                                                       (s/optional-key :support-stats-player-id) (s/maybe s/Uuid)
+                                                                                       (s/optional-key :stage) (s/maybe s/Str)
+                                                                                       (s/optional-key :winner-team-id) (s/maybe s/Uuid)}
    db]
   (let [row (cond-> {:pelada_id pelada-id
                      :home_team_id home-team-id
@@ -25,9 +27,11 @@
                      :sequence sequence
                      :status [:cast status :match_status]
                      :home_score home-score
-                     :away_score away-score}
+                     :away_score away-score
+                     :stage (or stage "regular")}
               support-camera-player-id (assoc :support_camera_player_id support-camera-player-id)
-              support-stats-player-id (assoc :support_stats_player_id support-stats-player-id))
+              support-stats-player-id (assoc :support_stats_player_id support-stats-player-id)
+              winner-team-id (assoc :winner_team_id winner-team-id))
         query (-> (h/insert-into :Matches)
                   (h/values [row])
                   (h/returning :id))]
@@ -51,7 +55,7 @@
 
 (s/defn update-match :- s/Int
   [id :- s/Uuid {:keys [home-score away-score status timer-started-at timer-accumulated-ms timer-status
-                        support-camera-player-id support-stats-player-id] :as data} db]
+                        support-camera-player-id support-stats-player-id stage winner-team-id home-team-id away-team-id] :as data} db]
   (let [db-row (cond-> {}
                  (some? home-score) (assoc :home_score home-score)
                  (some? away-score) (assoc :away_score away-score)
@@ -60,7 +64,11 @@
                  (some? timer-accumulated-ms) (assoc :timer_accumulated_ms timer-accumulated-ms)
                  timer-status (assoc :timer_status [:cast timer-status :timer_status])
                  (contains? data :support-camera-player-id) (assoc :support_camera_player_id support-camera-player-id)
-                 (contains? data :support-stats-player-id) (assoc :support_stats_player_id support-stats-player-id))]
+                 (contains? data :support-stats-player-id) (assoc :support_stats_player_id support-stats-player-id)
+                 stage (assoc :stage stage)
+                 (contains? data :winner-team-id) (assoc :winner_team_id winner-team-id)
+                 home-team-id (assoc :home_team_id home-team-id)
+                 away-team-id (assoc :away_team_id away-team-id))]
     (if (empty? db-row)
       1
       (let [query (-> (h/update :Matches)

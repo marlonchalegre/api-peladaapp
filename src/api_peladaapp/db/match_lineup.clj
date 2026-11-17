@@ -83,6 +83,13 @@
     (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         hsql/affected-rows-count)))
 
+(s/defn delete-by-match :- s/Int
+  [match-id :- s/Uuid db]
+  (let [query (-> (h/delete-from :MatchLineups)
+                  (h/where [:= :match_id match-id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)))
+
 (s/defn replace-player :- s/Int
   [match-id :- s/Uuid team-id :- s/Uuid out-player-id :- s/Uuid in-player-id :- s/Uuid db]
   (let [is-gk (db.team/is-goalkeeper? team-id out-player-id db)
