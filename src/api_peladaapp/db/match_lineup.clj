@@ -106,6 +106,29 @@
     (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
         hsql/affected-rows-count)))
 
+(s/defn replace-team-lineup! :- s/Int
+  [match-id :- s/Uuid team-id :- s/Uuid player-ids :- [s/Uuid] db]
+  (let [existing (->> (list-by-match match-id db)
+                      (filter #(= team-id (:team_id %))))
+        existing-gks (into #{} (comp (filter :is_goalkeeper) (map :player_id)) existing)
+        final-ids (->> (concat existing-gks player-ids) distinct vec)]
+    (if (= (set (map :player_id existing)) (set final-ids))
+      0
+      (let [del-query (-> (h/delete-from :MatchLineups)
+                          (h/where [:and [:= :match_id match-id] [:= :team_id team-id]]))]
+        (jdbc/execute-one! db (hsql/format del-query) hsql/opts)
+        (let [rows (mapv (fn [pid]
+                           {:match_id match-id
+                            :team_id team-id
+                            :player_id pid
+                            :is_goalkeeper (contains? existing-gks pid)})
+                         final-ids)]
+          (if (empty? rows)
+            0
+            (let [ins-query (-> (h/insert-into :MatchLineups)
+                                (h/values rows))]
+              (hsql/affected-rows-count (jdbc/execute-one! db (hsql/format ins-query) hsql/opts)))))))))
+
 (s/defn replace-player :- s/Int
   [match-id :- s/Uuid team-id :- s/Uuid out-player-id :- s/Uuid in-player-id :- s/Uuid db]
   (let [is-gk (db.team/is-goalkeeper? team-id out-player-id db)

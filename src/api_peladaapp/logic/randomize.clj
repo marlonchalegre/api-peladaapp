@@ -29,24 +29,6 @@
            (vec))
       (vec sorted))))
 
-(defn- get-team-states
-  "Calculates current score, player count and position distribution for each team."
-  [teams players-per-team org-id tx]
-  (mapv (fn [team]
-          (let [current-players (db.team/list-team-players (:id team) tx)
-                ;; We need grades and positions for current players
-                details (if (seq current-players)
-                          (db.player/get-players-details-for-balance (map :player-id current-players) org-id tx)
-                          [])
-                current-grades (->> details (map :grade) (remove nil?) (reduce + 0))
-                pos-counts (frequencies (map :position details))]
-            {:id (:id team)
-             :current-score current-grades
-             :current-count (count (filter #(not (:is-goalkeeper %)) current-players))
-             :max-players players-per-team
-             :positions pos-counts}))
-        teams))
-
 (defn- assign-player-to-best-team
   [player team-states]
   (let [pos (:position player)
@@ -88,48 +70,50 @@
       {:assignments (map #(dissoc % :final-states) acc)
        :imbalance (calculate-imbalance (:final-states (last acc)))})))
 
+(defn randomize-teams-tx!
+  "Randomly assigns provided players to empty slots in `teams` within an existing transaction."
+  [pelada-id player-ids players-per-team teams tx]
+  (when (and players-per-team (pos? players-per-team) (seq player-ids) (seq teams))
+    (let [pelada (db.pelada/get-pelada pelada-id tx)
+          org-id (:organization-id pelada)
+          global-gk-ids (set (keep identity [(:home-fixed-goalkeeper-id pelada)
+                                             (:away-fixed-goalkeeper-id pelada)]))]
+      ;; Clear existing assignments to allow full reshuffle.
+      (db.team/clear-teams-players pelada-id tx)
+
+      (let [remaining-player-ids (remove global-gk-ids player-ids)
+            players-details (db.player/get-players-details-for-balance remaining-player-ids org-id tx)
+            num-teams (count teams)
+            ;; All teams were just cleared, so initialize empty states in memory without N+1 queries.
+            initial-team-states (mapv (fn [team]
+                                        {:id (:id team)
+                                         :current-score 0
+                                         :current-count 0
+                                         :max-players players-per-team
+                                         :positions {}})
+                                      teams)
+            candidates (repeatedly 100 (fn []
+                                         (let [jittered (map #(update % :grade + (* 0.1 (- (rand) 0.5))) players-details)
+                                               sorted (sort-players-for-balance (shuffle jittered) num-teams)]
+                                           (generate-assignment-candidate sorted initial-team-states))))
+            sorted-candidates (->> candidates
+                                   (group-by :assignments)
+                                   vals
+                                   (map first)
+                                   (sort-by :imbalance))
+            min-imb (:imbalance (first sorted-candidates))
+            best-pool (->> sorted-candidates
+                           (filter #(<= (:imbalance %) (+ min-imb 0.5)))
+                           (take 10))
+            best-candidate (rand-nth best-pool)]
+        (when (seq (:assignments best-candidate))
+          (db.team/add-team-players-batch! (:assignments best-candidate) tx))))))
+
 (defn randomize-teams!
   "Randomly assigns provided players to empty slots in the pelada's teams, balancing by position and score.
    Uses a Best-of-N approach to minimize score imbalance."
   [pelada-id player-ids players-per-team db]
   (when (and players-per-team (pos? players-per-team) (seq player-ids))
     (jdbc/with-transaction [tx db]
-      (let [pelada (db.pelada/get-pelada pelada-id tx)
-            org-id (:organization-id pelada)
-            home-gk-id (:home-fixed-goalkeeper-id pelada)
-            away-gk-id (:away-fixed-goalkeeper-id pelada)
-            global-gk-ids (set (filter some? [home-gk-id away-gk-id]))]
-
-        ;; Clear existing assignments to allow full reshuffle.
-        (db.team/clear-teams-players pelada-id tx)
-
-        (let [;; Filter out players who are global fixed goalkeepers
-              remaining-player-ids (remove global-gk-ids player-ids)
-
-              ;; Fetch details for players (verifies they belong to org)
-              players-details (db.player/get-players-details-for-balance remaining-player-ids org-id tx)
-
-              teams (db.team/list-pelada-teams pelada-id tx)
-              num-teams (count teams)
-
-              ;; Initial team states
-              initial-team-states (get-team-states teams players-per-team org-id tx)
-
-              ;; Run multiple trials and pick one randomly among those with the lowest imbalance
-              candidates (repeatedly 100 (fn []
-                                           (let [jittered (map #(update % :grade + (* 0.1 (- (rand) 0.5))) players-details)
-                                                 sorted (sort-players-for-balance (shuffle jittered) num-teams)]
-                                             (generate-assignment-candidate sorted initial-team-states))))
-              sorted-candidates (->> candidates
-                                     (group-by :assignments)
-                                     vals
-                                     (map first)
-                                     (sort-by :imbalance))
-              min-imb (:imbalance (first sorted-candidates))
-              ;; Pick randomly from unique candidates that are "good enough" (within 0.5 of min)
-              best-pool (->> sorted-candidates
-                             (filter #(<= (:imbalance %) (+ min-imb 0.5)))
-                             (take 10))
-              best-candidate (rand-nth best-pool)]
-          (when (seq (:assignments best-candidate))
-            (db.team/add-team-players-batch! (:assignments best-candidate) tx)))))))
+      (randomize-teams-tx! pelada-id player-ids players-per-team
+                           (db.team/list-pelada-teams pelada-id tx) tx))))

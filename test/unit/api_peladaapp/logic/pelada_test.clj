@@ -230,4 +230,32 @@
                   :format-config {:rotation_mode "team_queue"}}
           next-spec {:home "t1" :away "t3" :stage "regular"}]
       (is (nil? (pelada.logic/compute-winner-stays-on-lineups
-                 pelada next-spec finished-matches [] team-players confirmed))))))
+                 pelada next-spec finished-matches [] team-players confirmed)))))
+
+  (testing "get-challenger-completion-context marks only fewest-consecutive-games candidates as eligible_by_fairness"
+    (let [confirmed (mapv (fn [i] {:player-id (str "p" i) :grade 7.0}) (range 1 13))
+          team-players (concat
+                        (map (fn [i] {:team_id "t1" :player_id (str "p" i)}) (range 1 6))
+                        (map (fn [i] {:team_id "t2" :player_id (str "p" i)}) (range 6 11)))
+          ;; Match 1: t1 (p1..p5) vs t2 (p6..p10); Match 2: t1 vs t2 where p6 played 2 games in a row and p7..p10 only played Match 2
+          finished-matches [{:id "m1" :sequence 1 :home-team-id "t1" :away-team-id "t2" :home-score 1 :away-score 0 :status "finished"}
+                            {:id "m2" :sequence 2 :home-team-id "t1" :away-team-id "t2" :home-score 1 :away-score 0 :status "finished"}]
+          match-lineups (concat
+                         (map (fn [i] {:match_id "m1" :team_id "t1" :player_id (str "p" i)}) (range 1 6))
+                         [{:match_id "m1" :team_id "t2" :player_id "p6"}
+                          {:match_id "m1" :team_id "t2" :player_id "p11"}
+                          {:match_id "m1" :team_id "t2" :player_id "p12"}]
+                         (map (fn [i] {:match_id "m2" :team_id "t1" :player_id (str "p" i)}) (range 1 6))
+                         (map (fn [i] {:match_id "m2" :team_id "t2" :player_id (str "p" i)}) (range 6 11)))
+          pelada {:format "winner_stays_on"
+                  :players-per-team 5
+                  :format-config {:rotation_mode "player_queue" :complete_team_rule "least_played"}}
+          target-match {:id "m3" :sequence 3 :home-team-id "t1" :away-team-id "t2"}
+          ctx (pelada.logic/get-challenger-completion-context
+               pelada target-match finished-matches match-lineups team-players confirmed)
+          by-id (into {} (map (juxt :player_id identity) (:candidates ctx)))]
+      (is (= 3 (:needed ctx)))
+      (is (= ["p11" "p12"] (:bench_player_ids ctx)))
+      ;; p6 played 2 consecutive games while p7..p10 played 1 consecutive game; 3 spots needed -> p7..p10 eligible, p6 not eligible
+      (is (false? (:eligible_by_fairness (get by-id "p6"))))
+      (is (true? (:eligible_by_fairness (get by-id "p7")))))))

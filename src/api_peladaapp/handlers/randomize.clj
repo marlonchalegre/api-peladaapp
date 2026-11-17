@@ -12,6 +12,7 @@
 (s/defschema RandomizeTeamsBody
   {:player_ids [s/Uuid]
    :players_per_team s/Int
+   (s/optional-key :num_teams) s/Int
    (s/optional-key :algorithm) (apply s/enum logic.draw/algorithms)
    (s/optional-key :use_history) s/Bool})
 
@@ -20,7 +21,7 @@
   (try
     (if-let [pelada-id-str (-> request :params :id)]
       (let [pelada-id (misc/as-uuid pelada-id-str)
-            {:keys [player_ids players_per_team algorithm use_history]} (:body request)
+            {:keys [player_ids players_per_team num_teams algorithm use_history]} (:body request)
             player-ids (map misc/as-uuid player_ids)
             user-id (auth/get-user-id-from-request request)
             db (:database request)
@@ -31,7 +32,8 @@
                                              {:algorithm algorithm
                                               :use-history (true? use_history)
                                               :player-ids player-ids
-                                              :players-per-team players_per_team}
+                                              :players-per-team players_per_team
+                                              :num-teams num_teams}
                                              db)]
           (response/response (merge {:success true} result))))
       (helper.response/bad-request {:error "Missing pelada id"}))

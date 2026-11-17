@@ -25,12 +25,7 @@
 
 (defn- auto-create-teams!
   [pelada-id team-count db]
-  (when (pos? team-count)
-    (->> (range 1 (inc team-count))
-         (map (fn [index]
-                {:pelada-id pelada-id
-                 :name (str "Time " index)}))
-         (run! #(db.team/insert-team % db)))))
+  (db.team/insert-teams! pelada-id team-count db))
 
 (defn- fetch-team-ids
   [pelada-id db]

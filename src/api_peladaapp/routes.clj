@@ -105,6 +105,8 @@
     (POST "/matches/:id/lineups/replace" [] handler.match/replace-lineup-player)
     (PUT "/matches/:id/support-lineup" [] handler.match/update-support-lineup)
     (POST "/matches/:id/support-lineup/reroll" [] handler.match/reroll-support-lineup)
+    (GET "/matches/:id/challenger-candidates" [] handler.match/get-challenger-candidates)
+    (PUT "/matches/:id/challenger-lineup" [] handler.match/update-challenger-lineup)
 
     ;; Players
     (POST "/players" [] handler.player/create)

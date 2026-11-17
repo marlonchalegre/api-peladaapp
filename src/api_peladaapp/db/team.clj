@@ -15,6 +15,22 @@
                   (h/returning :id))]
     (:id (jdbc/execute-one! db (hsql/format query) hsql/opts))))
 
+(s/defn insert-teams!
+  [pelada-id :- s/Uuid
+   team-count :- s/Int
+   db]
+  (if (pos? team-count)
+    (let [rows (mapv (fn [i] {:pelada_id pelada-id :name (str "Time " i)})
+                     (range 1 (inc team-count)))
+          query (-> (h/insert-into :Teams)
+                    (h/values rows)
+                    (h/returning :*))]
+      (->> (jdbc/execute! db (hsql/format query) hsql/opts)
+           (map adapter.team/db->model)
+           (sort-by :name)
+           vec))
+    []))
+
 (s/defn get-team [id :- s/Uuid db]
   (let [query (-> (h/select :*)
                   (h/from :Teams)

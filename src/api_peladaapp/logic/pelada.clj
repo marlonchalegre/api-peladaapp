@@ -336,14 +336,9 @@
                    [consecutive-games total-games (rank-fn pid)]))
                candidates))))
 
-(defn compute-winner-stays-on-lineups
-  "Computes dynamic {:home-lineup [...] :away-lineup [...]} for `winner_stays_on`
-   when `player_queue` rotation is enabled, a team has fewer than `players-per-team`
-   players, or bench players exist with < 3 teams. Returns nil if standard team
-   seeding should be used."
-  [pelada next-match-spec finished-matches match-lineups team-players confirmed-players]
-  (let [fmt (or (:format pelada) "round_robin")
-        fmt-config (or (:format-config pelada) (:format_config pelada) {})
+(defn- build-wso-context
+  [pelada staying-id away-id finished-matches match-lineups team-players confirmed-players]
+  (let [fmt-config (or (:format-config pelada) (:format_config pelada) {})
         rotation-mode (or (:rotation_mode fmt-config) (:rotation-mode fmt-config) "team_queue")
         complete-rule (or (:complete_team_rule fmt-config) (:complete-team-rule fmt-config) "least_played")
         players-per-team (int (or (:players-per-team pelada) (:players_per_team pelada) 5))
@@ -351,67 +346,94 @@
         fixed-gk-ids (if fixed-gks?
                        (into #{} (remove nil? [(or (:home-fixed-goalkeeper-id pelada) (:home_fixed_goalkeeper_id pelada))
                                                (or (:away-fixed-goalkeeper-id pelada) (:away_fixed_goalkeeper_id pelada))]))
-                       #{})]
+                       #{})
+        team-roster-map (reduce (fn [acc row]
+                                  (let [tid (or (:team-id row) (:team_id row))
+                                        pid (or (:player-id row) (:player_id row))]
+                                    (if (and tid pid (not (fixed-gk-ids pid)))
+                                      (update acc tid (fnil conj []) pid)
+                                      acc)))
+                                {}
+                                team-players)
+        ordered-matches (vec (sort-by :sequence finished-matches))
+        last-match (peek ordered-matches)
+        last-home (or (:home-team-id last-match) (:home_team_id last-match))
+        last-away (or (:away-team-id last-match) (:away_team_id last-match))
+        lineup-lookup (build-match-lineup-lookup ordered-matches match-lineups team-roster-map fixed-gk-ids)
+        player-stats (compute-player-play-stats ordered-matches lineup-lookup)
+        confirmed-ids (->> confirmed-players
+                           (map #(or (:player-id %) (:player_id %)))
+                           (remove fixed-gk-ids)
+                           distinct
+                           vec)
+        arrival-rank-map (into {} (map-indexed (fn [idx pid] [pid idx]) confirmed-ids))
+        player-info-map (into {} (map (fn [p] [(or (:player-id p) (:player_id p)) p]) confirmed-players))
+        last-sides (get lineup-lookup (:id last-match) {})
+        staying-lineup (->> (if (#{last-home last-away} staying-id)
+                              (get last-sides staying-id)
+                              (get team-roster-map staying-id))
+                            (take players-per-team)
+                            vec)
+        staying-set (set staying-lineup)
+        leaving-id (cond
+                     (= staying-id last-home) last-away
+                     (= staying-id last-away) last-home
+                     :else nil)
+        leaving-lineup (->> (if leaving-id (get last-sides leaving-id) [])
+                            (remove staying-set)
+                            vec)
+        last-match-players (into #{} (apply concat (vals last-sides)))
+        bench-players (->> confirmed-ids
+                           (remove staying-set)
+                           (remove last-match-players)
+                           (sort-by (fn [pid]
+                                      (let [{:keys [last-played-seq total-games]} (get player-stats pid {:last-played-seq 0 :total-games 0})]
+                                        [last-played-seq total-games (get arrival-rank-map pid 999999)])))
+                           vec)
+        team-count (count (keys team-roster-map))
+        away-initial (if (or (= rotation-mode "player_queue") (< team-count 3))
+                       (vec (take players-per-team bench-players))
+                       (vec (take players-per-team (remove staying-set (get team-roster-map away-id)))))]
+    {:rotation-mode rotation-mode
+     :complete-rule complete-rule
+     :players-per-team players-per-team
+     :fixed-gk-ids fixed-gk-ids
+     :team-roster-map team-roster-map
+     :team-count team-count
+     :player-stats player-stats
+     :arrival-rank-map arrival-rank-map
+     :player-info-map player-info-map
+     :staying-lineup staying-lineup
+     :staying-set staying-set
+     :leaving-lineup leaving-lineup
+     :bench-players bench-players
+     :away-initial away-initial}))
+
+(defn compute-winner-stays-on-lineups
+  "Computes dynamic {:home-lineup [...] :away-lineup [...]} for `winner_stays_on`
+   when `player_queue` rotation is enabled, a team has fewer than `players-per-team`
+   players, or bench players exist with < 3 teams. Returns nil if standard team
+   seeding should be used."
+  [pelada next-match-spec finished-matches match-lineups team-players confirmed-players]
+  (let [fmt (or (:format pelada) "round_robin")]
     (when (and (= fmt "winner_stays_on") next-match-spec (seq finished-matches))
-      (let [team-roster-map (reduce (fn [acc row]
-                                      (let [tid (or (:team-id row) (:team_id row))
-                                            pid (or (:player-id row) (:player_id row))]
-                                        (if (and tid pid (not (fixed-gk-ids pid)))
-                                          (update acc tid (fnil conj []) pid)
-                                          acc)))
-                                    {}
-                                    team-players)
+      (let [staying-id (:home next-match-spec)
+            away-id (:away next-match-spec)
+            {:keys [rotation-mode complete-rule players-per-team fixed-gk-ids
+                    team-roster-map team-count player-stats arrival-rank-map
+                    player-info-map staying-lineup staying-set leaving-lineup
+                    bench-players away-initial]}
+            (build-wso-context pelada staying-id away-id finished-matches match-lineups team-players confirmed-players)
             assigned-set (into #{} (mapcat val team-roster-map))
-            team-count (count (keys team-roster-map))
             bench-unassigned? (some #(let [pid (or (:player-id %) (:player_id %))]
                                        (and (not (fixed-gk-ids pid))
                                             (not (assigned-set pid))))
                                     confirmed-players)
-            away-id (:away next-match-spec)
             needs-dynamic? (or (= rotation-mode "player_queue")
                                (< (count (get team-roster-map away-id)) players-per-team)
                                (and (< team-count 3) bench-unassigned?))]
         (when needs-dynamic?
-          (let [ordered-matches (vec (sort-by :sequence finished-matches))
-                last-match (peek ordered-matches)
-                last-home (or (:home-team-id last-match) (:home_team_id last-match))
-                last-away (or (:away-team-id last-match) (:away_team_id last-match))
-                lineup-lookup (build-match-lineup-lookup ordered-matches match-lineups team-roster-map fixed-gk-ids)
-                player-stats (compute-player-play-stats ordered-matches lineup-lookup)
-                confirmed-ids (->> confirmed-players
-                                   (map #(or (:player-id %) (:player_id %)))
-                                   (remove fixed-gk-ids)
-                                   distinct
-                                   vec)
-                arrival-rank-map (into {} (map-indexed (fn [idx pid] [pid idx]) confirmed-ids))
-                player-info-map (into {} (map (fn [p] [(or (:player-id p) (:player_id p)) p]) confirmed-players))
-                staying-id (:home next-match-spec)
-                last-sides (get lineup-lookup (:id last-match) {})
-                staying-lineup (->> (if (#{last-home last-away} staying-id)
-                                      (get last-sides staying-id)
-                                      (get team-roster-map staying-id))
-                                    (take players-per-team)
-                                    vec)
-                staying-set (set staying-lineup)
-                leaving-id (cond
-                             (= staying-id last-home) last-away
-                             (= staying-id last-away) last-home
-                             :else nil)
-                leaving-lineup (->> (if leaving-id (get last-sides leaving-id) [])
-                                    (remove staying-set)
-                                    vec)
-                last-match-players (into #{} (apply concat (vals last-sides)))
-                bench-players (->> confirmed-ids
-                                   (remove staying-set)
-                                   (remove last-match-players)
-                                   (sort-by (fn [pid]
-                                              (let [{:keys [last-played-seq total-games]} (get player-stats pid {:last-played-seq 0 :total-games 0})]
-                                                [last-played-seq total-games (get arrival-rank-map pid 999999)])))
-                                   vec)
-                away-initial (if (or (= rotation-mode "player_queue") (< team-count 3))
-                               (vec (take players-per-team bench-players))
-                               (vec (take players-per-team (remove staying-set (get team-roster-map away-id)))))
-                away-initial-set (into staying-set away-initial)
+          (let [away-initial-set (into staying-set away-initial)
                 remaining-bench (vec (remove away-initial-set bench-players))
                 staying-grades (keep #(:grade (get player-info-map %)) staying-lineup)
                 staying-avg-grade (if (seq staying-grades)
@@ -428,3 +450,39 @@
                 away-lineup (vec (concat away-initial fillers))]
             {:home-lineup staying-lineup
              :away-lineup away-lineup}))))))
+
+(defn get-challenger-completion-context
+  "Returns challenger completion context for a `winner_stays_on` match, or nil
+   when the pelada is not `winner_stays_on` or no prior finished match exists."
+  [pelada target-match finished-matches match-lineups team-players confirmed-players]
+  (let [fmt (or (:format pelada) "round_robin")]
+    (when (and (= fmt "winner_stays_on") target-match (seq finished-matches))
+      (let [staying-id (or (:home-team-id target-match) (:home_team_id target-match))
+            away-id (or (:away-team-id target-match) (:away_team_id target-match))
+            {:keys [players-per-team fixed-gk-ids player-stats leaving-lineup away-initial]}
+            (build-wso-context pelada staying-id away-id finished-matches match-lineups team-players confirmed-players)
+            needed (max 0 (- players-per-team (count away-initial)))
+            candidate-ids (vec (remove (set away-initial) leaving-lineup))
+            sorted-by-consec (sort-by #(:consecutive-games (get player-stats % {:consecutive-games 0})) candidate-ids)
+            cutoff-consec (when (and (pos? needed) (seq sorted-by-consec))
+                            (let [nth-pid (nth sorted-by-consec (min (dec needed) (dec (count sorted-by-consec))))]
+                              (:consecutive-games (get player-stats nth-pid {:consecutive-games 0}))))
+            candidates (mapv (fn [pid]
+                               (let [{:keys [consecutive-games total-games]} (get player-stats pid {:consecutive-games 0 :total-games 0})]
+                                 {:player_id pid
+                                  :consecutive_games consecutive-games
+                                  :total_games total-games
+                                  :eligible_by_fairness (boolean (and cutoff-consec (<= consecutive-games cutoff-consec)))}))
+                             sorted-by-consec)
+            current-away (->> match-lineups
+                              (filter #(and (= (:match_id %) (:id target-match))
+                                            (= (:team_id %) away-id)))
+                              (map :player_id)
+                              (remove fixed-gk-ids)
+                              (remove (set away-initial))
+                              vec)]
+        {:needed needed
+         :away_team_id away-id
+         :bench_player_ids away-initial
+         :selected_player_ids current-away
+         :candidates candidates}))))

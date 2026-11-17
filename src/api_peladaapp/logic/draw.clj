@@ -117,18 +117,35 @@
   [message]
   (throw (ex-info message {:type :bad-request :message message})))
 
+(defn- ensure-teams!
+  [pelada-id num-teams tx]
+  (let [existing (db.team/list-pelada-teams pelada-id tx)]
+    (if (seq existing)
+      existing
+      (if (and num-teams (pos? num-teams))
+        (db.team/insert-teams! pelada-id num-teams tx)
+        (bad-request! "Pelada has no teams to fill")))))
+
+(defn- fixed-goalkeeper-ids
+  [pelada]
+  (set (keep identity [(:home-fixed-goalkeeper-id pelada)
+                       (:away-fixed-goalkeeper-id pelada)])))
+
+(defn- load-draw-context!
+  [pelada-id num-teams tx]
+  (let [pelada (db.pelada/get-pelada pelada-id tx)
+        teams (ensure-teams! pelada-id num-teams tx)]
+    {:pelada pelada
+     :org-id (:organization-id pelada)
+     :teams teams
+     :fixed-gks (fixed-goalkeeper-ids pelada)
+     :confirmed (db.attendance/list-confirmed-players-by-pelada pelada-id tx)}))
+
 (defn- draw-by-arrival!
-  [pelada-id algorithm player-ids players-per-team db]
+  [pelada-id {:keys [algorithm player-ids players-per-team num-teams]} db]
   (jdbc/with-transaction [tx db]
-    (let [pelada (db.pelada/get-pelada pelada-id tx)
-          org-id (:organization-id pelada)
-          teams (db.team/list-pelada-teams pelada-id tx)
-          _ (when (empty? teams) (bad-request! "Pelada has no teams to fill"))
-          fixed-gks (if (:fixed-goalkeepers pelada)
-                      (set (keep identity [(:home-fixed-goalkeeper-id pelada)
-                                           (:away-fixed-goalkeeper-id pelada)]))
-                      #{})
-          confirmed (db.attendance/list-confirmed-players-by-pelada pelada-id tx)
+    (let [{:keys [pelada org-id teams fixed-gks confirmed]} (load-draw-context! pelada-id num-teams tx)
+          fixed-gks (if (:fixed-goalkeepers pelada) fixed-gks #{})
           raw-players (if (seq confirmed)
                         (->> confirmed
                              (remove #(fixed-gks (:player-id %)))
@@ -173,29 +190,32 @@
   "Draws the teams of `pelada-id` and writes the result.
 
    Options: :algorithm (\"classic\" | \"gemini\" | \"gpt\" | \"arrival_fifo\" | \"arrival_first_balanced\"),
-   :use-history, :player-ids (fallback pool) and :players-per-team.
+   :use-history, :player-ids (fallback pool), :players-per-team, and optional :num-teams
+   (used to auto-create teams when none exist yet).
 
    Returns a report map for the caller to hand back to the UI. The classic
    and arrival algorithms report nothing beyond their name."
-  [pelada-id {:keys [algorithm use-history player-ids players-per-team]} db]
+  [pelada-id {:keys [algorithm use-history player-ids players-per-team num-teams]} db]
   (let [algorithm (or (algorithms algorithm) default-algorithm)]
     (cond
       (= default-algorithm algorithm)
-      (do (logic.randomize/randomize-teams! pelada-id player-ids players-per-team db)
+      (do (jdbc/with-transaction [tx db]
+            (let [teams (if (and num-teams (pos? num-teams))
+                          (ensure-teams! pelada-id num-teams tx)
+                          (db.team/list-pelada-teams pelada-id tx))]
+              (logic.randomize/randomize-teams-tx! pelada-id player-ids players-per-team teams tx)))
           {:algorithm default-algorithm :justification nil})
 
       (contains? arrival-algorithms algorithm)
-      (draw-by-arrival! pelada-id algorithm player-ids players-per-team db)
+      (draw-by-arrival! pelada-id {:algorithm algorithm
+                                   :player-ids player-ids
+                                   :players-per-team players-per-team
+                                   :num-teams num-teams} db)
 
       :else
       (jdbc/with-transaction [tx db]
-        (let [pelada (db.pelada/get-pelada pelada-id tx)
-              org-id (:organization-id pelada)
-              teams (db.team/list-pelada-teams pelada-id tx)
-              _ (when (empty? teams) (bad-request! "Pelada has no teams to fill"))
-              fixed-gks (set (keep identity [(:home-fixed-goalkeeper-id pelada)
-                                             (:away-fixed-goalkeeper-id pelada)]))
-              confirmed (map :player-id (db.attendance/list-confirmed-players-by-pelada pelada-id tx))
+        (let [{:keys [pelada org-id teams fixed-gks confirmed]} (load-draw-context! pelada-id num-teams tx)
+              confirmed (map :player-id confirmed)
               pool (remove fixed-gks (if (seq confirmed) confirmed player-ids))
               players (fill-missing-grades (enrich-players pool org-id tx))
               [selected benched] (capacity-split players (count teams) players-per-team)

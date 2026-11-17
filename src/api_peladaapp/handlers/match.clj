@@ -174,3 +174,27 @@
           adapter.match/model->response
           ok))
     (catch Exception e (exception/api-exception-handler e))))
+
+(defn- with-match-admin
+  [request {:keys [require-running?]} f]
+  (try
+    (let [db (:database request)
+          id (parse-uuid (clojure.core/str (get-in request [:params :id])))
+          user-id (auth/get-user-id-from-request request)
+          match (match-controller/get-match id db)
+          pelada (pelada-controller/get-pelada (:pelada-id match) db)]
+      (auth/require-organization-admin! user-id (:organization-id pelada) db)
+      (when require-running?
+        (pelada-logic/ensure-running pelada {:allow-closed? true}))
+      (ok (f id (:body request) db)))
+    (catch Exception e (exception/api-exception-handler e))))
+
+(defn get-challenger-candidates [request]
+  (with-match-admin request {:require-running? false}
+    (fn [id _ db]
+      (match-controller/get-challenger-candidates id db))))
+
+(defn update-challenger-lineup [request]
+  (with-match-admin request {:require-running? true}
+    (fn [id body db]
+      (match-controller/update-challenger-lineup id body db))))

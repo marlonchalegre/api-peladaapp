@@ -5,6 +5,7 @@
    what the unit tests cannot: the history queries, the confirmed-attendance
    source, and the rows the draw writes into TeamPlayers."
   (:require
+   [api-peladaapp.db.team :as db.team]
    [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.helpers.sql :as hsql]
    [api-peladaapp.logic.draw :as logic.draw]
@@ -256,6 +257,22 @@
           (is (some? thrown))
           (is (= :bad-request (:type (ex-data thrown))))
           (is (= "Pelada has no teams to fill" (:message (ex-data thrown)))))))
+
+    (testing "when :num-teams is provided and pelada has no teams yet, teams are auto-created and drawn"
+      (let [pelada-id (create-pelada! ds org-id {:players-per-team 2})
+            player-ids (mapv #(create-player! ds org-id %) (take 4 (squad)))]
+        (confirm! ds pelada-id player-ids)
+        (let [report (logic.draw/draw-teams! (misc/as-uuid pelada-id)
+                                             {:algorithm "arrival_fifo"
+                                              :use-history false
+                                              :player-ids []
+                                              :players-per-team 2
+                                              :num-teams 2}
+                                             ds)
+              teams (db.team/list-pelada-teams (misc/as-uuid pelada-id) ds)]
+          (is (= "arrival_fifo" (:algorithm report)))
+          (is (= 2 (count teams)))
+          (is (= #{"Time 1" "Time 2"} (set (map :name teams)))))))
 
     (testing "a pelada with teams but nobody confirmed is refused too"
       (let [pelada-id (create-pelada! ds org-id {:players-per-team 3})]

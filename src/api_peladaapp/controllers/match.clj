@@ -241,3 +241,40 @@
                             :support-stats-player-id (:support-stats-player-id updated-match)}
                            db)
     (db.match/get-match match-id db)))
+
+(defn get-challenger-candidates
+  [match-id db]
+  (let [target-match (db.match/get-match match-id db)
+        pelada-id (:pelada-id target-match)
+        pelada (db.pelada/get-pelada pelada-id db)
+        all-matches (db.match/list-matches-by-pelada pelada-id db)
+        finished-matches (filter #(and (= "finished" (:status %))
+                                       (< (or (:sequence %) 0) (or (:sequence target-match) 0)))
+                                 all-matches)
+        match-lineups (db.match-lineup/list-match-lineups-by-pelada pelada-id db)
+        team-players (db.team/list-team-players-by-pelada pelada-id db)
+        confirmed-players (vec (db.attendance/list-confirmed-players-by-pelada pelada-id db))]
+    (or (pelada.logic/get-challenger-completion-context
+         pelada target-match finished-matches match-lineups team-players confirmed-players)
+        {:needed 0 :away_team_id (:away-team-id target-match) :bench_player_ids [] :selected_player_ids [] :candidates []})))
+
+(defn update-challenger-lineup
+  [match-id {:keys [player_ids]} db]
+  (jdbc/with-transaction [tx db]
+    (let [ctx (get-challenger-candidates match-id tx)
+          needed (:needed ctx)
+          away-team-id (:away_team_id ctx)
+          valid-set (into #{} (map :player_id) (:candidates ctx))
+          chosen (->> player_ids
+                      (map #(if (uuid? %) % (parse-uuid (str %))))
+                      (filter valid-set)
+                      distinct
+                      vec)]
+      (when (not= (count chosen) needed)
+        (throw (ex-info (str "Expected " needed " player(s) to complete challenger team")
+                        {:type :bad-request
+                         :message (str "Expected " needed " player(s) to complete challenger team")})))
+      (db.match-lineup/replace-team-lineup! match-id away-team-id
+                                            (vec (concat (:bench_player_ids ctx) chosen))
+                                            tx)
+      (assoc ctx :selected_player_ids chosen))))
