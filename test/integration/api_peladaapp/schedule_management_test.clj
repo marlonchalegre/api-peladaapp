@@ -187,7 +187,7 @@
                     (is (= 1 (:matches_created (th/decode-body begin-resp))))
                     (let [dash1 (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" wso-id "/dashboard-data")) (auth))))
                           m1 (first (:matches dash1))]
-                    ;; Finish match 1 with home winning 2-0 -> away loses and gets replaced by bench (1 player from bench + 0? wait: 2 bench players fill 2-player team!)
+                    ;; Finish match 1 with home winning 2-0 so the 2 bench players enter as challenger
                       (app (-> (mock/request :put (str "/api/matches/" (:id m1) "/score"))
                                (auth)
                                (mock/json-body {"home_score" 2 "away_score" 0 "status" "finished"})))
@@ -196,4 +196,38 @@
                             m2-lineups (get-in dash2 [:match_lineups_map (keyword (str (:id m2)))])
                             away-lineup-pids (mapv :player_id (get m2-lineups (keyword (str (:away_team_id m2)))))]
                         (is (= 2 (count (:matches dash2))))
-                        (is (= (set (subvec rev-ids 4 6)) (set away-lineup-pids)))))))))))))))
+                        (is (= (set (subvec rev-ids 4 6)) (set away-lineup-pids)))))))
+
+                (testing "arrival_first_balanced draw and captain draft replace-all-teams-players"
+                  (let [p2-resp (app (-> (mock/request :post "/api/peladas")
+                                         (auth)
+                                         (mock/json-body {"organization_id" org-id
+                                                          "num_teams" 3
+                                                          "players_per_team" 2})))
+                        p2-id (:id (th/decode-body p2-resp))
+                        batch-resp (app (-> (mock/request :post (str "/api/peladas/" p2-id "/attendance/batch"))
+                                            (auth)
+                                            (mock/json-body {"player_ids" p-ids "status" "confirmed"})))]
+                    (is (= 200 (:status batch-resp)))
+                    (let [draw-bal (app (-> (mock/request :post (str "/api/peladas/" p2-id "/teams/randomize"))
+                                            (auth)
+                                            (mock/json-body {"algorithm" "arrival_first_balanced"
+                                                             "players_per_team" 2
+                                                             "num_teams" 3})))]
+                      (is (= 200 (:status draw-bal))))
+                    (let [details-before (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" p2-id "/full-details")) (auth))))
+                          team-ids (mapv :id (:teams details-before))
+                          _ (is (= [2 2 2] (mapv #(count (:players %)) (:teams details-before))))
+                          draft-payload {(str (nth team-ids 0)) [(nth p-ids 0) (nth p-ids 3)]
+                                         (str (nth team-ids 1)) [(nth p-ids 1) (nth p-ids 4)]
+                                         (str (nth team-ids 2)) [(nth p-ids 2) (nth p-ids 5)]}
+                          put-resp (app (-> (mock/request :put (str "/api/peladas/" p2-id "/teams/players"))
+                                            (auth)
+                                            (mock/json-body {"teams" draft-payload})))
+                          details-after (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" p2-id "/full-details")) (auth))))
+                          team-player-sets (into {} (map (fn [t] [(:id t) (set (map :id (:players t)))]) (:teams details-after)))]
+                      (is (= 200 (:status put-resp)))
+                      (is (= 6 (:assigned (th/decode-body put-resp))))
+                      (is (= #{(nth p-ids 0) (nth p-ids 3)} (get team-player-sets (nth team-ids 0))))
+                      (is (= #{(nth p-ids 1) (nth p-ids 4)} (get team-player-sets (nth team-ids 1))))
+                      (is (= #{(nth p-ids 2) (nth p-ids 5)} (get team-player-sets (nth team-ids 2)))))))))))))))

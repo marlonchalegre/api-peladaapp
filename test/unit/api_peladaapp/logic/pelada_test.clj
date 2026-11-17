@@ -164,25 +164,59 @@
               [{:sequence 1 :home-team-id "t1" :away-team-id "t2" :home-score 1 :away-score 2}]
               {}))))))
 
+(defn- make-wso-lineup-fixture
+  [{:keys [grades fixed-gks?] :or {grades {}}}]
+  (let [confirmed (vec (concat
+                        (when fixed-gks?
+                          [{:player-id "gk1" :grade 7.0}
+                           {:player-id "gk2" :grade 7.0}])
+                        (map (fn [i]
+                               (let [pid (str "p" i)]
+                                 {:player-id pid :grade (get grades pid (+ 5.0 (* 0.1 i)))}))
+                             (range 1 13))))
+        team-players (concat
+                      (map (fn [i] {:team_id "t1" :player_id (str "p" i)}) (range 1 6))
+                      (map (fn [i] {:team_id "t2" :player_id (str "p" i)}) (range 6 11)))
+        finished-matches [{:id "m1" :sequence 1 :home-team-id "t1" :away-team-id "t2" :home-score 2 :away-score 0 :status "finished"}]
+        match-lineups (map (fn [{:keys [team_id player_id]}] {:match_id "m1" :team_id team_id :player_id player_id}) team-players)]
+    {:confirmed confirmed
+     :team-players team-players
+     :finished-matches finished-matches
+     :match-lineups match-lineups
+     :next-spec {:home "t1" :away "t2" :stage "regular"}}))
+
 (deftest test-compute-winner-stays-on-lineups
   (testing "12 players in 5v5: 2 bench players + 3 players from losing team form next challenger"
-    (let [confirmed (mapv (fn [i] {:player-id (str "p" i) :grade (+ 5.0 (* 0.1 i))}) (range 1 13))
-          team-players (concat
-                        (map (fn [i] {:team_id "t1" :player_id (str "p" i)}) (range 1 6))
-                        (map (fn [i] {:team_id "t2" :player_id (str "p" i)}) (range 6 11)))
-          finished-matches [{:id "m1" :sequence 1 :home-team-id "t1" :away-team-id "t2" :home-score 2 :away-score 0 :status "finished"}]
-          match-lineups (map (fn [{:keys [team_id player_id]}] {:match_id "m1" :team_id team_id :player_id player_id}) team-players)
+    (let [{:keys [confirmed team-players finished-matches match-lineups next-spec]} (make-wso-lineup-fixture {})
           pelada {:format "winner_stays_on"
                   :players-per-team 5
                   :format-config {:rotation_mode "player_queue"
                                   :complete_team_rule "least_played"}}
-          next-spec {:home "t1" :away "t2" :stage "regular"}
           res (pelada.logic/compute-winner-stays-on-lineups
                pelada next-spec finished-matches match-lineups team-players confirmed)]
       (is (= ["p1" "p2" "p3" "p4" "p5"] (:home-lineup res)))
-      (is (= 5 (count (:away-lineup res))))
-      ;; p11 and p12 were on bench, plus 3 players from t2 (p6, p7, p8)
       (is (= ["p11" "p12" "p6" "p7" "p8"] (:away-lineup res)))))
+
+  (testing "Balanced and random complete_team_rule + fixed goalkeepers exclusion"
+    (let [grades (into {"p8" 9.0} (map (fn [i] [(str "p" i) 5.0]) (remove #{8} (range 1 13))))
+          {:keys [confirmed team-players finished-matches match-lineups next-spec]}
+          (make-wso-lineup-fixture {:grades grades :fixed-gks? true})
+          base-pelada {:format "winner_stays_on"
+                       :players-per-team 5
+                       :fixed-goalkeepers true
+                       :home-fixed-goalkeeper-id "gk1"
+                       :away-fixed-goalkeeper-id "gk2"}
+          res-balanced (pelada.logic/compute-winner-stays-on-lineups
+                        (assoc base-pelada :format-config {:rotation_mode "player_queue" :complete_team_rule "balanced"})
+                        next-spec finished-matches match-lineups team-players confirmed)
+          res-random (pelada.logic/compute-winner-stays-on-lineups
+                      (assoc base-pelada :format-config {:rotation_mode "player_queue" :complete_team_rule "random"})
+                      next-spec finished-matches match-lineups team-players confirmed)]
+      ;; Fixed GKs (gk1, gk2) are excluded from outfield rotation; p8 (grade 9.0) is farthest from 5.0
+      (is (= ["p11" "p12" "p6" "p7" "p9"] (:away-lineup res-balanced)))
+      (is (= 5 (count (:away-lineup res-random))))
+      (is (= #{"p11" "p12"} (set (take 2 (:away-lineup res-random)))))
+      (is (every? #{"p6" "p7" "p8" "p9" "p10"} (drop 2 (:away-lineup res-random))))))
 
   (testing "Returns nil when team_queue has full teams and >= 3 teams"
     (let [confirmed (mapv (fn [i] {:player-id (str "p" i) :grade 7.0}) (range 1 16))
