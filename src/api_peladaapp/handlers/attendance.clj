@@ -42,3 +42,12 @@
              user-id (auth/get-user-id-from-request request)]
          (ok (controller.attendance/update-voting-enabled pelada-id user-id player-id enabled? db)))
        (catch Exception e (exception/api-exception-handler e))))
+
+(defn update-arrival-order [request]
+  (try (let [db (:database request)
+             pelada-id (misc/as-uuid (get-in request [:params :id]))
+             body (:body request)
+             player-ids (mapv misc/as-uuid (:player_ids body))
+             user-id (auth/get-user-id-from-request request)]
+         (ok (controller.attendance/update-arrival-order pelada-id user-id player-ids db)))
+       (catch Exception e (exception/api-exception-handler e))))

@@ -149,7 +149,8 @@
                               :user (user->response (:user player))
                               :is_goalkeeper (:is_goalkeeper player)
                               :attendance_status (:attendance-status player)
-                              :attendance_updated_at (when updated-at (some-> updated-at helpers.time/->instant str))))))
+                              :attendance_updated_at (when updated-at (some-> updated-at helpers.time/->instant str))
+                              :arrival_order (or (:arrival-order player) (:arrival_order player))))))
 
 (defn full-details->response [data]
   (let [pelada-resp (assoc (model->response (:pelada data))

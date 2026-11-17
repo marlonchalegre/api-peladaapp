@@ -5,7 +5,7 @@
    [api-peladaapp.controllers.team :as controller.team]
    [api-peladaapp.helpers.exception :as exception]
    [api-peladaapp.helpers.misc :as misc]
-   [api-peladaapp.helpers.responses :refer [created deleted]]
+   [api-peladaapp.helpers.responses :refer [created deleted ok]]
    [api-peladaapp.logic.authorization :as auth]))
 
 (defn- get-org-id-from-pelada [pelada-id db]
@@ -56,4 +56,14 @@
              org-id (get-org-id-from-team team-id db)]
          (auth/require-organization-admin! user-id org-id db)
          (deleted (controller.team/remove-player team-id player-id db)))
+       (catch Exception e (exception/api-exception-handler e))))
+
+(defn replace-pelada-teams-players [request]
+  (try (let [db (:database request)
+             pelada-id (misc/as-uuid (get-in request [:params :id]))
+             teams-map (get-in request [:body :teams] {})
+             user-id (auth/get-user-id-from-request request)
+             org-id (get-org-id-from-pelada pelada-id db)]
+         (auth/require-organization-admin! user-id org-id db)
+         (ok (controller.team/replace-all-teams-players! pelada-id teams-map db)))
        (catch Exception e (exception/api-exception-handler e))))

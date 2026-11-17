@@ -78,15 +78,40 @@
     (map (fn [r] {:player-id (:player_id r) :player-name (:player_name r) :phone (:phone r)}) results)))
 
 (s/defn list-confirmed-players-by-pelada [pelada-id :- s/Uuid db]
-  (let [query (-> (h/select [:op.id :player_id] [:u.name :player_name] :u.phone)
+  (let [query (-> (h/select [:op.id :player_id] [:u.name :player_name] :u.phone :op.grade :u.position :pa.arrival_order :pa.updated_at)
                   (h/from [:Attendance :pa])
                   (h/join [:OrganizationPlayers :op] [:= :pa.player_id :op.id])
                   (h/join [:Users :u] [:= :op.user_id :u.id])
                   (h/where [:and
                             [:= :pa.pelada_id pelada-id]
-                            [:= :pa.status [:cast "confirmed" :attendance_status]]]))
+                            [:= :pa.status [:cast "confirmed" :attendance_status]]])
+                  (h/order-by [[:coalesce :pa.arrival_order 999999] :asc]
+                              [:pa.updated_at :asc]
+                              [:u.name :asc]))
         results (jdbc/execute! db (hsql/format query) hsql/opts)]
-    (map (fn [r] {:player-id (:player_id r) :player-name (:player_name r) :phone (:phone r)}) results)))
+    (map (fn [r] {:player-id (:player_id r)
+                  :player-name (:player_name r)
+                  :phone (:phone r)
+                  :grade (:grade r)
+                  :position (:position r)
+                  :arrival-order (:arrival_order r)
+                  :updated-at (:updated_at r)})
+         results)))
+
+(s/defn update-arrival-order!
+  [pelada-id :- s/Uuid player-ids :- [s/Uuid] db]
+  (let [unique-ids (vec (distinct player-ids))
+        case-expr (when (seq unique-ids)
+                    (conj (into [:case]
+                                (mapcat (fn [[idx pid]] [[:= :player_id pid] (inc idx)])
+                                        (map-indexed vector unique-ids)))
+                          :else nil))
+        query (-> (h/update :Attendance)
+                  (h/set {:arrival_order case-expr})
+                  (h/where [:= :pelada_id pelada-id]))]
+    (-> (jdbc/execute-one! db (hsql/format query) hsql/opts)
+        hsql/affected-rows-count)
+    (count unique-ids)))
 
 (s/defn delete-attendance :- s/Int
   [pelada-id :- s/Uuid

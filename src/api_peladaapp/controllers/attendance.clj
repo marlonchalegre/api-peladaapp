@@ -129,3 +129,15 @@
           (db.vote/delete-votes-for-target pelada-id player-id tx))
         {:updated res}))))
 
+(s/defn update-arrival-order :- s/Any
+  [pelada-id :- s/Uuid
+   user-id :- s/Uuid
+   player-ids :- [s/Uuid]
+   db]
+  (let [pelada (db.pelada/get-pelada pelada-id db)
+        _ (when (nil? pelada)
+            (throw (ex-info "Pelada not found" {:type :not-found :message "Pelada not found"})))
+        org-id (:organization-id pelada)]
+    (auth/require-organization-admin! user-id org-id db)
+    {:updated (db.attendance/update-arrival-order! pelada-id player-ids db)}))
+

@@ -1,5 +1,7 @@
 (ns api-peladaapp.schedule-management-test
   (:require
+   [api-peladaapp.db.player :as db.player]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.test-helpers :as th]
    [clojure.test :refer [deftest is testing use-fixtures]]
    [ring.mock.request :as mock]))
@@ -133,4 +135,65 @@
                       final-match (last all-matches)]
                   (is (= 4 (count all-matches)))
                   (is (= "final" (:stage final-match)))
-                  (is (= "scheduled" (:status final-match))))))))))))
+                  (is (= "scheduled" (:status final-match))))))))
+
+        (testing "arrival_order draw and winner_stays_on dynamic lineup completion"
+          (let [;; Add 6 players to org and confirm them in a new 2-team, 2-players-per-team pelada
+                p-ids (vec (for [i (range 1 7)]
+                             (let [email (str "p" i "@test.com")]
+                               (app (-> (mock/request :post "/auth/register")
+                                        (mock/json-body {"name" (str "Player " i) "email" email "password" "pass123"})))
+                               (let [u-resp (app (-> (mock/request :post "/auth/login")
+                                                     (mock/json-body {"email" email "password" "pass123"})))
+                                     uid (misc/as-uuid (get-in (th/decode-body u-resp) [:user :id]))]
+                                 (str (db.player/insert-player {:user-id uid
+                                                                :organization-id (misc/as-uuid org-id)
+                                                                :grade (+ 5.0 i)}
+                                                               ds))))))
+                wso-resp (app (-> (mock/request :post "/api/peladas")
+                                  (auth)
+                                  (mock/json-body {"organization_id" org-id
+                                                   "num_teams" 2
+                                                   "players_per_team" 2
+                                                   "format" "winner_stays_on"
+                                                   "format_config" {"rotation_mode" "player_queue"
+                                                                    "complete_team_rule" "least_played"}})))
+                wso-id (:id (th/decode-body wso-resp))]
+            (app (-> (mock/request :post (str "/api/peladas/" wso-id "/attendance/batch"))
+                     (auth)
+                     (mock/json-body {"player_ids" p-ids "status" "confirmed"})))
+            (let [rev-ids (vec (reverse p-ids))
+                  ao-resp (app (-> (mock/request :post (str "/api/peladas/" wso-id "/attendance/arrival-order"))
+                                   (auth)
+                                   (mock/json-body {"player_ids" rev-ids})))]
+              (is (= 200 (:status ao-resp)))
+              (let [draw-resp (app (-> (mock/request :post (str "/api/peladas/" wso-id "/teams/randomize"))
+                                       (auth)
+                                       (mock/json-body {"algorithm" "arrival_fifo"
+                                                        "players_per_team" 2
+                                                        "num_teams" 2})))]
+                (is (= 200 (:status draw-resp)))
+                (let [details (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" wso-id "/full-details")) (auth))))
+                      t1-players (mapv :id (:players (first (:teams details))))
+                      t2-players (mapv :id (:players (second (:teams details))))]
+                  ;; First 2 of rev-ids -> team 1, next 2 -> team 2, last 2 -> bench
+                  (is (= (set (subvec rev-ids 0 2)) (set t1-players)))
+                  (is (= (set (subvec rev-ids 2 4)) (set t2-players)))
+                  (app (-> (mock/request :post (str "/api/peladas/" wso-id "/close-attendance")) auth))
+                  (let [begin-resp (app (-> (mock/request :post (str "/api/peladas/" wso-id "/begin"))
+                                            (auth)
+                                            (mock/json-body {"format" "winner_stays_on"})))]
+                    (is (= 200 (:status begin-resp)))
+                    (is (= 1 (:matches_created (th/decode-body begin-resp))))
+                    (let [dash1 (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" wso-id "/dashboard-data")) (auth))))
+                          m1 (first (:matches dash1))]
+                    ;; Finish match 1 with home winning 2-0 -> away loses and gets replaced by bench (1 player from bench + 0? wait: 2 bench players fill 2-player team!)
+                      (app (-> (mock/request :put (str "/api/matches/" (:id m1) "/score"))
+                               (auth)
+                               (mock/json-body {"home_score" 2 "away_score" 0 "status" "finished"})))
+                      (let [dash2 (th/decode-body (app (-> (mock/request :get (str "/api/peladas/" wso-id "/dashboard-data")) (auth))))
+                            m2 (second (:matches dash2))
+                            m2-lineups (get-in dash2 [:match_lineups_map (keyword (str (:id m2)))])
+                            away-lineup-pids (mapv :player_id (get m2-lineups (keyword (str (:away_team_id m2)))))]
+                        (is (= 2 (count (:matches dash2))))
+                        (is (= (set (subvec rev-ids 4 6)) (set away-lineup-pids)))))))))))))))

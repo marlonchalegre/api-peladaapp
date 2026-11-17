@@ -53,11 +53,6 @@
                        {:type :bad-request
                         :message "At least four teams are required for Group Stage + Semifinals & Final"}))
 
-       (and (= fmt "winner_stays_on") (< team-count 3))
-       (throw (ex-info "At least three teams are required for Winner Stays On"
-                       {:type :bad-request
-                        :message "At least three teams are required for Winner Stays On"}))
-
        :else (vec team-ids)))))
 
 (s/defn get-voting-info :- s/Any
@@ -129,10 +124,15 @@
        :next-away (nth clean-queue 1)
        :queue (-> (subvec clean-queue 2) (conj leaving-id) (conj staying-id))
        :streak {}}
-      {:next-home staying-id
-       :next-away (first clean-queue)
-       :queue (-> (vec (rest clean-queue)) (conj leaving-id))
-       :streak {staying-id wins}})))
+      (if (empty? clean-queue)
+        {:next-home staying-id
+         :next-away leaving-id
+         :queue []
+         :streak {staying-id wins}}
+        {:next-home staying-id
+         :next-away (first clean-queue)
+         :queue (-> (vec (rest clean-queue)) (conj leaving-id))
+         :streak {staying-id wins}}))))
 
 (defn compute-winner-stays-on-next-match
   "Replays finished matches in sequence order for `winner_stays_on` and returns
@@ -168,14 +168,23 @@
                        :else
                        (case draw-rule
                          "both_leave"
-                         (if (>= (count clean-queue) 2)
+                         (cond
+                           (>= (count clean-queue) 2)
                            {:next-home (nth clean-queue 0)
                             :next-away (nth clean-queue 1)
                             :queue (-> (subvec clean-queue 2) (conj home-id) (conj away-id))
                             :streak {}}
+
+                           (= (count clean-queue) 1)
                            {:next-home (first clean-queue)
                             :next-away away-id
                             :queue [home-id]
+                            :streak {}}
+
+                           :else
+                           {:next-home away-id
+                            :next-away home-id
+                            :queue []
                             :streak {}})
 
                          "defender_stays"
@@ -257,3 +266,165 @@
           []))
 
       [])))
+
+(defn- build-match-lineup-lookup
+  [finished-matches match-lineups team-roster-map fixed-gk-ids]
+  (let [by-match-team (reduce (fn [acc row]
+                                (let [mid (or (:match-id row) (:match_id row))
+                                      tid (or (:team-id row) (:team_id row))
+                                      pid (or (:player-id row) (:player_id row))]
+                                  (if (and mid tid pid (not (fixed-gk-ids pid)))
+                                    (update-in acc [mid tid] (fnil conj []) pid)
+                                    acc)))
+                              {}
+                              match-lineups)]
+    (into {}
+          (map (fn [m]
+                 (let [mid (:id m)
+                       hid (or (:home-team-id m) (:home_team_id m))
+                       aid (or (:away-team-id m) (:away_team_id m))
+                       explicit (get by-match-team mid)]
+                   [mid {hid (vec (distinct (or (get explicit hid) (get team-roster-map hid) [])))
+                         aid (vec (distinct (or (get explicit aid) (get team-roster-map aid) [])))}]))
+               finished-matches))))
+
+(defn- compute-player-play-stats
+  [ordered-matches lineup-lookup]
+  (let [rev-matches (reverse ordered-matches)]
+    (first
+     (reduce
+      (fn [[acc streak-active?] m]
+        (let [seq-num (or (:sequence m) 0)
+              sides (get lineup-lookup (:id m) {})
+              played-set (into #{} (apply concat (vals sides)))
+              next-acc (reduce (fn [a pid]
+                                 (let [cur (get a pid {:total-games 0 :consecutive-games 0 :last-played-seq 0})
+                                       can-streak? (contains? streak-active? pid)]
+                                   (assoc a pid {:total-games (inc (:total-games cur))
+                                                 :consecutive-games (if (or (empty? a) can-streak?)
+                                                                      (inc (:consecutive-games cur))
+                                                                      (:consecutive-games cur))
+                                                 :last-played-seq (max (:last-played-seq cur) seq-num)})))
+                               acc
+                               played-set)]
+          [next-acc (into #{} (filter streak-active? played-set))]))
+      [{} (into #{} (apply concat (vals (get lineup-lookup (:id (first rev-matches)) {}))))]
+      rev-matches))))
+
+(defn- sort-leaving-candidates
+  [candidates player-stats arrival-rank-map player-info-map staying-avg-grade complete-rule]
+  (let [stats-fn (fn [pid] (get player-stats pid {:consecutive-games 0 :total-games 0 :last-played-seq 0}))
+        rank-fn (fn [pid] (get arrival-rank-map pid 999999))]
+    (case complete-rule
+      "random"
+      (->> candidates
+           (group-by #(:consecutive-games (stats-fn %)))
+           (sort-by key)
+           (mapcat (fn [[_ grp]] (shuffle grp)))
+           vec)
+
+      "balanced"
+      (sort-by (fn [pid]
+                 (let [{:keys [consecutive-games total-games]} (stats-fn pid)
+                       grade (double (or (:grade (get player-info-map pid)) 5.0))]
+                   [consecutive-games (Math/abs (- grade staying-avg-grade)) total-games (rank-fn pid)]))
+               candidates)
+
+      ;; Default: "least_played"
+      (sort-by (fn [pid]
+                 (let [{:keys [consecutive-games total-games]} (stats-fn pid)]
+                   [consecutive-games total-games (rank-fn pid)]))
+               candidates))))
+
+(defn compute-winner-stays-on-lineups
+  "Computes dynamic {:home-lineup [...] :away-lineup [...]} for `winner_stays_on`
+   when `player_queue` rotation is enabled, a team has fewer than `players-per-team`
+   players, or bench players exist with < 3 teams. Returns nil if standard team
+   seeding should be used."
+  [pelada next-match-spec finished-matches match-lineups team-players confirmed-players]
+  (let [fmt (or (:format pelada) "round_robin")
+        fmt-config (or (:format-config pelada) (:format_config pelada) {})
+        rotation-mode (or (:rotation_mode fmt-config) (:rotation-mode fmt-config) "team_queue")
+        complete-rule (or (:complete_team_rule fmt-config) (:complete-team-rule fmt-config) "least_played")
+        players-per-team (int (or (:players-per-team pelada) (:players_per_team pelada) 5))
+        fixed-gks? (boolean (or (:fixed-goalkeepers pelada) (:fixed_goalkeepers pelada)))
+        fixed-gk-ids (if fixed-gks?
+                       (into #{} (remove nil? [(or (:home-fixed-goalkeeper-id pelada) (:home_fixed_goalkeeper_id pelada))
+                                               (or (:away-fixed-goalkeeper-id pelada) (:away_fixed_goalkeeper_id pelada))]))
+                       #{})]
+    (when (and (= fmt "winner_stays_on") next-match-spec (seq finished-matches))
+      (let [team-roster-map (reduce (fn [acc row]
+                                      (let [tid (or (:team-id row) (:team_id row))
+                                            pid (or (:player-id row) (:player_id row))]
+                                        (if (and tid pid (not (fixed-gk-ids pid)))
+                                          (update acc tid (fnil conj []) pid)
+                                          acc)))
+                                    {}
+                                    team-players)
+            assigned-set (into #{} (mapcat val team-roster-map))
+            team-count (count (keys team-roster-map))
+            bench-unassigned? (some #(let [pid (or (:player-id %) (:player_id %))]
+                                       (and (not (fixed-gk-ids pid))
+                                            (not (assigned-set pid))))
+                                    confirmed-players)
+            away-id (:away next-match-spec)
+            needs-dynamic? (or (= rotation-mode "player_queue")
+                               (< (count (get team-roster-map away-id)) players-per-team)
+                               (and (< team-count 3) bench-unassigned?))]
+        (when needs-dynamic?
+          (let [ordered-matches (vec (sort-by :sequence finished-matches))
+                last-match (peek ordered-matches)
+                last-home (or (:home-team-id last-match) (:home_team_id last-match))
+                last-away (or (:away-team-id last-match) (:away_team_id last-match))
+                lineup-lookup (build-match-lineup-lookup ordered-matches match-lineups team-roster-map fixed-gk-ids)
+                player-stats (compute-player-play-stats ordered-matches lineup-lookup)
+                confirmed-ids (->> confirmed-players
+                                   (map #(or (:player-id %) (:player_id %)))
+                                   (remove fixed-gk-ids)
+                                   distinct
+                                   vec)
+                arrival-rank-map (into {} (map-indexed (fn [idx pid] [pid idx]) confirmed-ids))
+                player-info-map (into {} (map (fn [p] [(or (:player-id p) (:player_id p)) p]) confirmed-players))
+                staying-id (:home next-match-spec)
+                last-sides (get lineup-lookup (:id last-match) {})
+                staying-lineup (->> (if (#{last-home last-away} staying-id)
+                                      (get last-sides staying-id)
+                                      (get team-roster-map staying-id))
+                                    (take players-per-team)
+                                    vec)
+                staying-set (set staying-lineup)
+                leaving-id (cond
+                             (= staying-id last-home) last-away
+                             (= staying-id last-away) last-home
+                             :else nil)
+                leaving-lineup (->> (if leaving-id (get last-sides leaving-id) [])
+                                    (remove staying-set)
+                                    vec)
+                last-match-players (into #{} (apply concat (vals last-sides)))
+                bench-players (->> confirmed-ids
+                                   (remove staying-set)
+                                   (remove last-match-players)
+                                   (sort-by (fn [pid]
+                                              (let [{:keys [last-played-seq total-games]} (get player-stats pid {:last-played-seq 0 :total-games 0})]
+                                                [last-played-seq total-games (get arrival-rank-map pid 999999)])))
+                                   vec)
+                away-initial (if (or (= rotation-mode "player_queue") (< team-count 3))
+                               (vec (take players-per-team bench-players))
+                               (vec (take players-per-team (remove staying-set (get team-roster-map away-id)))))
+                away-initial-set (into staying-set away-initial)
+                remaining-bench (vec (remove away-initial-set bench-players))
+                staying-grades (keep #(:grade (get player-info-map %)) staying-lineup)
+                staying-avg-grade (if (seq staying-grades)
+                                    (/ (reduce + 0.0 staying-grades) (count staying-grades))
+                                    5.0)
+                sorted-leaving (sort-leaving-candidates (remove away-initial-set leaving-lineup)
+                                                        player-stats
+                                                        arrival-rank-map
+                                                        player-info-map
+                                                        staying-avg-grade
+                                                        complete-rule)
+                needed (max 0 (- players-per-team (count away-initial)))
+                fillers (take needed (concat remaining-bench sorted-leaving))
+                away-lineup (vec (concat away-initial fillers))]
+            {:home-lineup staying-lineup
+             :away-lineup away-lineup}))))))

@@ -290,6 +290,7 @@
           attendance (db.attendance/list-attendance-by-pelada pelada-id db)
           attendance-map (into {} (map (fn [a] [(misc/as-uuid (:player_id a)) {:status (:status a)
                                                                                :updated_at (:updated_at a)
+                                                                               :arrival_order (:arrival_order a)
                                                                                :voting_enabled (if (contains? a :voting_enabled)
                                                                                                  (boolean (:voting_enabled a))
                                                                                                  true)}]))
@@ -346,7 +347,8 @@
                                               (let [att (get attendance-map (misc/as-uuid (:id player)))]
                                                 (assoc player :user (get users-map (:user-id player))
                                                        :attendance-status (:status att "pending")
-                                                       :attendance-updated-at (some-> (:updated_at att) helpers.time/->instant str))))
+                                                       :attendance-updated-at (some-> (:updated_at att) helpers.time/->instant str)
+                                                       :arrival-order (:arrival_order att))))
                                             available-players)
 
           ;; Calculate normalized scores for all players in org

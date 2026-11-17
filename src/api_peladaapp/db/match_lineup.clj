@@ -25,6 +25,32 @@
                 (update acc team-id (fnil conj []) row)))
             {} rows)))
 
+(defn- insert-lineup!
+  [match-id home-team-id away-team-id home-rows away-rows pelada db]
+  (let [outfield (concat (map (fn [{:keys [player-id is-goalkeeper]}]
+                                {:match_id match-id :team_id home-team-id :player_id player-id :is_goalkeeper (boolean is-goalkeeper)})
+                              home-rows)
+                         (map (fn [{:keys [player-id is-goalkeeper]}]
+                                {:match_id match-id :team_id away-team-id :player_id player-id :is_goalkeeper (boolean is-goalkeeper)})
+                              away-rows))
+        lineup-map (reduce (fn [acc p] (assoc acc (:player_id p) p)) {} outfield)
+        final-lineup (cond-> lineup-map
+                       (and (:fixed-goalkeepers pelada) (:home-fixed-goalkeeper-id pelada))
+                       (assoc (:home-fixed-goalkeeper-id pelada)
+                              {:match_id match-id :team_id home-team-id :player_id (:home-fixed-goalkeeper-id pelada) :is_goalkeeper true})
+
+                       (and (:fixed-goalkeepers pelada) (:away-fixed-goalkeeper-id pelada))
+                       (assoc (:away-fixed-goalkeeper-id pelada)
+                              {:match_id match-id :team_id away-team-id :player_id (:away-fixed-goalkeeper-id pelada) :is_goalkeeper true}))
+        to-insert (vals final-lineup)]
+    (if (empty? to-insert)
+      0
+      (try
+        (let [query (-> (h/insert-into :MatchLineups)
+                        (h/values to-insert))]
+          (hsql/affected-rows-count (jdbc/execute-one! db (hsql/format query) hsql/opts)))
+        (catch Exception _ 0)))))
+
 (s/defn ensure-seeded :- s/Int
   "Seed lineup from team players for both sides if match has no lineup rows yet.
    Returns number of rows inserted (may be 0)."
@@ -37,35 +63,25 @@
             home (:home-team-id m)
             away (:away-team-id m)
             home-players (db.team/list-team-players home db)
-            away-players (db.team/list-team-players away db)
+            away-players (db.team/list-team-players away db)]
+        (insert-lineup! match-id home away home-players away-players pelada db)))))
 
-            ;; Base outfield players
-            outfield (concat (map (fn [p] {:match_id match-id :team_id home :player_id (:player-id p) :is_goalkeeper (boolean (:is-goalkeeper p))}) home-players)
-                             (map (fn [p] {:match_id match-id :team_id away :player_id (:player-id p) :is_goalkeeper (boolean (:is-goalkeeper p))}) away-players))
-
-            ;; Add fixed goalkeepers if enabled
-            ;; Using a map keyed by player_id to ensure uniqueness
-            lineup-map (reduce (fn [acc p] (assoc acc (:player_id p) p))
-                               {}
-                               outfield)
-
-            final-lineup (cond-> lineup-map
-                           (and (:fixed-goalkeepers pelada) (:home-fixed-goalkeeper-id pelada))
-                           (assoc (:home-fixed-goalkeeper-id pelada)
-                                  {:match_id match-id :team_id home :player_id (:home-fixed-goalkeeper-id pelada) :is_goalkeeper true})
-
-                           (and (:fixed-goalkeepers pelada) (:away-fixed-goalkeeper-id pelada))
-                           (assoc (:away-fixed-goalkeeper-id pelada)
-                                  {:match_id match-id :team_id away :player_id (:away-fixed-goalkeeper-id pelada) :is_goalkeeper true}))
-
-            to-insert (vals final-lineup)]
-        (if (empty? to-insert)
-          0
-          (try
-            (let [query (-> (h/insert-into :MatchLineups)
-                            (h/values to-insert))]
-              (hsql/affected-rows-count (jdbc/execute-one! db (hsql/format query) hsql/opts)))
-            (catch Exception _ 0)))))))
+(s/defn seed-custom-lineup! :- s/Int
+  "Seed explicit home/away player lineups for a match (plus fixed goalkeepers if enabled)."
+  [match-id :- s/Uuid
+   home-team-id :- s/Uuid
+   away-team-id :- s/Uuid
+   home-player-ids :- [s/Uuid]
+   away-player-ids :- [s/Uuid]
+   pelada
+   db]
+  (insert-lineup! match-id
+                  home-team-id
+                  away-team-id
+                  (map (fn [pid] {:player-id pid :is-goalkeeper false}) home-player-ids)
+                  (map (fn [pid] {:player-id pid :is-goalkeeper false}) away-player-ids)
+                  pelada
+                  db))
 
 (s/defn add-player :- s/Int
   [match-id :- s/Uuid team-id :- s/Uuid player-id :- s/Uuid db]

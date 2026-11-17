@@ -1,7 +1,9 @@
 (ns api-peladaapp.controllers.team
   (:require
    [api-peladaapp.db.team :as db.team]
+   [api-peladaapp.helpers.misc :as misc]
    [api-peladaapp.models.team :as models.team]
+   [next.jdbc :as jdbc]
    [schema.core :as s]))
 
 (s/defn create-team :- models.team/Team
@@ -45,3 +47,21 @@
 (s/defn remove-player :- s/Int
   [team-id :- s/Uuid player-id :- s/Uuid db]
   (db.team/remove-player-from-team team-id player-id db))
+
+(s/defn replace-all-teams-players!
+  [pelada-id :- s/Uuid teams-map db]
+  (jdbc/with-transaction [tx db]
+    (let [valid-team-ids (set (map :id (db.team/list-pelada-teams pelada-id tx)))
+          assignments (vec (for [[team-id-raw player-ids] teams-map
+                                 :let [tid (misc/as-uuid (name team-id-raw))]
+                                 :when (contains? valid-team-ids tid)
+                                 pid-raw player-ids
+                                 :let [pid (misc/as-uuid pid-raw)]
+                                 :when pid]
+                             {:team_id tid
+                              :player_id pid
+                              :is_goalkeeper false}))]
+      (db.team/clear-teams-players pelada-id tx)
+      (when (seq assignments)
+        (db.team/add-team-players-batch! assignments tx))
+      {:assigned (count assignments)})))

@@ -80,6 +80,7 @@
     (POST "/peladas/:id/attendance/batch" [] handler.attendance/batch-update-attendance)
     (POST "/peladas/:id/attendance" [] handler.attendance/update-attendance)
     (POST "/peladas/:id/attendance/voting-enabled" [] handler.attendance/update-voting-enabled)
+    (POST "/peladas/:id/attendance/arrival-order" [] handler.attendance/update-arrival-order)
     (POST "/peladas/:id/close-attendance" [] handler.attendance/close-attendance)
 
     (GET "/peladas/:id/dashboard-data" [] handler.pelada/get-dashboard-data)
@@ -92,6 +93,7 @@
 
     ;; Matches
     (POST "/peladas/:id/teams/randomize" [] handlers.randomize/randomize-teams)
+    (PUT "/peladas/:id/teams/players" [] handler.team/replace-pelada-teams-players)
     (PUT "/matches/:id/score" [] handler.match/update-score)
     (POST "/matches/:id/timer/start" [] handler.match/start-timer)
     (POST "/matches/:id/timer/pause" [] handler.match/pause-timer)

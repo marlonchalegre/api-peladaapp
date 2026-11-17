@@ -59,14 +59,13 @@
 
   (testing "Throws when team count is too small for specific formats"
     (let [ex-final (try (pelada.logic/ensure-schedulable-team-count ["t1" "t2"] "championship_final") (catch Exception e e))
-          ex-semis (try (pelada.logic/ensure-schedulable-team-count ["t1" "t2" "t3"] "championship_semis_final") (catch Exception e e))
-          ex-wso (try (pelada.logic/ensure-schedulable-team-count ["t1" "t2"] "winner_stays_on") (catch Exception e e))]
+          ex-semis (try (pelada.logic/ensure-schedulable-team-count ["t1" "t2" "t3"] "championship_semis_final") (catch Exception e e))]
       (is (= "At least three teams are required for Group Stage + Final" (:message (ex-data ex-final))))
-      (is (= "At least four teams are required for Group Stage + Semifinals & Final" (:message (ex-data ex-semis))))
-      (is (= "At least three teams are required for Winner Stays On" (:message (ex-data ex-wso))))))
+      (is (= "At least four teams are required for Group Stage + Semifinals & Final" (:message (ex-data ex-semis))))))
 
   (testing "Returns vector of team IDs when count >= required"
     (is (= ["t1" "t2"] (pelada.logic/ensure-schedulable-team-count '("t1" "t2"))))
+    (is (= ["t1" "t2"] (pelada.logic/ensure-schedulable-team-count ["t1" "t2"] "winner_stays_on")))
     (is (= ["t1" "t2" "t3"] (pelada.logic/ensure-schedulable-team-count ["t1" "t2" "t3"] "championship_final")))
     (is (= ["t1" "t2" "t3" "t4"] (pelada.logic/ensure-schedulable-team-count ["t1" "t2" "t3" "t4"] "championship_semis_final")))
     (is (= ["t1" "t2" "t3"] (pelada.logic/ensure-schedulable-team-count ["t1" "t2" "t3"] "winner_stays_on")))))
@@ -151,4 +150,50 @@
               teams
               [{:sequence 1 :home-team-id "t1" :away-team-id "t2" :home-score 2 :away-score 0}
                {:sequence 2 :home-team-id "t1" :away-team-id "t3" :home-score 1 :away-score 0}]
-              {:max_consecutive_wins 2}))))))
+              {:max_consecutive_wins 2}))))
+
+    (testing "2-team winner_stays_on rotates cleanly without nil away"
+      (is (= {:home "t1" :away "t2" :stage "regular"}
+             (pelada.logic/compute-winner-stays-on-next-match
+              ["t1" "t2"]
+              [{:sequence 1 :home-team-id "t1" :away-team-id "t2" :home-score 2 :away-score 1}]
+              {})))
+      (is (= {:home "t2" :away "t1" :stage "regular"}
+             (pelada.logic/compute-winner-stays-on-next-match
+              ["t1" "t2"]
+              [{:sequence 1 :home-team-id "t1" :away-team-id "t2" :home-score 1 :away-score 2}]
+              {}))))))
+
+(deftest test-compute-winner-stays-on-lineups
+  (testing "12 players in 5v5: 2 bench players + 3 players from losing team form next challenger"
+    (let [confirmed (mapv (fn [i] {:player-id (str "p" i) :grade (+ 5.0 (* 0.1 i))}) (range 1 13))
+          team-players (concat
+                        (map (fn [i] {:team_id "t1" :player_id (str "p" i)}) (range 1 6))
+                        (map (fn [i] {:team_id "t2" :player_id (str "p" i)}) (range 6 11)))
+          finished-matches [{:id "m1" :sequence 1 :home-team-id "t1" :away-team-id "t2" :home-score 2 :away-score 0 :status "finished"}]
+          match-lineups (map (fn [{:keys [team_id player_id]}] {:match_id "m1" :team_id team_id :player_id player_id}) team-players)
+          pelada {:format "winner_stays_on"
+                  :players-per-team 5
+                  :format-config {:rotation_mode "player_queue"
+                                  :complete_team_rule "least_played"}}
+          next-spec {:home "t1" :away "t2" :stage "regular"}
+          res (pelada.logic/compute-winner-stays-on-lineups
+               pelada next-spec finished-matches match-lineups team-players confirmed)]
+      (is (= ["p1" "p2" "p3" "p4" "p5"] (:home-lineup res)))
+      (is (= 5 (count (:away-lineup res))))
+      ;; p11 and p12 were on bench, plus 3 players from t2 (p6, p7, p8)
+      (is (= ["p11" "p12" "p6" "p7" "p8"] (:away-lineup res)))))
+
+  (testing "Returns nil when team_queue has full teams and >= 3 teams"
+    (let [confirmed (mapv (fn [i] {:player-id (str "p" i) :grade 7.0}) (range 1 16))
+          team-players (concat
+                        (map (fn [i] {:team_id "t1" :player_id (str "p" i)}) (range 1 6))
+                        (map (fn [i] {:team_id "t2" :player_id (str "p" i)}) (range 6 11))
+                        (map (fn [i] {:team_id "t3" :player_id (str "p" i)}) (range 11 16)))
+          finished-matches [{:id "m1" :sequence 1 :home-team-id "t1" :away-team-id "t2" :home-score 2 :away-score 0 :status "finished"}]
+          pelada {:format "winner_stays_on"
+                  :players-per-team 5
+                  :format-config {:rotation_mode "team_queue"}}
+          next-spec {:home "t1" :away "t3" :stage "regular"}]
+      (is (nil? (pelada.logic/compute-winner-stays-on-lineups
+                 pelada next-spec finished-matches [] team-players confirmed))))))

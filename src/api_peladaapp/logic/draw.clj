@@ -33,7 +33,9 @@
   {draw.gemini/algorithm-name draw.gemini/draw
    draw.gpt/algorithm-name draw.gpt/draw})
 
-(def algorithms (into #{default-algorithm} (keys draw-fns)))
+(def arrival-algorithms #{"arrival_fifo" "arrival_first_balanced"})
+
+(def algorithms (into (into #{default-algorithm} (keys draw-fns)) arrival-algorithms))
 
 (defn- draw-cutoff
   "Peladas closed strictly before this instant feed the history. Falls back to
@@ -103,29 +105,89 @@
 
 (defn- enrich-players
   [player-ids org-id db]
-  (mapv (fn [p] {:id (:id p)
-                 :name (or (:name p) (str (:id p)))
-                 :position (:position p)
-                 :grade (some-> (:grade p) double)})
-        (db.player/get-players-details-for-balance (vec player-ids) org-id db)))
+  (let [details-by-id (into {}
+                            (map (fn [p] [(:id p) {:id (:id p)
+                                                   :name (or (:name p) (str (:id p)))
+                                                   :position (:position p)
+                                                   :grade (some-> (:grade p) double)}]))
+                            (db.player/get-players-details-for-balance (vec player-ids) org-id db))]
+    (vec (keep details-by-id player-ids))))
 
 (defn- bad-request!
   [message]
   (throw (ex-info message {:type :bad-request :message message})))
 
+(defn- draw-by-arrival!
+  [pelada-id algorithm player-ids players-per-team db]
+  (jdbc/with-transaction [tx db]
+    (let [pelada (db.pelada/get-pelada pelada-id tx)
+          org-id (:organization-id pelada)
+          teams (db.team/list-pelada-teams pelada-id tx)
+          _ (when (empty? teams) (bad-request! "Pelada has no teams to fill"))
+          fixed-gks (if (:fixed-goalkeepers pelada)
+                      (set (keep identity [(:home-fixed-goalkeeper-id pelada)
+                                           (:away-fixed-goalkeeper-id pelada)]))
+                      #{})
+          confirmed (db.attendance/list-confirmed-players-by-pelada pelada-id tx)
+          raw-players (if (seq confirmed)
+                        (->> confirmed
+                             (remove #(fixed-gks (:player-id %)))
+                             (mapv (fn [p] {:id (:player-id p)
+                                            :name (or (:player-name p) (str (:player-id p)))
+                                            :position (:position p)
+                                            :grade (some-> (:grade p) double)})))
+                        (enrich-players (vec (remove fixed-gks player-ids)) org-id tx))
+          players (if (= algorithm "arrival_first_balanced")
+                    (fill-missing-grades raw-players)
+                    raw-players)
+          _ (when (empty? players) (bad-request! "No confirmed players to draw"))
+          num-teams (count teams)
+          per-team (if (and players-per-team (pos? players-per-team))
+                     players-per-team
+                     (long (math/ceil (/ (double (count players)) (max 1 num-teams)))))
+          capacity (* num-teams per-team)
+          selected (vec (take capacity players))
+          ordered-teams
+          (if (and (= algorithm "arrival_first_balanced") (>= num-teams 2))
+            (let [first-two-count (* 2 per-team)
+                  first-two-pool (vec (take first-two-count selected))
+                  rest-pool (vec (drop first-two-count selected))
+                  rng (java.util.Random.)
+                  [t1 t2] (if (seq first-two-pool)
+                            (common/balanced-distribution first-two-pool 2 rng)
+                            [[] []])
+                  other-teams (->> (partition-all per-team rest-pool)
+                                   (mapv vec))
+                  padded-others (vec (take (- num-teams 2)
+                                           (concat other-teams (repeat []))))]
+              (into [(vec t1) (vec t2)] padded-others))
+            (->> (partition-all per-team selected)
+                 (mapv vec)
+                 (#(vec (take num-teams (concat % (repeat [])))))))
+          assigned (persist-assignments! pelada-id ordered-teams (mapv :id teams) tx)]
+      (log/info (str "[DRAW] " algorithm " placed " assigned " players in "
+                     num-teams " teams of pelada " pelada-id))
+      {:algorithm algorithm :justification nil})))
+
 (defn draw-teams!
   "Draws the teams of `pelada-id` and writes the result.
 
-   Options: :algorithm (\"classic\" | \"gemini\" | \"gpt\"), :use-history,
-   :player-ids (fallback pool) and :players-per-team.
+   Options: :algorithm (\"classic\" | \"gemini\" | \"gpt\" | \"arrival_fifo\" | \"arrival_first_balanced\"),
+   :use-history, :player-ids (fallback pool) and :players-per-team.
 
    Returns a report map for the caller to hand back to the UI. The classic
-   algorithm reports nothing beyond its name — it has no justifications."
+   and arrival algorithms report nothing beyond their name."
   [pelada-id {:keys [algorithm use-history player-ids players-per-team]} db]
   (let [algorithm (or (algorithms algorithm) default-algorithm)]
-    (if (= default-algorithm algorithm)
+    (cond
+      (= default-algorithm algorithm)
       (do (logic.randomize/randomize-teams! pelada-id player-ids players-per-team db)
           {:algorithm default-algorithm :justification nil})
+
+      (contains? arrival-algorithms algorithm)
+      (draw-by-arrival! pelada-id algorithm player-ids players-per-team db)
+
+      :else
       (jdbc/with-transaction [tx db]
         (let [pelada (db.pelada/get-pelada pelada-id tx)
               org-id (:organization-id pelada)

@@ -1,0 +1,1 @@
+ALTER TABLE "Attendance" ADD COLUMN IF NOT EXISTS arrival_order INTEGER;

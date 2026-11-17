@@ -25,12 +25,16 @@
   (db.match/get-match match-id db))
 
 (defn- create-dynamic-matches!
-  [pelada-id new-match-specs existing-matches teams tx]
+  [pelada new-match-specs existing-matches teams tx]
   (when (seq new-match-specs)
-    (let [max-seq (reduce max 0 (map :sequence existing-matches))
+    (let [pelada-id (:id pelada)
+          max-seq (reduce max 0 (map :sequence existing-matches))
           team-ids (mapv :id teams)
           team-players (db.team/list-team-players-by-pelada pelada-id tx)
-          confirmed-player-ids (mapv :player-id (db.attendance/list-confirmed-players-by-pelada pelada-id tx))]
+          confirmed-players (vec (db.attendance/list-confirmed-players-by-pelada pelada-id tx))
+          confirmed-player-ids (mapv :player-id confirmed-players)
+          match-lineups (when (= "winner_stays_on" (:format pelada))
+                          (db.match-lineup/list-match-lineups-by-pelada pelada-id tx))]
       (loop [[spec & more] new-match-specs
              curr-seq (inc max-seq)
              accumulated-matches (vec existing-matches)]
@@ -48,8 +52,27 @@
                                                                  team-ids
                                                                  team-players
                                                                  confirmed-player-ids)
-                match-id (db.match/insert-match with-support tx)]
-            (db.match-lineup/ensure-seeded match-id tx)
+                match-id (db.match/insert-match with-support tx)
+                custom-lineups (when (= "winner_stays_on" (:format pelada))
+                                 (pelada.logic/compute-winner-stays-on-lineups
+                                  pelada
+                                  spec
+                                  (filter #(= "finished" (:status %)) accumulated-matches)
+                                  match-lineups
+                                  team-players
+                                  confirmed-players))
+                seeded (if custom-lineups
+                         (db.match-lineup/seed-custom-lineup!
+                          match-id
+                          (:home spec)
+                          (:away spec)
+                          (:home-lineup custom-lineups)
+                          (:away-lineup custom-lineups)
+                          pelada
+                          tx)
+                         0)]
+            (when (zero? seeded)
+              (db.match-lineup/ensure-seeded match-id tx))
             (recur more (inc curr-seq) (conj accumulated-matches (assoc with-support :id match-id)))))))))
 
 (defn- maybe-advance-pelada-progression!
@@ -60,7 +83,7 @@
       (let [all-matches (db.match/list-matches-by-pelada pelada-id tx)
             teams (db.team/list-pelada-teams pelada-id tx)
             new-specs (pelada.logic/compute-next-progression-matches pelada all-matches teams)]
-        (create-dynamic-matches! pelada-id new-specs all-matches teams tx)))))
+        (create-dynamic-matches! pelada new-specs all-matches teams tx)))))
 
 (s/defn update-score :- models.match/Match
   [match-id :- s/Uuid score-update db]
