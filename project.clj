@@ -3,7 +3,7 @@
   :url "http://example.com/FIXME"
   :license {:name "MIT"
             :url  "https://www.eclipse.org/legal/epl-2.0/"}
-  :dependencies [[org.clojure/clojure "1.12.6"]
+  :dependencies [[org.clojure/clojure "1.12.7"]
                  [org.clojure/data.json "2.5.2"]
                  [org.clojure/math.combinatorics "0.3.2"]
                  [ring/ring-core "1.15.6"]
@@ -27,8 +27,8 @@
                  [com.stuartsierra/component "1.2.0"]
                  [hikari-cp "4.1.0"]
                  [migratus "1.6.8"]
-                 [org.clojure/tools.logging "1.3.1"]
-                 [ch.qos.logback/logback-classic "1.6.6"]
+                 [org.clojure/tools.logging "1.3.2"]
+                 [ch.qos.logback/logback-classic "1.6.8"]
                  [org.slf4j/slf4j-api "2.0.20"]]
   :main ^:skip-aot api-peladaapp.core
   :plugins [[lein-ring "0.12.6"]
